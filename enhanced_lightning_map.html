@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Lightning Strike Visualiser⚡</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      background: #f4f7fa;
+    }
+    h2 {
+      margin: 10px 20px;
+      color: #1a2a44;
+      font-weight: 600;
+    }
+    #map { 
+      height: calc(100vh - 220px); 
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin: 0 20px;
+    }
+    .controls {
+      padding: 15px;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin: 10px 20px;
+    }
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.9em;
+      color: #1a2a44;
+      font-weight: 500;
+    }
+    .controls input, .controls select, .controls button {
+      margin-top: 5px;
+      padding: 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.9em;
+      transition: all 0.2s;
+    }
+    .controls input[type="checkbox"] {
+      margin-top: 5px;
+    }
+    .controls input[type="number"] {
+      width: 80px;
+    }
+    .controls button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      cursor: pointer;
+      padding: 8px 16px;
+    }
+    .controls button:hover {
+      background: #2563eb;
+    }
+    .animator {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: #ffffff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 1001;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .animator button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .animator button:hover {
+      background: #2563eb;
+    }
+    .slider {
+      width: 200px;
+    }
+    .speed-slider {
+      width: 100px;
+    }
+    .status {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.9);
+      padding: 8px 15px;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      font-size: 0.9em;
+      color: #1a2a44;
+      z-index: 1001;
+    }
+    .legend {
+      position: absolute;
+      top: 60px;
+      right: 20px;
+      background: rgba(255,255,255,0.95);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      font-size: 0.9em;
+      color: #1a2a44;
+      z-index: 1000;
+      max-width: 200px;
+    }
+    .legend h4 {
+      margin: 0 0 10px;
+      font-weight: 600;
+    }
+    .legend div {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .color-box {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      border-radius: 4px;
+    }
+    .gradient-bar {
+      width: 100%;
+      height: 20px;
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1002;
+    }
+    .modal button {
+      margin: 10px 5px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .modal button.yes {
+      background: #3b82f6;
+      color: white;
+    }
+    .modal button.no {
+      background: #e5e7eb;
+      color: #1a2a44;
+    }
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1001;
+    }
+    #map.dropzone {
+      border: 2px dashed #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+    }
+    .fullscreen #map {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .fullscreen .controls,
+    .fullscreen h2 {
+      display: none;
+    }
+    .fullscreen .animator {
+      bottom: 10px;
+      left: 10px;
+    }
+    .fullscreen .status {
+      top: 10px;
+      right: 10px;
+    }
+    .fullscreen .legend {
+      top: 50px;
+      right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Lightning Strike Visualiser ⚡</h2>
+  <div class="controls">
+    <label>Start Time: <input type="datetime-local" id="start-time"></label>
+    <label>End Time: <input type="datetime-local" id="end-time"></label>
+    <button onclick="applyFilter()">Apply Filter</button>
+    <label>Color by age: <input type="checkbox" id="color-mode" checked></label>
+    <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"></label>
+    <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"></label>
+    <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"></label>
+    <label>KML Layer: <input type="checkbox" id="kml-layer-toggle" onchange="toggleKMLLayer()"></label>
+    <label>PNG Layer: <input type="checkbox" id="png-layer-toggle" onchange="togglePNGLayer()"></label>
+    <label>Density: <input type="range" id="density-slider" min="1" max="100" value="10" onchange="updateOverlay(currentFiltered)"></label>
+    <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="15" onchange="updateHeatmap(currentFiltered)"></label>
+    <label>PNG Opacity: <input type="range" id="png-opacity-slider" min="0" max="1" step="0.1" value="0.8" onchange="updatePNGOpacity()"></label>
+    <label>KML File: <input type="file" id="kml-file" accept=".kml" onchange="importKML(this)"></label>
+    <label>PNG File: <input type="file" id="png-file" accept=".png" onchange="importPNG(this)"></label>
+    <label>Map Style:
+      <select id="map-style" onchange="switchBaseMap(this.value)">
+        <option value="mapbox" selected>Mapbox (Handry Outlook)</option>
+        <option value="custom">Custom Map Style</option>
+        <option value="osm">OpenStreetMap</option>
+        <option value="opentopo">OpenTopoMap</option>
+        <option value="esri">Esri World Imagery</option>
+      </select>
+    </label>
+    <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked></label>
+    <label>Lightning Z-Index: <input type="number" id="lightning-zindex" value="1000" min="0" onchange="updateZIndex()"></label>
+    <label>Heatmap Z-Index: <input type="number" id="heatmap-zindex" value="900" min="0" onchange="updateZIndex()"></label>
+    <label>KML Z-Index: <input type="number" id="kml-zindex" value="1100" min="0" onchange="updateZIndex()"></label>
+    <label>PNG Z-Index: <input type="number" id="png-zindex" value="1000" min="0" onchange="updateZIndex()"></label>
+    <label>Numbers Z-Index: <input type="number" id="numbers-zindex" value="1200" min="0" onchange="updateZIndex()"></label>
+  </div>
+  <div id="map"></div>
+  <div class="animator">
+    <button onclick="playAnimation()">▶️ Play</button>
+    <button onclick="stopAnimation()">⏹️ Stop</button>
+    <button onclick="toggleFullScreen()">⛶ Fullscreen</button>
+    <input type="range" id="time-slider" class="slider" min="0" max="100" value="0" oninput="sliderSeek()">
+    <label>Speed: <input type="range" id="speed-slider" class="speed-slider" min="0.5" max="5" step="0.5" value="1"></label>
+  </div>
+  <div id="status" class="status"></div>
+  <div id="legend" class="legend"></div>
+  <div id="modal" class="modal">
+    <p>Do you want to automatically adjust the time filter based on the file's timestamp?</p>
+    <button class="yes" onclick="confirmAutoTimeFilter(true)">Yes</button>
+    <button class="no" onclick="confirmAutoTimeFilter(false)">No</button>
+  </div>
+  <div id="overlay" class="overlay"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/togeojson@0.16.0"></script>
+
+  <script>
+    const risk_colors = {
+      'Low risk': '#5aac91',
+      'Slight risk': '#ffff00',
+      'Enhanced risk': '#ffa500',
+      'Moderate risk': '#ff0000',
+      'High risk': '#800080'
+    };
+
+    const region_bounds = {
+      "England": [[47.7, -21.1], [57.075, 9.95]],
+      "Wales": [[51.4, -5.3], [53.4, -2.8]],
+      "Scotland": [[54.6, -7.5], [60.8, -0.7]],
+      "Northern Ireland": [[54.0, -8.2], [55.3, -5.4]],
+      "Ireland and Northern Ireland": [[49.98, -21.65], [56.25, 1.075]],
+      "UK": [[47.8, -32.6], [61.3, 15.8]]
+    };
+
+    let baseLayers = {
+      mapbox: L.tileLayer('https://api.mapbox.com/styles/v1/handry-outlook/cm9457ty1009d01sk37353ux2/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiaGFuZHJ5LW91dGxvb2siLCJhIjoiY2xrbnNrbmVlMXo0NDNqa2d3MTY2NW90bCJ9.AJbccNwtKvKA8il3JkE3PA', {
+        tileSize: 512,
+        zoomOffset: -1,
+        attribution: '© Mapbox © OpenStreetMap',
+        maxZoom: 18
+      }),
+      custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiaGFuZHJ5LW91dGxvb2siLCJhIjoiY2xrbnNrbmVlMXo0NDNqa2d3MTY2NW90bCJ9.AJbccNwtKvKA8il3JkE3PA', {
+        tileSize: 512,
+        zoomOffset: -1,
+        attribution: '© Mapbox © OpenStreetMap',
+        maxZoom: 18
+      }),
+      osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }),
+      opentopo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17,
+        attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
+      }),
+      esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles © Esri'
+      })
+    };
+
+    const map = L.map('map', { layers: [baseLayers.mapbox] }).setView([57.5, -4.5], 6);
+
+    let strikeData = [];
+    let strikeLayer = L.layerGroup().addTo(map);
+    let heatmapLayer = null;
+    let numberOverlay = null;
+    let animationInterval = null;
+    let animationIndex = 0;
+    let animationSteps = 100;
+    let currentFiltered = [];
+    let animationStart, animationEnd;
+    let kmlLayer = null;
+    let pngLayer = null;
+    let isPlaying = false;
+    let strikeCircles = [];
+    let pendingFile = null;
+    let pendingFileType = null;
+    let isFullScreen = false;
+
+    function parseDateFromFilename(filename) {
+      const regex = /(\d{2})(\d{2})(\d{4})_(\d{2})(\d{2})__(\d{2})(\d{2})(\d{4})_(\d{2})(\d{2})|(\d{2})(\d{2})(\d{4})\s+(\d{2})(\d{2})\s+-\s+(\d{2})(\d{2})(\d{4})\s+(\d{2})(\d{2})/;
+      const match = filename.match(regex);
+      if (!match) return null;
+
+      let startDate, endDate;
+      if (match[1]) {
+        startDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4]}:${match[5]}:00Z`);
+        endDate = new Date(`${match[8]}-${match[7]}-${match[6]}T${match[9]}:${match[10]}:00Z`);
+      } else {
+        startDate = new Date(`${match[13]}-${match[12]}-${match[11]}T${match[14]}:${match[15]}:00Z`);
+        endDate = new Date(`${match[18]}-${match[17]}-${match[16]}T${match[19]}:${match[20]}:00Z`);
+      }
+
+      return { startDate, endDate };
+    }
+
+    function showTimeFilterModal(file, type) {
+      pendingFile = file;
+      pendingFileType = type;
+      const modal = document.getElementById('modal');
+      const overlay = document.getElementById('overlay');
+      modal.style.display = 'block';
+      overlay.style.display = 'block';
+    }
+
+    function confirmAutoTimeFilter(confirm) {
+      const modal = document.getElementById('modal');
+      const overlay = document.getElementById('overlay');
+      modal.style.display = 'none';
+      overlay.style.display = 'none';
+
+      if (!pendingFile || !pendingFileType) {
+        console.warn('No pending file or file type set.');
+        return;
+      }
+
+      if (confirm && document.getElementById('auto-time-filter').checked) {
+        const dates = parseDateFromFilename(pendingFile.name);
+        if (dates && !isNaN(dates.startDate) && !isNaN(dates.endDate)) {
+          document.getElementById('start-time').value = dates.startDate.toISOString().slice(0, 16);
+          document.getElementById('end-time').value = dates.endDate.toISOString().slice(0, 16);
+          applyFilter();
+        }
+      }
+
+      if (pendingFileType === 'kml') {
+        importKML({ files: [pendingFile] });
+      } else if (pendingFileType === 'png') {
+        importPNG({ files: [pendingFile] });
+      }
+
+      pendingFile = null;
+      pendingFileType = null;
+    }
+
+    async function fetchData() {
+      const githubUrl = 'https://raw.githubusercontent.com/HandryOutlook/lightning_data/main/lightning_data.json';
+      const metOfficeUrl = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning';
+
+      try {
+        const [githubResponse, metOfficeResponse] = await Promise.all([
+          fetch(githubUrl).then(res => res.json()).catch(() => null),
+          fetch(metOfficeUrl).then(res => res.json()).catch(() => null)
+        ]);
+
+        let githubStrikes = [];
+        let metOfficeStrikes = [];
+
+        if (githubResponse && githubResponse.lightning_strikes) {
+          githubStrikes = githubResponse.lightning_strikes.map(s => ({
+            ...s,
+            time: new Date(s.strike_time)
+          }));
+        } else {
+          console.warn('Failed to fetch or parse GitHub lightning data.');
+        }
+
+        if (metOfficeResponse && metOfficeResponse.lightning_strikes) {
+          metOfficeStrikes = metOfficeResponse.lightning_strikes.map(s => ({
+            ...s,
+            time: new Date(s.strike_time)
+          }));
+        } else {
+          console.warn('Failed to fetch or parse Met Office lightning data.');
+        }
+
+        const allStrikes = [...githubStrikes, ...metOfficeStrikes];
+        const seen = new Map();
+        strikeData = [];
+
+        allStrikes.forEach(s => {
+          const key = `${s.strike_time}_${s.coordinates[0]}_${s.coordinates[1]}`;
+          if (!seen.has(key)) {
+            seen.set(key, true);
+            strikeData.push(s);
+          }
+        });
+
+        console.log(`Loaded ${strikeData.length} unique strikes after deduplication.`);
+        applyFilter();
+      } catch (error) {
+        console.error('Error fetching lightning data:', error);
+        strikeData = [];
+        applyFilter();
+      }
+    }
+
+    function getColorFromAge(ageFraction) {
+      if (ageFraction < 0.2) return '#ffd700';
+      if (ageFraction < 0.4) return '#ff69b4';
+      if (ageFraction < 0.6) return '#ff00ff';
+      if (ageFraction < 0.8) return '#800080';
+      return '#4b0082';
+    }
+
+    function updateLegend() {
+      const legend = document.getElementById('legend');
+      legend.innerHTML = '';
+      const colorMode = document.getElementById('color-mode').checked;
+      const heatmapEnabled = document.getElementById('heatmap-toggle').checked;
+      const lightningEnabled = document.getElementById('lightning-layer-toggle').checked;
+      const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
+      const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
+
+      if (lightningEnabled) {
+        legend.innerHTML += '<h4>Lightning Strikes</h4>';
+        if (colorMode) {
+          legend.innerHTML += `
+            <div><div class="color-box" style="background: #ffd700"></div>Newest</div>
+            <div><div class="color-box" style="background: #ff69b4"></div></div>
+            <div><div class="color-box" style="background: #ff00ff"></div></div>
+            <div><div class="color-box" style="background: #800080"></div></div>
+            <div><div class="color-box" style="background: #4b0082"></div>Oldest</div>
+          `;
+        } else {
+          legend.innerHTML += `
+            <div><div class="color-box" style="background: black"></div>Strikes</div>
+          `;
+        }
+      }
+
+      if (heatmapEnabled) {
+        legend.innerHTML += `
+          <h4>Heatmap Intensity</h4>
+          <div style="background: linear-gradient(to right, #4b0082, #00b7eb, #ffd700); margin-top: 5px" class="gradient-bar"></div>
+          <div style="display: flex; justify-content: space-between; margin-top: 5px">
+            <span>Low</span><span>High</span>
+          </div>
+        `;
+      }
+
+      if (kmlEnabled && kmlLayer) {
+        legend.innerHTML += '<h4>Risk Levels</h4>';
+        Object.entries(risk_colors).forEach(([name, color]) => {
+          legend.innerHTML += `
+            <div><div class="color-box" style="background: ${color}"></div>${name}</div>
+          `;
+        });
+      }
+
+      legend.style.display = legend.innerHTML ? 'block' : 'none';
+    }
+
+    function applyFilter() {
+      const startInput = document.getElementById('start-time').value;
+      const endInput = document.getElementById('end-time').value;
+
+      if (!startInput || !endInput) {
+        alert('Please select both start and end times.');
+        return;
+      }
+
+      const start = new Date(startInput);
+      const end = new Date(endInput);
+
+      if (isNaN(start) || isNaN(end)) {
+        alert('Invalid date/time format. Please ensure both times are valid.');
+        return;
+      }
+
+      strikeLayer.clearLayers();
+      strikeCircles = [];
+      currentFiltered = strikeData.filter(s => s.time >= start && s.time <= end);
+      animationStart = start;
+      animationEnd = end;
+
+      currentFiltered.forEach(s => {
+        const ageFraction = (end - s.time) / (end - start);
+        const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
+        const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+          radius: 5,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.8
+        }).bindPopup(s.time.toISOString());
+        strikeLayer.addLayer(circle);
+        strikeCircles.push({ circle, strike: s });
+      });
+
+      updateHeatmap(currentFiltered);
+      updateOverlay(currentFiltered);
+      document.getElementById('status').innerText = `Showing strikes from ${start.toISOString()} to ${end.toISOString()}`;
+      updateZIndex();
+      updateLegend();
+    }
+
+    function updateHeatmap(filtered) {
+      const data = filtered.map(s => [s.coordinates[1], s.coordinates[0], 1]);
+      const blur = parseInt(document.getElementById('blur-slider').value);
+      if (heatmapLayer) map.removeLayer(heatmapLayer);
+
+      heatmapLayer = L.heatLayer(data, {
+        radius: 25,
+        blur: blur,
+        maxZoom: 10,
+        gradient: {
+          0.0: '#4b0082',
+          0.5: '#00b7eb',
+          1.0: '#ffd700'
+        }
+      });
+
+      if (document.getElementById('heatmap-toggle').checked) heatmapLayer.addTo(map);
+      updateZIndex();
+      updateLegend();
+    }
+
+    function toggleHeatmap() {
+      if (document.getElementById('heatmap-toggle').checked) {
+        if (heatmapLayer) heatmapLayer.addTo(map);
+      } else {
+        if (heatmapLayer) map.removeLayer(heatmapLayer);
+      }
+      updateZIndex();
+      updateLegend();
+    }
+
+    function toggleLightningLayer() {
+      const toggle = document.getElementById('lightning-layer-toggle').checked;
+      if (toggle) {
+        if (!map.hasLayer(strikeLayer)) map.addLayer(strikeLayer);
+      } else {
+        map.removeLayer(strikeLayer);
+      }
+      updateZIndex();
+      updateLegend();
+    }
+
+    function toggleKMLLayer() {
+      const toggle = document.getElementById('kml-layer-toggle').checked;
+      if (toggle) {
+        if (kmlLayer && !map.hasLayer(kmlLayer)) {
+          map.addLayer(kmlLayer);
+          map.invalidateSize();
+        }
+      } else {
+        if (kmlLayer) map.removeLayer(kmlLayer);
+      }
+      updateZIndex();
+      updateLegend();
+    }
+
+    function togglePNGLayer() {
+      const toggle = document.getElementById('png-layer-toggle').checked;
+      if (toggle) {
+        if (pngLayer && !map.hasLayer(pngLayer)) {
+          map.addLayer(pngLayer);
+          map.invalidateSize();
+        }
+      } else {
+        if (pngLayer) map.removeLayer(pngLayer);
+      }
+      updateZIndex();
+      updateLegend();
+    }
+
+    function updateZIndex() {
+      const lightningZ = parseInt(document.getElementById('lightning-zindex').value) || 1000;
+      const heatmapZ = parseInt(document.getElementById('heatmap-zindex').value) || 900;
+      const kmlZ = parseInt(document.getElementById('kml-zindex').value) || 1100;
+      const pngZ = parseInt(document.getElementById('png-zindex').value) || 1000;
+      const numbersZ = parseInt(document.getElementById('numbers-zindex').value) || 1200;
+
+      if (strikeLayer && map.hasLayer(strikeLayer)) {
+        strikeLayer.setZIndex(lightningZ);
+      }
+      if (heatmapLayer && map.hasLayer(heatmapLayer)) {
+        if (heatmapLayer._canvas) {
+          heatmapLayer._canvas.style.zIndex = heatmapZ;
+        }
+      }
+      if (kmlLayer && map.hasLayer(kmlLayer)) {
+        kmlLayer.setZIndex(kmlZ);
+      }
+      if (pngLayer && map.hasLayer(pngLayer)) {
+        pngLayer.setZIndex(pngZ);
+      }
+      if (numberOverlay && map.hasLayer(numberOverlay)) {
+        numberOverlay.setZIndex(numbersZ);
+      }
+    }
+
+    function updateOverlay(filtered) {
+      if (numberOverlay) map.removeLayer(numberOverlay);
+      if (!document.getElementById('number-overlay-toggle').checked) return;
+
+      const density = parseInt(document.getElementById('density-slider').value);
+      const UK_BBOX = [-15, 49, 8, 61];
+      const [minLng, minLat, maxLng, maxLat] = UK_BBOX;
+
+      const latStep = (maxLat - minLat) / density;
+      const lngStep = (maxLng - minLng) / density;
+      const grid = new Map();
+
+      for (let i = 0; i < density; i++) {
+        for (let j = 0; j < density; j++) {
+          const key = `${i}_${j}`;
+          grid.set(key, 0);
+        }
+      }
+
+      filtered.forEach(s => {
+        const lat = s.coordinates[1];
+        const lng = s.coordinates[0];
+        if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) return;
+        const i = Math.floor((lat - minLat) / latStep);
+        const j = Math.floor((lng - minLng) / lngStep);
+        const key = `${i}_${j}`;
+        if (grid.has(key)) grid.set(key, grid.get(key) + 1);
+      });
+
+      numberOverlay = L.layerGroup();
+      grid.forEach((count, key) => {
+        const [i, j] = key.split('_').map(Number);
+        const cellLat = minLat + (i + 0.5) * latStep;
+        const cellLng = minLng + (j + 0.5) * lngStep;
+        const label = L.marker([cellLat, cellLng], {
+          icon: L.divIcon({
+            className: 'text-labels',
+            html: `<b style="font-size:12px">${count}</b>`,
+            iconSize: [30, 20],
+            iconAnchor: [15, 10]
+          })
+        });
+        numberOverlay.addLayer(label);
+      });
+
+      numberOverlay.addTo(map);
+      updateZIndex();
+    }
+
+    function importKML(input) {
+      if (!input.files || !input.files[0]) {
+        alert('No KML file selected.');
+        return;
+      }
+
+      const file = input.files[0];
+      if (document.getElementById('auto-time-filter').checked && !pendingFile) {
+        showTimeFilterModal(file, 'kml');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parser = new DOMParser();
+          const kml = parser.parseFromString(e.target.result, 'text/xml');
+          const geojson = toGeoJSON.kml(kml);
+          if (kmlLayer) map.removeLayer(kmlLayer);
+
+          kmlLayer = L.geoJSON(geojson, {
+            style: function(feature) {
+              const name = feature.properties.name || '';
+              if (risk_colors[name]) {
+                return {
+                  color: risk_colors[name],
+                  fillColor: risk_colors[name],
+                  fillOpacity: 0.3
+                };
+              } else {
+                return {
+                  color: 'black',
+                  fillOpacity: 0
+                };
+              }
+            },
+            onEachFeature: (f, l) => {
+              if (f.properties.name) l.bindPopup(f.properties.name);
+            }
+          });
+
+          kmlLayer.addTo(map);
+          document.getElementById('kml-layer-toggle').checked = true;
+          map.invalidateSize();
+          updateZIndex();
+          updateLegend();
+        } catch (error) {
+          console.error('Error processing KML file:', error);
+          alert('Failed to process KML file. Please ensure it is valid.');
+        }
+      };
+      reader.onerror = function() {
+        console.error('Error reading KML file.');
+        alert('Error reading KML file.');
+      };
+      reader.readAsText(file);
+    }
+
+    function importPNG(input) {
+      if (!input.files || !input.files[0]) {
+        alert('No PNG file selected.');
+        return;
+      }
+
+      const file = input.files[0];
+      if (document.getElementById('auto-time-filter').checked && !pendingFile) {
+        showTimeFilterModal(file, 'png');
+        return;
+      }
+
+      const region = Object.keys(region_bounds).find(r => file.name.includes(r));
+      if (!region) {
+        console.error('Region not recognized in filename:', file.name);
+        alert('Region not recognized in filename. Please include a region like "England".');
+        return;
+      }
+
+      const [[south, west], [north, east]] = region_bounds[region];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          if (pngLayer) map.removeLayer(pngLayer);
+          const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
+          pngLayer = L.imageOverlay(e.target.result, [[south, west], [north, east]], { opacity });
+
+          pngLayer.addTo(map);
+          document.getElementById('png-layer-toggle').checked = true;
+          map.fitBounds([[south, west], [north, east]]);
+          map.invalidateSize();
+          updateZIndex();
+          updateLegend();
+        } catch (error) {
+          console.error('Error processing PNG file:', error);
+          alert('Failed to process PNG file. Please ensure it is valid.');
+        }
+      };
+      reader.onerror = function() {
+        console.error('Error reading PNG file.');
+        alert('Error reading PNG file.');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function updatePNGOpacity() {
+      const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
+      if (pngLayer) {
+        pngLayer.setOpacity(opacity);
+      }
+    }
+
+    function switchBaseMap(style) {
+      Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+      if (baseLayers[style]) {
+        baseLayers[style].addTo(map);
+      } else {
+        baseLayers.mapbox.addTo(map);
+      }
+      map.invalidateSize();
+    }
+
+    function playAnimation() {
+      if (isPlaying) return;
+      isPlaying = true;
+      const colorMode = document.getElementById('color-mode').checked;
+      const speed = parseFloat(document.getElementById('speed-slider').value);
+      const interval = 300 / speed;
+
+      animationInterval = setInterval(() => {
+        if (animationIndex > animationSteps) {
+          stopAnimation();
+          return;
+        }
+
+        const currentTime = new Date(animationStart.getTime() + ((animationEnd - animationStart) * animationIndex / animationSteps));
+        document.getElementById('time-slider').value = animationIndex;
+        document.getElementById('status').innerText = `Animating strikes at ${currentTime.toISOString()}`;
+
+        if (colorMode) {
+          strikeCircles.forEach(({ circle, strike }) => {
+            const ageFraction = (currentTime - strike.time) / (animationEnd - animationStart);
+            const color = ageFraction > 1 ? '#4b0082' : getColorFromAge(ageFraction);
+            circle.setStyle({
+              color: color,
+              fillColor: color,
+              fillOpacity: 0.8
+            });
+          });
+        }
+
+        const slice = currentFiltered.filter(s => 
+          s.time <= currentTime && 
+          s.time > new Date(currentTime.getTime() - (animationEnd - animationStart) / animationSteps)
+        );
+
+        slice.forEach(s => {
+          if (!strikeCircles.some(sc => sc.strike === s)) {
+            const color = colorMode ? getColorFromAge(0) : 'black';
+            const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+              radius: 5,
+              color: color,
+              fillColor: color,
+              fillOpacity: 0.8
+            }).bindPopup(s.time.toISOString());
+            strikeLayer.addLayer(circle);
+            strikeCircles.push({ circle, strike: s });
+          }
+        });
+
+        animationIndex++;
+      }, interval);
+    }
+
+    function stopAnimation() {
+      if (animationInterval) clearInterval(animationInterval);
+      animationInterval = null;
+      isPlaying = false;
+    }
+
+    function sliderSeek() {
+      stopAnimation();
+      animationIndex = parseInt(document.getElementById('time-slider').value);
+      const colorMode = document.getElementById('color-mode').checked;
+      const currentTime = new Date(animationStart.getTime() + ((animationEnd - animationStart) * animationIndex / animationSteps));
+      document.getElementById('status').innerText = `Animating strikes at ${currentTime.toISOString()}`;
+
+      strikeLayer.clearLayers();
+      strikeCircles = [];
+
+      const slice = currentFiltered.filter(s => s.time <= currentTime);
+      slice.forEach(s => {
+        const color = colorMode ? getColorFromAge((currentTime - s.time) / (animationEnd - animationStart)) : 'black';
+        const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+          radius: 5,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.8
+        }).bindPopup(s.time.toISOString());
+        strikeLayer.addLayer(circle);
+        strikeCircles.push({ circle, strike: s });
+      });
+    }
+
+    function toggleFullScreen() {
+      if (!isFullScreen) {
+        document.documentElement.requestFullscreen().then(() => {
+          document.body.classList.add('fullscreen');
+          isFullScreen = true;
+          document.querySelector('.animator button[onclick="toggleFullScreen()"]').innerText = '🛗 Exit Fullscreen';
+          map.invalidateSize();
+        }).catch(err => {
+          console.error('Fullscreen request failed:', err);
+          alert('Failed to enter fullscreen mode.');
+        });
+      } else {
+        document.exitFullscreen().then(() => {
+          document.body.classList.remove('fullscreen');
+          isFullScreen = false;
+          document.querySelector('.animator button[onclick="toggleFullScreen()"]').innerText = '⛶ Fullscreen';
+          map.invalidateSize();
+        }).catch(err => {
+          console.error('Exit fullscreen failed:', err);
+          alert('Failed to exit fullscreen mode.');
+        });
+      }
+    }
+
+    const mapDiv = document.getElementById('map');
+    mapDiv.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      mapDiv.classList.add('dropzone');
+    });
+
+    mapDiv.addEventListener('dragleave', () => {
+      mapDiv.classList.remove('dropzone');
+    });
+
+    mapDiv.addEventListener('drop', (e) => {
+      e.preventDefault();
+      mapDiv.classList.remove('dropzone');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+
+      if (file.name.endsWith('.kml')) {
+        if (document.getElementById('auto-time-filter').checked) {
+          showTimeFilterModal(file, 'kml');
+        } else {
+          importKML({ files: [file] });
+        }
+      } else if (file.name.endsWith('.png')) {
+        if (document.getElementById('auto-time-filter').checked) {
+          showTimeFilterModal(file, 'png');
+        } else {
+          importPNG({ files: [file] });
+        }
+      } else {
+        alert('Unsupported file format. Please upload a .kml or .png file.');
+      }
+    });
+
+    fetchData();
+  </script>
+</body>
+</html>
