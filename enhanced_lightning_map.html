@@ -54,7 +54,7 @@
     .controls input[type="number"] {
       width: 60px;
     }
-    .controls button {
+    .controls button, #remove-filter {
       background: #3b82f6;
       color: white;
       border: none;
@@ -63,7 +63,7 @@
       font-size: 0.8em;
       border-radius: 4px;
     }
-    .controls button:hover {
+    .controls button:hover, #remove-filter:hover {
       background: #2563eb;
     }
     .time-slider-container {
@@ -240,6 +240,7 @@
     <label>Start Time: <input type="datetime-local" id="start-time"></label>
     <label>End Time: <input type="datetime-local" id="end-time"></label>
     <button onclick="applyFilter()">Apply Filter</button>
+    <button id="remove-filter" onclick="removeTimeFilter()" style="display: none;">Remove Time Filter</button>
     <label>Color by age: <input type="checkbox" id="color-mode" checked onchange="updateStrikeColors()"></label>
     <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"></label>
     <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"></label>
@@ -254,7 +255,7 @@
       </select>
     </label>
     <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked></label>
-    <label>Density: <input type="range" id="density-slider" min="1" max="100" value="50onchange="updateOverlay(currentFiltered)"></label>
+    <label>Density: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"></label>
     <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"></label>
     <label>Auto-refresh every:
       <select id="refresh-interval" onchange="setRefreshInterval()">
@@ -429,10 +430,12 @@
     }
 
     function updateHistorySliderMax() {
-      const maxHours = parseInt(document.getElementById('max-history-hours').value) || 48;
-      document.getElementById('history-slider').max = maxHours * 60;
-      document.getElementById('history-slider').value = maxHours * 60;
-      updateHistory();
+      if (lastFilterMode === 'slider') {
+        const maxHours = parseInt(document.getElementById('max-history-hours').value) || 48;
+        document.getElementById('history-slider').max = maxHours * 60;
+        document.getElementById('history-slider').value = maxHours * 60;
+        updateHistory();
+      }
     }
 
     function formatTimeAgo(minutesBack) {
@@ -446,50 +449,98 @@
     }
 
     function updateHistory() {
-      isAdjustingHistory = true;
+  isAdjustingHistory = true;
+  const slider = document.getElementById('history-slider');
+  const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+  let start, end, sliderMax, sliderValue, minutesBack;
+
+  if (lastFilterMode === 'inputs') {
+    // Use custom time filter range
+    const startInput = document.getElementById('start-time').value;
+    const endInput = document.getElementById('end-time').value;
+    const filterStart = new Date(startInput);
+    const filterEnd = new Date(endInput);
+
+    if (isNaN(filterStart) || isNaN(filterEnd)) {
+      console.error('Invalid custom date/time format.');
+      isAdjustingHistory = false;
+      return;
+    }
+
+    // Calculate total minutes in the custom range
+    const totalMinutes = (filterEnd - filterStart) / (60 * 1000);
+    sliderMax = Math.max(totalMinutes, lifespanHours * 60); // Ensure at least lifespan duration
+    sliderValue = parseInt(slider.value) || sliderMax;
+    minutesBack = sliderMax - sliderValue;
+
+    // Adjust start and end based on slider position
+    end = new Date(filterStart.getTime() + sliderValue * 60 * 1000);
+    start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
+
+    // Update slider attributes
+    slider.max = sliderMax;
+    slider.min = 0;
+    slider.value = sliderValue;
+
+    document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
+    document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+  } else {
+    // Use Max History range
+    const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+    sliderMax = maxMinutes;
+    sliderValue = parseInt(slider.value) || maxMinutes;
+    minutesBack = maxMinutes - sliderValue;
+
+    const now = new Date();
+    end = new Date(now.getTime() - minutesBack * 60 * 1000);
+    start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
+
+    // Update slider attributes
+    slider.max = maxMinutes;
+    slider.min = 0;
+    slider.value = sliderValue;
+
+    document.getElementById('start-time').value = start.toISOString().slice(0, 16);
+    document.getElementById('end-time').value = end.toISOString().slice(0, 16);
+    document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
+    document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+    document.getElementById('remove-filter').style.display = 'none';
+  }
+
+  animationStart = start;
+  animationEnd = end;
+
+  strikeLayer.clearLayers();
+  strikeCircles = [];
+
+  currentFiltered = strikeData.filter(s => s.time >= start && s.time <= end);
+
+  currentFiltered.forEach(s => {
+    const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
+    const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
+    const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+      radius: 5,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.8
+    }).bindPopup(s.time.toISOString());
+    strikeLayer.addLayer(circle);
+    strikeCircles.push({ circle, strike: s });
+  });
+
+  updateHeatmap(currentFiltered);
+  updateOverlay(currentFiltered);
+  updateZIndex();
+  updateLegend();
+
+  setTimeout(() => { isAdjustingHistory = false; }, 1000);
+}
+
+    function removeTimeFilter() {
       lastFilterMode = 'slider';
-      const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
-      const sliderValue = parseInt(document.getElementById('history-slider').value);
-      const minutesBack = maxMinutes - sliderValue;
-      const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
-
-      const now = new Date();
-      const end = new Date(now.getTime() - minutesBack * 60 * 1000);
-      const start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
-
-      document.getElementById('start-time').value = start.toISOString().slice(0, 16);
-      document.getElementById('end-time').value = end.toISOString().slice(0, 16);
-
-      document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
-      document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
-
-      animationStart = start;
-      animationEnd = end;
-
-      strikeLayer.clearLayers();
-      strikeCircles = [];
-
-      currentFiltered = strikeData.filter(s => s.time >= start && s.time <= end);
-
-      currentFiltered.forEach(s => {
-        const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
-        const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
-        const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
-          radius: 5,
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.8
-        }).bindPopup(s.time.toISOString());
-        strikeLayer.addLayer(circle);
-        strikeCircles.push({ circle, strike: s });
-      });
-
-      updateHeatmap(currentFiltered);
-      updateOverlay(currentFiltered);
-      updateZIndex();
-      updateLegend();
-
-      setTimeout(() => { isAdjustingHistory = false; }, 1000);
+      document.getElementById('remove-filter').style.display = 'none';
+      document.getElementById('auto-latest').checked = true;
+      toggleAutoLatest();
     }
 
     function setRefreshInterval() {
@@ -511,6 +562,7 @@
         document.getElementById('history-slider').value = maxMinutes;
         document.getElementById('history-label').innerText = 'Now';
         lastFilterMode = 'slider';
+        document.getElementById('remove-filter').style.display = 'none';
         updateHistory();
       }
     }
@@ -610,7 +662,7 @@
         if (lastFilterMode === 'slider') {
           updateHistory();
         } else {
-          applyFilter();
+          applyyrinthFilter();
         }
       } catch (error) {
         console.error('Error fetching lightning data:', error);
@@ -703,6 +755,13 @@
         return;
       }
 
+      // Update slider for custom range
+      const totalMinutes = (end - start) / (60 * 1000);
+      const slider = document.getElementById('history-slider');
+      slider.max = Math.max(totalMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
+      slider.value = totalMinutes;
+      slider.min = 0;
+
       strikeLayer.clearLayers();
       strikeCircles = [];
       currentFiltered = strikeData.filter(s => s.time >= start && s.time <= end);
@@ -726,6 +785,9 @@
       updateHeatmap(currentFiltered);
       updateOverlay(currentFiltered);
       document.getElementById('time-range').innerText = `Showing strikes from ${start.toISOString()} to ${end.toISOString()}`;
+      document.getElementById('history-label').innerText = formatTimeAgo(0);
+      document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+      document.getElementById('remove-filter').style.display = 'block';
       updateZIndex();
       updateLegend();
     }
@@ -766,6 +828,7 @@
         document.getElementById('start-time').value = start.toISOString().slice(0, 16);
         document.getElementById('end-time').value = now.toISOString().slice(0, 16);
         lastFilterMode = 'slider';
+        document.getElementById('remove-filter').style.display = 'none';
         updateHistory();
       }
     }
@@ -779,7 +842,7 @@
         radius: 25,
         blur: blur,
         maxZoom: 10,
-	minZoom: 10,
+        minZoom: 10,
         gradient: { 0.0: '#001219',0.1: '#001219', 0.2:'#0A9396', 0.3:'#94D2BD', 0.4:'#E9D8A6', 0.5: '#c89578',0.6:'#EE9B00',0.7:'#CA6702',0.8:'#BB3E03',0.9:'#AE2012',  1.0: '#9B2226'}
       });
 
@@ -939,7 +1002,7 @@
           });
 
           kmlLayer.addTo(map);
-          kmlLayer.setZIndex(60); // Set KML layer below lightning strikes (default 1000)
+          kmlLayer.setZIndex(60);
           document.getElementById('kml-layer-toggle').checked = true;
           document.getElementById('kml-zindex').value = 60;
           updateZIndex();
@@ -1010,31 +1073,31 @@
       document.getElementById('speed-slider').value = sliderValue;
     }
 
-    function playAnimation() {
-      if (isPlaying) return;
-      isPlaying = true;
-      const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
-      const maxMinutes = parseInt(document.getElementById('history-slider').max);
-      const minutesPerFrame = minutesPerSecond*1;
-      const interval = 10;
-      let currentValue = 0;
+   function playAnimation() {
+  if (isPlaying) return;
+  isPlaying = true;
+  const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
+  const maxMinutes = parseInt(document.getElementById('history-slider').max);
+  const minutesPerFrame = minutesPerSecond * 1;
+  const interval = 10; // 1 second interval
+  let currentValue = parseInt(document.getElementById('history-slider').value) || 0; // Start from current slider position
 
-      document.getElementById('history-slider').value = currentValue;
-      lastFilterMode = 'slider';
+  lastFilterMode = 'slider';
+  document.getElementById('remove-filter').style.display = 'none';
+  updateHistory();
+
+  animationInterval = setInterval(() => {
+    currentValue += minutesPerFrame;
+    if (currentValue >= maxMinutes) {
+      stopAnimation();
+      document.getElementById('history-slider').value = maxMinutes;
       updateHistory();
-
-      animationInterval = setInterval(() => {
-        currentValue += minutesPerFrame;
-        if (currentValue >= maxMinutes) {
-          stopAnimation();
-          document.getElementById('history-slider').value = maxMinutes;
-          updateHistory();
-          return;
-        }
-        document.getElementById('history-slider').value = Math.min(currentValue, maxMinutes);
-        updateHistory();
-      }, interval);
+      return;
     }
+    document.getElementById('history-slider').value = Math.min(currentValue, maxMinutes);
+    updateHistory();
+  }, interval);
+}
 
     function stopAnimation() {
       if (animationInterval) clearInterval(animationInterval);
@@ -1083,10 +1146,43 @@
         alert('Unsupported file format. Use .kml or .png.');
       }
     });
+    document.getElementById('history-slider').addEventListener('input', () => {
+  if (isPlaying) {
+    // Stop the current animation interval
+    if (animationInterval) clearInterval(animationInterval);
+
+    // Get the new slider position
+    const newValue = parseInt(document.getElementById('history-slider').value);
+
+    // Restart the animation from the new position
+    isPlaying = true;
+    const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
+    const maxMinutes = parseInt(document.getElementById('history-slider').max);
+    const minutesPerFrame = minutesPerSecond * 1;
+    const interval = 10;
+    let currentValue = newValue; // Start from the new slider position
+
+    lastFilterMode = 'slider';
+    document.getElementById('remove-filter').style.display = 'none';
+    updateHistory();
+
+    animationInterval = setInterval(() => {
+      currentValue += minutesPerFrame;
+      if (currentValue >= maxMinutes) {
+        stopAnimation();
+        document.getElementById('history-slider').value = maxMinutes;
+        updateHistory();
+        return;
+      }
+      document.getElementById('history-slider').value = Math.min(currentValue, maxMinutes);
+      updateHistory();
+    }, interval);
+  }
+});
 
     updateHistorySliderMax();
     setRefreshInterval();
     fetchData();
   </script>
 </body>
-</html>
+</html> 
