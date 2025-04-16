@@ -297,7 +297,7 @@
       <button onclick="stopAnimation()">⏹️ Stop</button>
       <button onclick="toggleFullScreen()">⛶ Fullscreen</button>
       <label>Speed: <input type="range" id="speed-slider" class="speed-slider" min="0.0167" max="5" step="0.0167" value="1" oninput="updateSpeedTextbox()"></label>
-      <label>Minutes per frame: <input type="number" id="playback-minutes" class="playback-speed-input" min="0.01" step="0.01" value="1" oninput="updateSpeedSlider()"></label>
+      <label>Minutes per second: <input type="number" id="playback-minutes" class="playback-speed-input" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
     </div>
     <p id="time-range" class="status-info"></p>
     <p id="last-update" class="status-info"></p>
@@ -412,6 +412,9 @@
     let lastUpdateTime = null;
     let isAdjustingHistory = false;
     let lastFilterMode = 'slider';
+    let customFilterStart = null;
+    let customFilterEnd = null;
+    let showAllStrikes = false;
 
     function toggleExpertMode() {
       const expertControls = document.getElementById('expert-controls');
@@ -449,95 +452,94 @@
     }
 
     function updateHistory() {
-  isAdjustingHistory = true;
-  const slider = document.getElementById('history-slider');
-  const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
-  let start, end, sliderMax, sliderValue, minutesBack;
+      isAdjustingHistory = true;
+      const slider = document.getElementById('history-slider');
+      const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+      let start, end, sliderMax, sliderValue, minutesBack;
 
-  if (lastFilterMode === 'inputs') {
-    // Use custom time filter range
-    const startInput = document.getElementById('start-time').value;
-    const endInput = document.getElementById('end-time').value;
-    const filterStart = new Date(startInput);
-    const filterEnd = new Date(endInput);
+      if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+        const filterStart = new Date(customFilterStart);
+        const filterEnd = new Date(customFilterEnd);
 
-    if (isNaN(filterStart) || isNaN(filterEnd)) {
-      console.error('Invalid custom date/time format.');
-      isAdjustingHistory = false;
-      return;
+        if (isNaN(filterStart) || isNaN(filterEnd)) {
+          console.error('Invalid custom date/time format.');
+          isAdjustingHistory = false;
+          return;
+        }
+
+        const totalMinutes = (filterEnd - filterStart) / (60 * 1000);
+        sliderMax = Math.max(totalMinutes, lifespanHours * 60);
+        sliderValue = parseInt(slider.value) || sliderMax;
+        minutesBack = sliderMax - sliderValue;
+
+        end = new Date(filterStart.getTime() + sliderValue * 60 * 1000);
+        start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
+
+        slider.max = sliderMax;
+        slider.min = 0;
+        slider.value = sliderValue;
+
+        document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
+        document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+      } else {
+        const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+        sliderMax = maxMinutes;
+        sliderValue = parseInt(slider.value) || maxMinutes;
+        minutesBack = maxMinutes - sliderValue;
+
+        const now = new Date();
+        end = new Date(now.getTime() - minutesBack * 60 * 1000);
+        start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
+
+        slider.max = maxMinutes;
+        slider.min = 0;
+        slider.value = sliderValue;
+
+        document.getElementById('start-time').value = start.toISOString().slice(0, 16);
+        document.getElementById('end-time').value = end.toISOString().slice(0, 16);
+        document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
+        document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+        document.getElementById('remove-filter').style.display = 'none';
+      }
+
+      animationStart = start;
+      animationEnd = end;
+
+      strikeLayer.clearLayers();
+      strikeCircles = [];
+
+      currentFiltered = strikeData.filter(s => {
+        if (showAllStrikes) {
+          return s.time >= new Date(end.getTime() - parseInt(document.getElementById('max-history-hours').value) * 3600 * 1000) && s.time <= end;
+        }
+        return s.time >= start && s.time <= end;
+      });
+
+      currentFiltered.forEach(s => {
+        const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
+        const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
+        const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+          radius: 5,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.8
+        }).bindPopup(s.time.toISOString());
+        strikeLayer.addLayer(circle);
+        strikeCircles.push({ circle, strike: s });
+      });
+
+      updateHeatmap(currentFiltered);
+      updateOverlay(currentFiltered);
+      updateZIndex();
+      updateLegend();
+
+      setTimeout(() => { isAdjustingHistory = false; }, 1000);
     }
-
-    // Calculate total minutes in the custom range
-    const totalMinutes = (filterEnd - filterStart) / (60 * 1000);
-    sliderMax = Math.max(totalMinutes, lifespanHours * 60); // Ensure at least lifespan duration
-    sliderValue = parseInt(slider.value) || sliderMax;
-    minutesBack = sliderMax - sliderValue;
-
-    // Adjust start and end based on slider position
-    end = new Date(filterStart.getTime() + sliderValue * 60 * 1000);
-    start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
-
-    // Update slider attributes
-    slider.max = sliderMax;
-    slider.min = 0;
-    slider.value = sliderValue;
-
-    document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
-    document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
-  } else {
-    // Use Max History range
-    const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
-    sliderMax = maxMinutes;
-    sliderValue = parseInt(slider.value) || maxMinutes;
-    minutesBack = maxMinutes - sliderValue;
-
-    const now = new Date();
-    end = new Date(now.getTime() - minutesBack * 60 * 1000);
-    start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
-
-    // Update slider attributes
-    slider.max = maxMinutes;
-    slider.min = 0;
-    slider.value = sliderValue;
-
-    document.getElementById('start-time').value = start.toISOString().slice(0, 16);
-    document.getElementById('end-time').value = end.toISOString().slice(0, 16);
-    document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
-    document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
-    document.getElementById('remove-filter').style.display = 'none';
-  }
-
-  animationStart = start;
-  animationEnd = end;
-
-  strikeLayer.clearLayers();
-  strikeCircles = [];
-
-  currentFiltered = strikeData.filter(s => s.time >= start && s.time <= end);
-
-  currentFiltered.forEach(s => {
-    const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
-    const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
-    const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
-      radius: 5,
-      color: color,
-      fillColor: color,
-      fillOpacity: 0.8
-    }).bindPopup(s.time.toISOString());
-    strikeLayer.addLayer(circle);
-    strikeCircles.push({ circle, strike: s });
-  });
-
-  updateHeatmap(currentFiltered);
-  updateOverlay(currentFiltered);
-  updateZIndex();
-  updateLegend();
-
-  setTimeout(() => { isAdjustingHistory = false; }, 1000);
-}
 
     function removeTimeFilter() {
       lastFilterMode = 'slider';
+      customFilterStart = null;
+      customFilterEnd = null;
       document.getElementById('remove-filter').style.display = 'none';
       document.getElementById('auto-latest').checked = true;
       toggleAutoLatest();
@@ -562,6 +564,8 @@
         document.getElementById('history-slider').value = maxMinutes;
         document.getElementById('history-label').innerText = 'Now';
         lastFilterMode = 'slider';
+        customFilterStart = null;
+        customFilterEnd = null;
         document.getElementById('remove-filter').style.display = 'none';
         updateHistory();
       }
@@ -659,22 +663,22 @@
         lastUpdateTime = new Date();
         document.getElementById('last-update').innerText = `Last update: ${lastUpdateTime.toLocaleString()}`;
         
+        // Only refresh the map if no custom time filter is applied
         if (lastFilterMode === 'slider') {
           updateHistory();
-        } else {
-          applyyrinthFilter();
+        } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
+          applyFilter();
         }
       } catch (error) {
         console.error('Error fetching lightning data:', error);
         strikeData = [];
         if (lastFilterMode === 'slider') {
           updateHistory();
-        } else {
+        } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
           applyFilter();
         }
       }
     }
-
     function getColorFromAge(ageFraction) {
       if (ageFraction < 0.2) return '#ffd700';
       if (ageFraction < 0.4) return '#ff69b4';
@@ -755,7 +759,9 @@
         return;
       }
 
-      // Update slider for custom range
+      customFilterStart = start;
+      customFilterEnd = end;
+
       const totalMinutes = (end - start) / (60 * 1000);
       const slider = document.getElementById('history-slider');
       slider.max = Math.max(totalMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
@@ -764,9 +770,12 @@
 
       strikeLayer.clearLayers();
       strikeCircles = [];
-      currentFiltered = strikeData.filter(s => s.time >= start && s.time <= end);
-      animationStart = start;
-      animationEnd = end;
+      currentFiltered = strikeData.filter(s => {
+        if (showAllStrikes) {
+          return s.time >= new Date(end.getTime() - parseInt(document.getElementById('max-history-hours').value) * 3600 * 1000) && s.time <= end;
+        }
+        return s.time >= start && s.time <= end;
+      });
 
       currentFiltered.forEach(s => {
         const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
@@ -811,24 +820,13 @@
     function toggleViewMode() {
       stopAnimation();
       const button = document.getElementById('view-mode');
-      if (button.innerText === 'Enable all strikes') {
-        button.innerText = 'Disable all strikes';
-        const now = new Date();
-        const maxHours = parseInt(document.getElementById('max-history-hours').value);
-        const start = new Date(now.getTime() - maxHours * 3600 * 1000);
-        document.getElementById('start-time').value = start.toISOString().slice(0, 16);
-        document.getElementById('end-time').value = now.toISOString().slice(0, 16);
-        lastFilterMode = 'inputs';
+      showAllStrikes = !showAllStrikes;
+      button.innerText = showAllStrikes ? 'Disable all strikes' : 'Enable all strikes';
+      
+      // Reapply the current filter or history without changing time inputs
+      if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
         applyFilter();
       } else {
-        button.innerText = 'Enable all strikes';
-        const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
-        const now = new Date();
-        const start = new Date(now.getTime() - lifespanHours * 3600 * 1000);
-        document.getElementById('start-time').value = start.toISOString().slice(0, 16);
-        document.getElementById('end-time').value = now.toISOString().slice(0, 16);
-        lastFilterMode = 'slider';
-        document.getElementById('remove-filter').style.display = 'none';
         updateHistory();
       }
     }
@@ -1073,31 +1071,42 @@
       document.getElementById('speed-slider').value = sliderValue;
     }
 
-   function playAnimation() {
-  if (isPlaying) return;
-  isPlaying = true;
-  const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
-  const maxMinutes = parseInt(document.getElementById('history-slider').max);
-  const minutesPerFrame = minutesPerSecond * 1;
-  const interval = 10; // 1 second interval
-  let currentValue = parseInt(document.getElementById('history-slider').value) || 0; // Start from current slider position
+    function playAnimation() {
+      if (isPlaying) return;
+      isPlaying = true;
+      const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
+      const slider = document.getElementById('history-slider');
+      const interval = document.getElementById('number-overlay-toggle').checked ? 10 : 10;
+      let maxMinutes, currentValue, minutesPerFrame;
 
-  lastFilterMode = 'slider';
-  document.getElementById('remove-filter').style.display = 'none';
-  updateHistory();
+      if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+        const start = new Date(customFilterStart);
+        const end = new Date(customFilterEnd);
+        maxMinutes = (end - start) / (60 * 1000);
+        currentValue = parseInt(slider.value) || 0;
+        minutesPerFrame = minutesPerSecond * (interval / 1000);
+        slider.max = Math.max(maxMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
+      } else {
+        maxMinutes = parseInt(document.getElementById('max-history-hours').value) * 60;
+        currentValue = parseInt(slider.value) || 0;
+        minutesPerFrame = minutesPerSecond * (interval / 1000);
+        slider.max = maxMinutes;
+      }
 
-  animationInterval = setInterval(() => {
-    currentValue += minutesPerFrame;
-    if (currentValue >= maxMinutes) {
-      stopAnimation();
-      document.getElementById('history-slider').value = maxMinutes;
       updateHistory();
-      return;
+
+      animationInterval = setInterval(() => {
+        currentValue += minutesPerFrame;
+        if (currentValue >= maxMinutes) {
+          stopAnimation();
+          slider.value = maxMinutes;
+          updateHistory();
+          return;
+        }
+        slider.value = Math.min(currentValue, maxMinutes);
+        updateHistory();
+      }, interval);
     }
-    document.getElementById('history-slider').value = Math.min(currentValue, maxMinutes);
-    updateHistory();
-  }, interval);
-}
 
     function stopAnimation() {
       if (animationInterval) clearInterval(animationInterval);
@@ -1146,43 +1155,52 @@
         alert('Unsupported file format. Use .kml or .png.');
       }
     });
+
     document.getElementById('history-slider').addEventListener('input', () => {
-  if (isPlaying) {
-    // Stop the current animation interval
-    if (animationInterval) clearInterval(animationInterval);
+      if (isPlaying) {
+        if (animationInterval) clearInterval(animationInterval);
 
-    // Get the new slider position
-    const newValue = parseInt(document.getElementById('history-slider').value);
+        const newValue = parseInt(document.getElementById('history-slider').value);
+        isPlaying = true;
+        const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
+        const interval = document.getElementById('number-overlay-toggle').checked ? 10 : 10;
+        let maxMinutes, currentValue, minutesPerFrame;
 
-    // Restart the animation from the new position
-    isPlaying = true;
-    const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
-    const maxMinutes = parseInt(document.getElementById('history-slider').max);
-    const minutesPerFrame = minutesPerSecond * 1;
-    const interval = 10;
-    let currentValue = newValue; // Start from the new slider position
+        if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+          const start = new Date(customFilterStart);
+          const end = new Date(customFilterEnd);
+          maxMinutes = (end - start) / (60 * 1000);
+          currentValue = newValue;
+          minutesPerFrame = minutesPerSecond * (interval / 1000);
+          document.getElementById('history-slider').max = Math.max(maxMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
+        } else {
+          maxMinutes = parseInt(document.getElementById('max-history-hours').value) * 60;
+          currentValue = newValue;
+          minutesPerFrame = minutesPerSecond * (interval / 1000);
+          document.getElementById('history-slider').max = maxMinutes;
+        }
 
-    lastFilterMode = 'slider';
-    document.getElementById('remove-filter').style.display = 'none';
-    updateHistory();
-
-    animationInterval = setInterval(() => {
-      currentValue += minutesPerFrame;
-      if (currentValue >= maxMinutes) {
-        stopAnimation();
-        document.getElementById('history-slider').value = maxMinutes;
         updateHistory();
-        return;
+
+        animationInterval = setInterval(() => {
+          currentValue += minutesPerFrame;
+          if (currentValue >= maxMinutes) {
+            stopAnimation();
+            document.getElementById('history-slider').value = maxMinutes;
+            updateHistory();
+            return;
+          }
+          document.getElementById('history-slider').value = Math.min(currentValue, maxMinutes);
+          updateHistory();
+        }, interval);
+      } else {
+        updateHistory();
       }
-      document.getElementById('history-slider').value = Math.min(currentValue, maxMinutes);
-      updateHistory();
-    }, interval);
-  }
-});
+    });
 
     updateHistorySliderMax();
     setRefreshInterval();
     fetchData();
   </script>
 </body>
-</html> 
+</html>
