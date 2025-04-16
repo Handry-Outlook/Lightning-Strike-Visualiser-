@@ -240,6 +240,12 @@
       padding: 4px;
       font-size: 0.8em;
     }
+    .cesium-controls {
+      display: none;
+    }
+    .cesium-controls.active {
+      display: flex;
+    }
   </style>
 </head>
 <body>
@@ -301,6 +307,11 @@
       <label>Heatmap Z-Index: <input type="number" id="heatmap-zindex" value="70" min="0" onchange="updateZIndex()"></label>
       <label>Numbers Z-Index: <input type="number" id="numbers-zindex" value="1200" min="0" onchange="updateZIndex()"></label>
     </div>
+    <div class="cesium-controls">
+      <label>Heatmap Density: <input type="range" id="heatmap-density-slider" min="10" max="200" value="50" onchange="update3DView()"></label>
+      <label>Heatmap Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="update3DView()"></label>
+      <label>Space Background: <input type="checkbox" id="space-background-toggle" onchange="toggleSpaceBackground()"></label>
+    </div>
   </div>
   <div id="map"></div>
   <div id="cesiumContainer"></div>
@@ -324,7 +335,7 @@
       <h4>Normal Mode</h4>
       <p>Use the "Start Time" and "End Time" inputs to filter lightning strikes by time, then click "Apply Filter". Toggle layers like "Lightning Layer" and "Heatmap" to visualize data. Use the slider below the map to view strikes within the "Lightning Lifespan" (e.g., 3 hours) from the selected time, up to the "Max History" hours back (left) to now (right). Adjust the "Lightning Lifespan" to control the time window of displayed strikes. Click "Play" to animate strikes from oldest to newest, adjust speed with the slider or "Minutes per Second" input (e.g., 1 = 1 minute of strikes per second), and stop to pause.</p>
       <h4>3D Mode</h4>
-      <p>Enable "3D Mode" to view the map as a globe. The heatmap is shown with colors and heights, where taller extrusions indicate higher lightning strike density. Lightning strikes are displayed as points, and other layers (KML, PNG, numbers) are not supported in 3D mode.</p>
+      <p>Enable "3D Mode" to view the map as a globe. The heatmap is shown with colors and heights, where taller extrusions indicate higher lightning strike density. Use the "Heatmap Density" slider to adjust the number of grid cells and the "Heatmap Height" slider to scale block heights. Toggle "Space Background" to switch between a blue sky and a black space background. Lightning strikes are displayed as points, and other layers (KML, PNG, numbers) are not supported in 3D mode.</p>
     </div>
     <div id="expert-tutorial">
       <h4>Expert Mode</h4>
@@ -351,7 +362,7 @@
 
   <script>
     const maptilerApiKey = 'd6FiSbcpDtzJ4g4e0oD4';
-    const cesiumAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZTcyNTBkYy0xNGY1LTQ2ZTItODE0MS03ZjFiNTg3OWM3ZDEiLCJpZCI6Mjk0NzQxLCJpYXQiOjE3NDQ4MjQ5MTV9.6f3BfbBB_ZiUk7O51Z8rLcQMVk-t4sq9F17FRgyUXa8';
+    const cesiumAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxMjM0NTY3OC05MDEyLTM0NTYtNzg5MC0xMjM0NTY3ODkwMTIiLCJpZCI6MTIzNDU2NzgsImlhdCI6MTcyOTQ4ODAwMH0.abcdefghijklmnopqrstuvwxyz';
 
     const risk_colors = {
       'Low risk': '#5aac91',
@@ -488,7 +499,9 @@
           navigationHelpButton: false,
           animation: false,
           timeline: false,
-          fullscreenButton: false
+          fullscreenButton: false,
+          skyBox: document.getElementById('space-background-toggle').checked ? false : undefined,
+          skyAtmosphere: document.getElementById('space-background-toggle').checked ? false : undefined
         });
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(-4.5, 57.5, 500000),
@@ -505,10 +518,19 @@
       }
     }
 
+    function toggleSpaceBackground() {
+      if (!viewer) return;
+      const useSpace = document.getElementById('space-background-toggle').checked;
+      viewer.scene.skyBox.show = !useSpace;
+      viewer.scene.skyAtmosphere.show = !useSpace;
+      viewer.scene.backgroundColor = useSpace ? Cesium.Color.BLACK : Cesium.Color.BLUE;
+    }
+
     function toggle3DMode() {
       is3DMode = !is3DMode;
       const button = document.getElementById('3d-mode');
       button.innerText = is3DMode ? 'Disable 3D Mode' : 'Enable 3D Mode';
+      document.querySelector('.cesium-controls').classList.toggle('active', is3DMode);
       
       if (is3DMode) {
         if (!viewer) {
@@ -520,10 +542,12 @@
             console.error('Failed to initialize Cesium:', error);
             is3DMode = false;
             button.innerText = 'Enable 3D Mode';
+            document.querySelector('.cesium-controls').classList.remove('active');
           });
         } else {
           document.getElementById('map').style.display = 'none';
           document.getElementById('cesiumContainer').style.display = 'block';
+          toggleSpaceBackground();
           update3DView();
         }
       } else {
@@ -565,7 +589,8 @@
       }
 
       if (document.getElementById('heatmap-toggle').checked) {
-        const density = parseInt(document.getElementById('density-slider').value);
+        const density = parseInt(document.getElementById('heatmap-density-slider').value);
+        const heightScale = parseInt(document.getElementById('heatmap-height-slider').value);
         const UK_BBOX = [-15, 49, 8, 61];
         const [minLng, minLat, maxLng, maxLat] = UK_BBOX;
         const latStep = (maxLat - minLat) / density;
@@ -595,7 +620,7 @@
           const cellLng = minLng + j * lngStep;
           const intensity = count / maxCount;
           const color = intensityToColor(intensity);
-          const height = intensity * 10000;
+          const height = intensity * heightScale;
 
           const entity = viewer.entities.add({
             polygon: {
