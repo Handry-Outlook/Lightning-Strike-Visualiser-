@@ -254,7 +254,7 @@
       </select>
     </label>
     <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked></label>
-    <label>Density: <input type="range" id="density-slider" min="1" max="100" value="10" onchange="updateOverlay(currentFiltered)"></label>
+    <label>Density: <input type="range" id="density-slider" min="1" max="100" value="70" onchange="updateOverlay(currentFiltered)"></label>
     <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"></label>
     <label>Auto-refresh every:
       <select id="refresh-interval" onchange="setRefreshInterval()">
@@ -659,7 +659,7 @@
 
       if (heatmapEnabled) {
         legendDiv.innerHTML += `
-          <h4>Heatmap Intensity</h4>
+          <h4>Lightning Intensity</h4>
           <div style="background: linear-gradient(to right, #001219,#001219,#0A9396,#94D2BD,#E9D8A6,#c89578,#EE9B00,#CA6702,#BB3E03,#AE2012,#9B2226); margin-top: 4px" class="gradient-bar"></div>
           <div style="display: flex; justify-content: space-between; margin-top: 4px">
             <span>Low</span><span>High</span>
