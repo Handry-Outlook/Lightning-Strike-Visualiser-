@@ -247,6 +247,1211 @@
     <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"></label>
     <label>Map Style:
       <select id="map-style" onchange="switchBaseMap(this.value)">
+        <option value="mapbox" selected>Default</option>
+        <option value="custom">Classic</option>
+        <option value="osm">OpenStreetMap</option>
+        <option value="opentopo">OpenTopoMap</option>
+        <option value="esri">Esri World Imagery</option>
+      </select>
+    </label>
+    <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked></label>
+    <label>Density: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"></label>
+    <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"></label>
+    <label>Auto-refresh every:
+      <select id="refresh-interval" onchange="setRefreshInterval()">
+        <option value="0">Off</option>
+        <option value="0.5">30 seconds</option>
+        <option value="1" selected>1 minute</option>
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="30">30 minutes</option>
+        <option value="60">60 minutes</option>
+      </select>
+    </label>
+    <label>Auto-set to latest: <input type="checkbox" id="auto-latest" checked onchange="toggleAutoLatest()"></label>
+    <label>Lightning Lifespan: <input type="number" id="lightning-lifespan" value="3" min="0.1" step="0.1"> hours <span title="Strikes will be shown only within this period from the selected time.">ℹ️</span></label>
+    <label>Max History: <input type="number" id="max-history-hours" value="48" min="1" step="1" onchange="updateHistorySliderMax()"> hours <span title="Maximum hours back for history slider.">ℹ️</span></label>
+    <label><button id="view-mode" onclick="toggleViewMode()">Enable all strikes</button></label>
+    <button onclick="showTutorial()">Help</button>
+    <label>Expert Mode: <input type="checkbox" id="expert-mode" onchange="toggleExpertMode()"></label>
+    <div id="expert-controls">
+      <label>KML Layer: <input type="checkbox" id="kml-layer-toggle" onchange="toggleKMLLayer()"></label>
+      <label>KML File: <input type="file" id="kml-file" accept=".kml" onchange="importKML(this)"></label>
+      <label>PNG Layer: <input type="checkbox" id="png-layer-toggle" onchange="togglePNGLayer()"></label>
+      <label>PNG File: <input type="file" id="png-file" accept=".png" onchange="importPNG(this)"></label>
+      <label>PNG Opacity: <input type="range" id="png-opacity-slider" min="0" max="1" step="0.1" value="0.8" onchange="updatePNGOpacity()"></label>
+      <label>KML Z-Index: <input type="number" id="kml-zindex" value="60" min="0" onchange="updateZIndex()"></label>
+      <label>PNG Z-Index: <input type="number" id="png-zindex" value="40" min="0" onchange="updateZIndex()"></label>
+      <label>Lightning Z-Index: <input type="number" id="lightning-zindex" value="1000" min="0" onchange="updateZIndex()"></label>
+      <label>Heatmap Z-Index: <input type="number" id="heatmap-zindex" value="70" min="0" onchange="updateZIndex()"></label>
+      <label>Numbers Z-Index: <input type="number" id="numbers-zindex" value="1200" min="0" onchange="updateZIndex()"></label>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div class="time-slider-container">
+    <label><input type="range" id="history-slider" class="slider" min="0" max="2880" value="2880" oninput="updateHistory()"> <span id="history-label">Now</span></label>
+    <p id="history-time"></p>
+    <div class="animator">
+      <button onclick="playAnimation()">▶️ Play</button>
+      <button onclick="stopAnimation()">⏹️ Stop</button>
+      <button onclick="toggleFullScreen()">⛶ Fullscreen</button>
+      <label>Speed: <input type="range" id="speed-slider" class="speed-slider" min="0.0167" max="5" step="0.0167" value="1" oninput="updateSpeedTextbox()"></label>
+      <label>Minutes per second: <input type="number" id="playback-minutes" class="playback-speed-input" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
+    </div>
+    <p id="time-range" class="status-info"></p>
+    <p id="last-update" class="status-info"></p>
+    <p id="current-time" class="status-info"></p>
+  </div>
+  <div id="tutorial-modal" class="modal" style="display: none;">
+    <h3>Tutorial</h3>
+    <div id="normal-tutorial">
+      <h4>Normal Mode</h4>
+      <p>Use the "Start Time" and "End Time" inputs to filter lightning strikes by time, then click "Apply Filter". Toggle layers like "Lightning Layer" and "Heatmap" to visualize data. Use the slider below the map to view strikes within the "Lightning Lifespan" (e.g., 3 hours) from the selected time, up to the "Max History" hours back (left) to now (right). Adjust the "Lightning Lifespan" to control the time window of displayed strikes. Click "Play" to animate strikes from oldest to newest, adjust speed with the slider or "Minutes per Second" input (e.g., 1 = 1 minute of strikes per second), and stop to pause.</p>
+    </div>
+    <div id="expert-tutorial">
+      <h4>Expert Mode</h4>
+      <p>Enable "Expert Mode" to access KML and PNG uploads. Upload a KML file to overlay risk zones, or a PNG file for custom imagery (initially placed below lightning strikes). Toggle these layers on/off and adjust settings like "PNG Opacity" or layer z-indices to customize their display order.</p>
+      <p>For KML files, ensure polygon names match risk levels: 'Low risk', 'Slight risk', 'Enhanced risk', 'Moderate risk', 'High risk' for correct colors.</p>
+      <p>For PNG files, the filename should include the region name (e.g., 'England', 'Wales') to set image bounds.</p>
+    </div>
+    <button onclick="closeTutorial()">Close</button>
+  </div>
+  <div id="modal" class="modal">
+    <p>Do you want to automatically adjust the time filter based on the file's timestamp?</p>
+    <button class="yes" onclick="confirmAutoTimeFilter(true)">Yes</button>
+    <button class="no" onclick="confirmAutoTimeFilter(false)">No</button>
+  </div>
+  <div id="overlay" class="overlay"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/togeojson@0.16.0"></script>
+
+  <script>
+    const risk_colors = {
+      'Low risk': '#5aac91',
+      'Slight risk': '#ffff00',
+      'Enhanced risk': '#ffa500',
+      'Moderate risk': '#ff0000',
+      'High risk': '#800080'
+    };
+
+    const region_bounds = {
+      "England": [[47.7, -21.1], [57.075, 9.95]],
+      "Wales": [[51.4, -5.3], [53.4, -2.8]],
+      "Scotland": [[54.6, -7.5], [60.8, -0.7]],
+      "Northern Ireland": [[54.0, -8.2], [55.3, -5.4]],
+      "Ireland and Northern Ireland": [[49.98, -21.65], [56.25, 1.075]],
+      "UK": [[47.8, -32.6], [61.3, 15.8]]
+    };
+
+    let baseLayers = {
+      mapbox: L.tileLayer('https://api.mapbox.com/styles/v1/handry-outlook/cm9457ty1009d01sk37353ux2/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiaGFuZHJ5LW91dGxvb2siLCJhIjoiY2xrbnNrbmVlMXo0NDNqa2d3MTY2NW90bCJ9.AJbccNwtKvKA8il3JkE3PA', {
+        tileSize: 512,
+        zoomOffset: -1,
+        attribution: '© Mapbox © OpenStreetMap',
+        maxZoom: 18
+      }),
+      custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiaGFuZHJ5LW91dGxvb2siLCJhIjoiY2xrbnNrbmVlMXo0NDNqa2d3MTY2NW90bCJ9.AJbccNwtKvKA8il3JkE3PA', {
+        tileSize: 512,
+        zoomOffset: -1,
+        attribution: '© Mapbox © OpenStreetMap',
+        maxZoom: 18
+      }),
+      osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }),
+      opentopo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17,
+        attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
+      }),
+      esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles © Esri'
+      })
+    };
+
+    const map = L.map('map', { layers: [baseLayers.mapbox], zoomControl: false }).setView([57.5, -4.5], 6);
+
+    const mapContainer = document.getElementById('map');
+    const logo = document.createElement('img');
+    logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png';
+    logo.style.position = 'absolute';
+    logo.style.top = '10px';
+    logo.style.left = '10px';
+    logo.style.zIndex = '1000';
+    logo.style.width = '100px';
+    logo.style.pointerEvents = 'none';
+    mapContainer.appendChild(logo);
+
+    const legendControl = L.control({ position: 'topright' });
+    legendControl.onAdd = function (map) {
+      const div = L.DomUtil.create('div', 'legend');
+      div.innerHTML = '<h4>Legend</h4>';
+      return div;
+    };
+    legendControl.addTo(map);
+
+    let strikeData = [];
+    let strikeLayer = L.layerGroup().addTo(map);
+    let heatmapLayer = null;
+    let numberOverlay = null;
+    let animationInterval = null;
+    let currentFiltered = [];
+    let animationStart, animationEnd;
+    let kmlLayer = null;
+    let pngLayer = null;
+    let isPlaying = false;
+    let strikeCircles = [];
+    let pendingFile = null;
+    let pendingFileType = null;
+    let isFullScreen = false;
+    let refreshTimer = null;
+    let lastUpdateTime = null;
+    let isAdjustingHistory = false;
+    let lastFilterMode = 'slider';
+    let customFilterStart = null;
+    let customFilterEnd = null;
+    let showAllStrikes = false;
+
+    function toggleExpertMode() {
+      const expertControls = document.getElementById('expert-controls');
+      expertControls.style.display = document.getElementById('expert-mode').checked ? 'grid' : 'none';
+      updateZIndex();
+    }
+
+    function showTutorial() {
+      document.getElementById('tutorial-modal').style.display = 'block';
+      document.getElementById('overlay').style.display = 'block';
+    }
+
+    function closeTutorial() {
+      document.getElementById('tutorial-modal').style.display = 'none';
+      document.getElementById('overlay').style.display = 'none';
+    }
+
+    function updateHistorySliderMax() {
+      if (lastFilterMode === 'slider') {
+        const maxHours = parseInt(document.getElementById('max-history-hours').value) || 48;
+        document.getElementById('history-slider').max = maxHours * 60;
+        document.getElementById('history-slider').value = maxHours * 60;
+        updateHistory();
+      }
+    }
+
+    function formatTimeAgo(minutesBack) {
+      if (minutesBack === 0) return 'Now';
+      const hours = Math.floor(minutesBack / 60);
+      const minutes = minutesBack % 60;
+      let result = '';
+      if (hours > 0) result += `${hours}h `;
+      if (minutes > 0 || hours === 0) result += `${minutes}m`;
+      return result.trim() + ' ago';
+    }
+
+    function updateHistory() {
+      isAdjustingHistory = true;
+      const slider = document.getElementById('history-slider');
+      const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+      let start, end, sliderMax, sliderValue, minutesBack;
+
+      if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+        const filterStart = new Date(customFilterStart);
+        const filterEnd = new Date(customFilterEnd);
+
+        if (isNaN(filterStart) || isNaN(filterEnd)) {
+          console.error('Invalid custom date/time format.');
+          isAdjustingHistory = false;
+          return;
+        }
+
+        const totalMinutes = (filterEnd - filterStart) / (60 * 1000);
+        sliderMax = Math.max(totalMinutes, lifespanHours * 60);
+        sliderValue = parseInt(slider.value) || sliderMax;
+        minutesBack = sliderMax - sliderValue;
+
+        end = new Date(filterStart.getTime() + sliderValue * 60 * 1000);
+        start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
+
+        slider.max = sliderMax;
+        slider.min = 0;
+        slider.value = sliderValue;
+
+        document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
+        document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+      } else {
+        const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+        sliderMax = maxMinutes;
+        sliderValue = parseInt(slider.value) || maxMinutes;
+        minutesBack = maxMinutes - sliderValue;
+
+        const now = new Date();
+        end = new Date(now.getTime() - minutesBack * 60 * 1000);
+        start = new Date(end.getTime() - lifespanHours * 3600 * 1000);
+
+        slider.max = maxMinutes;
+        slider.min = 0;
+        slider.value = sliderValue;
+
+        document.getElementById('start-time').value = start.toISOString().slice(0, 16);
+        document.getElementById('end-time').value = end.toISOString().slice(0, 16);
+        document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
+        document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+        document.getElementById('remove-filter').style.display = 'none';
+      }
+
+      animationStart = start;
+      animationEnd = end;
+
+      strikeLayer.clearLayers();
+      strikeCircles = [];
+
+      currentFiltered = strikeData.filter(s => {
+        if (showAllStrikes) {
+          return s.time >= new Date(end.getTime() - parseInt(document.getElementById('max-history-hours').value) * 3600 * 1000) && s.time <= end;
+        }
+        return s.time >= start && s.time <= end;
+      });
+
+      currentFiltered.forEach(s => {
+        const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
+        const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
+        const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+          radius: 5,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.8
+        }).bindPopup(s.time.toISOString());
+        strikeLayer.addLayer(circle);
+        strikeCircles.push({ circle, strike: s });
+      });
+
+      updateHeatmap(currentFiltered);
+      updateOverlay(currentFiltered);
+      updateZIndex();
+      updateLegend();
+
+      setTimeout(() => { isAdjustingHistory = false; }, 1000);
+    }
+
+    function removeTimeFilter() {
+      lastFilterMode = 'slider';
+      customFilterStart = null;
+      customFilterEnd = null;
+      document.getElementById('remove-filter').style.display = 'none';
+      document.getElementById('auto-latest').checked = true;
+      toggleAutoLatest();
+    }
+
+    function setRefreshInterval() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      const interval = parseFloat(document.getElementById('refresh-interval').value);
+      if (interval > 0) {
+        refreshTimer = setInterval(fetchData, interval * 60 * 1000);
+      }
+    }
+
+    function toggleAutoLatest() {
+      if (document.getElementById('auto-latest').checked) {
+        const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+        const now = new Date();
+        const start = new Date(now.getTime() - lifespanHours * 3600 * 1000);
+        document.getElementById('start-time').value = start.toISOString().slice(0, 16);
+        document.getElementById('end-time').value = now.toISOString().slice(0, 16);
+        const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+        document.getElementById('history-slider').value = maxMinutes;
+        document.getElementById('history-label').innerText = 'Now';
+        lastFilterMode = 'slider';
+        customFilterStart = null;
+        customFilterEnd = null;
+        document.getElementById('remove-filter').style.display = 'none';
+        updateHistory();
+      }
+    }
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('current-time').innerText = `Current time: ${now.toLocaleString()}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function parseDateFromFilename(filename) {
+      const regex = /(\d{2})(\d{2})(\d{4})_(\d{2})(\d{2})__(\d{2})(\d{2})(\d{4})_(\d{2})(\d{2})|(\d{2})(\d{2})(\d{4})\s+(\d{2})(\d{2})\s+-\s+(\d{2})(\d{2})(\d{4})\s+(\d{2})(\d{2})/;
+      const match = filename.match(regex);
+      if (!match) return null;
+
+      let startDate, endDate;
+      if (match[1]) {
+        startDate = new Date(`${match[3]}-${match[2]}-${match[1]}T${match[4]}:${match[5]}:00Z`);
+        endDate = new Date(`${match[8]}-${match[7]}-${match[6]}T${match[9]}:${match[10]}:00Z`);
+      } else {
+        startDate = new Date(`${match[13]}-${match[12]}-${match[11]}T${match[14]}:${match[15]}:00Z`);
+        endDate = new Date(`${match[18]}-${match[17]}-${match[16]}T${match[19]}:${match[20]}:00Z`);
+      }
+
+      return { startDate, endDate };
+    }
+
+    function showTimeFilterModal(file, type) {
+      pendingFile = file;
+      pendingFileType = type;
+      const modal = document.getElementById('modal');
+      const overlay = document.getElementById('overlay');
+      modal.style.display = 'block';
+      overlay.style.display = 'block';
+    }
+
+    function confirmAutoTimeFilter(confirm) {
+      const modal = document.getElementById('modal');
+      const overlay = document.getElementById('overlay');
+      modal.style.display = 'none';
+      overlay.style.display = 'none';
+
+      if (!pendingFile || !pendingFileType) return;
+
+      if (confirm && document.getElementById('auto-time-filter').checked) {
+        const dates = parseDateFromFilename(pendingFile.name);
+        if (dates && !isNaN(dates.startDate) && !isNaN(dates.endDate)) {
+          document.getElementById('start-time').value = dates.startDate.toISOString().slice(0, 16);
+          document.getElementById('end-time').value = dates.endDate.toISOString().slice(0, 16);
+          lastFilterMode = 'inputs';
+          applyFilter();
+        }
+      }
+
+      if (pendingFileType === 'kml') importKML({ files: [pendingFile] });
+      else if (pendingFileType === 'png') importPNG({ files: [pendingFile] });
+
+      pendingFile = null;
+      pendingFileType = null;
+    }
+
+    async function fetchData() {
+      const githubUrl = 'https://raw.githubusercontent.com/HandryOutlook/lightning_data/main/lightning_data.json';
+      const metOfficeUrl = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning';
+
+      try {
+        const [githubResponse, metOfficeResponse] = await Promise.all([
+          fetch(githubUrl).then(res => res.json()).catch(() => null),
+          fetch(metOfficeUrl).then(res => res.json()).catch(() => null)
+        ]);
+
+        let githubStrikes = githubResponse?.lightning_strikes?.map(s => ({
+          ...s,
+          time: new Date(s.strike_time)
+        })) || [];
+        let metOfficeStrikes = metOfficeResponse?.lightning_strikes?.map(s => ({
+          ...s,
+          time: new Date(s.strike_time)
+        })) || [];
+
+        const allStrikes = [...githubStrikes, ...metOfficeStrikes];
+        const seen = new Map();
+        strikeData = allStrikes.filter(s => {
+          const key = `${s.strike_time}_${s.coordinates[0]}_${s.coordinates[1]}`;
+          if (!seen.has(key)) {
+            seen.set(key, true);
+            return true;
+          }
+          return false;
+        });
+
+        console.log(`Loaded ${strikeData.length} unique strikes.`);
+        lastUpdateTime = new Date();
+        document.getElementById('last-update').innerText = `Last update: ${lastUpdateTime.toLocaleString()}`;
+        
+        // Only refresh the map if no custom time filter is applied
+        if (lastFilterMode === 'slider') {
+          updateHistory();
+        } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
+          applyFilter();
+        }
+      } catch (error) {
+        console.error('Error fetching lightning data:', error);
+        strikeData = [];
+        if (lastFilterMode === 'slider') {
+          updateHistory();
+        } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
+          applyFilter();
+        }
+      }
+    }
+    function getColorFromAge(ageFraction) {
+      if (ageFraction < 0.2) return '#ffd700';
+      if (ageFraction < 0.4) return '#ff69b4';
+      if (ageFraction < 0.6) return '#ff00ff';
+      if (ageFraction < 0.8) return '#800080';
+      return '#4b0082';
+    }
+
+    function updateLegend() {
+      const legendDiv = document.querySelector('.legend');
+      legendDiv.innerHTML = '';
+      const colorMode = document.getElementById('color-mode').checked;
+      const heatmapEnabled = document.getElementById('heatmap-toggle').checked;
+      const lightningEnabled = document.getElementById('lightning-layer-toggle').checked;
+      const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
+      const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
+
+      if (lightningEnabled) {
+        legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
+        if (colorMode) {
+          legendDiv.innerHTML += `
+            <div><div class="color-box" style="background: #ffd700"></div>Newest</div>
+            <div><div class="color-box" style="background: #ff69b4"></div></div>
+            <div><div class="color-box" style="background: #ff00ff"></div></div>
+            <div><div class="color-box" style="background: #800080"></div></div>
+            <div><div class="color-box" style="background: #4b0082"></div>Oldest</div>
+          `;
+        } else {
+          legendDiv.innerHTML += `
+            <div><div class="color-box" style="background: black"></div>Strikes</div>
+          `;
+        }
+      }
+
+      if (heatmapEnabled) {
+        legendDiv.innerHTML += `
+          <h4>Lightning Intensity</h4>
+          <div style="background: linear-gradient(to right, #001219,#001219,#0A9396,#94D2BD,#E9D8A6,#c89578,#EE9B00,#CA6702,#BB3E03,#AE2012,#9B2226); margin-top: 4px" class="gradient-bar"></div>
+          <div style="display: flex; justify-content: space-between; margin-top: 4px">
+            <span>Low</span><span>High</span>
+          </div>
+        `;
+      }
+
+      if (kmlEnabled && kmlLayer) {
+        legendDiv.innerHTML += '<h4>Risk Levels</h4>';
+        Object.entries(risk_colors).forEach(([name, color]) => {
+          legendDiv.innerHTML += `
+            <div><div class="color-box" style="background: ${color}"></div>${name}</div>
+          `;
+        });
+      }
+
+      legendDiv.style.display = legendDiv.innerHTML ? 'block' : 'none';
+    }
+
+    function applyFilter() {
+      lastFilterMode = 'inputs';
+      let startInput = document.getElementById('start-time').value;
+      let endInput = document.getElementById('end-time').value;
+      const now = new Date();
+
+      if (!startInput) {
+        const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+        startInput = new Date(now.getTime() - lifespanHours * 3600 * 1000).toISOString().slice(0, 16);
+        document.getElementById('start-time').value = startInput;
+      }
+      if (!endInput) {
+        endInput = now.toISOString().slice(0, 16);
+        document.getElementById('end-time').value = endInput;
+      }
+
+      const start = new Date(startInput);
+      const end = new Date(endInput);
+
+      if (isNaN(start) || isNaN(end)) {
+        console.error('Invalid date/time format.');
+        return;
+      }
+
+      customFilterStart = start;
+      customFilterEnd = end;
+
+      const totalMinutes = (end - start) / (60 * 1000);
+      const slider = document.getElementById('history-slider');
+      slider.max = Math.max(totalMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
+      slider.value = totalMinutes;
+      slider.min = 0;
+
+      strikeLayer.clearLayers();
+      strikeCircles = [];
+      currentFiltered = strikeData.filter(s => {
+        if (showAllStrikes) {
+          return s.time >= new Date(end.getTime() - parseInt(document.getElementById('max-history-hours').value) * 3600 * 1000) && s.time <= end;
+        }
+        return s.time >= start && s.time <= end;
+      });
+
+      currentFiltered.forEach(s => {
+        const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+        const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
+        const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
+        const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+          radius: 5,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.8
+        }).bindPopup(s.time.toISOString());
+        strikeLayer.addLayer(circle);
+        strikeCircles.push({ circle, strike: s });
+      });
+
+      updateHeatmap(currentFiltered);
+      updateOverlay(currentFiltered);
+      document.getElementById('time-range').innerText = `Showing strikes from ${start.toISOString()} to ${end.toISOString()}`;
+      document.getElementById('history-label').innerText = formatTimeAgo(0);
+      document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+      document.getElementById('remove-filter').style.display = 'block';
+      updateZIndex();
+      updateLegend();
+    }
+
+    function updateStrikeColors() {
+      const colorMode = document.getElementById('color-mode').checked;
+      const end = new Date(document.getElementById('end-time').value);
+      const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+      strikeCircles.forEach(({ circle, strike }) => {
+        let color;
+        if (colorMode) {
+          const ageFraction = (end - strike.time) / (lifespanHours * 3600 * 1000);
+          color = getColorFromAge(ageFraction);
+        } else {
+          color = 'black';
+        }
+        circle.setStyle({ color, fillColor: color });
+      });
+    }
+
+    function toggleViewMode() {
+      stopAnimation();
+      const button = document.getElementById('view-mode');
+      showAllStrikes = !showAllStrikes;
+      button.innerText = showAllStrikes ? 'Disable all strikes' : 'Enable all strikes';
+      
+      // Reapply the current filter or history without changing time inputs
+      if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+        applyFilter();
+      } else {
+        updateHistory();
+      }
+    }
+
+    function updateHeatmap(filtered) {
+      const data = filtered.map(s => [s.coordinates[1], s.coordinates[0], 1]);
+      const blur = parseInt(document.getElementById('blur-slider').value);
+      if (heatmapLayer) map.removeLayer(heatmapLayer);
+
+      heatmapLayer = L.heatLayer(data, {
+        radius: 25,
+        blur: blur,
+        maxZoom: 10,
+        minZoom: 10,
+        gradient: { 0.0: '#001219',0.1: '#001219', 0.2:'#0A9396', 0.3:'#94D2BD', 0.4:'#E9D8A6', 0.5: '#c89578',0.6:'#EE9B00',0.7:'#CA6702',0.8:'#BB3E03',0.9:'#AE2012',  1.0: '#9B2226'}
+      });
+
+      if (document.getElementById('heatmap-toggle').checked) {
+        heatmapLayer.addTo(map);
+        heatmapLayer._canvas.style.zIndex = 70;
+      }
+      updateZIndex();
+      map.invalidateSize();
+      updateLegend();
+    }
+
+    function toggleHeatmap() {
+      if (document.getElementById('heatmap-toggle').checked) {
+        if (heatmapLayer) {
+          heatmapLayer.addTo(map);
+          heatmapLayer._canvas.style.zIndex = 70;
+        }
+      } else {
+        if (heatmapLayer) map.removeLayer(heatmapLayer);
+      }
+      updateZIndex();
+      map.invalidateSize();
+      updateLegend();
+    }
+
+    function toggleLightningLayer() {
+      if (document.getElementById('lightning-layer-toggle').checked) {
+        if (!map.hasLayer(strikeLayer)) {
+          map.addLayer(strikeLayer);
+        }
+      } else {
+        map.removeLayer(strikeLayer);
+      }
+      updateZIndex();
+      map.invalidateSize();
+      updateLegend();
+    }
+
+    function toggleKMLLayer() {
+      const toggle = document.getElementById('kml-layer-toggle').checked;
+      if (toggle && kmlLayer && !map.hasLayer(kmlLayer)) {
+        map.addLayer(kmlLayer);
+        kmlLayer.setZIndex(60);
+      } else if (kmlLayer) {
+        map.removeLayer(kmlLayer);
+      }
+      updateZIndex();
+      map.invalidateSize();
+      updateLegend();
+    }
+
+    function togglePNGLayer() {
+      const toggle = document.getElementById('png-layer-toggle').checked;
+      if (toggle && pngLayer && !map.hasLayer(pngLayer)) {
+        map.addLayer(pngLayer);
+        pngLayer.setZIndex(40);
+      } else if (pngLayer) {
+        map.removeLayer(pngLayer);
+      }
+      updateZIndex();
+      map.invalidateSize();
+      updateLegend();
+    }
+
+    function updateZIndex() {
+      const expertMode = document.getElementById('expert-mode').checked;
+      const lightningZ = expertMode ? parseInt(document.getElementById('lightning-zindex').value) || 1000 : 1000;
+      const heatmapZ = expertMode ? parseInt(document.getElementById('heatmap-zindex').value) || 70 : 70;
+      const kmlZ = expertMode ? parseInt(document.getElementById('kml-zindex').value) || 60 : 60;
+      const pngZ = expertMode ? parseInt(document.getElementById('png-zindex').value) || 40 : 40;
+      const numbersZ = expertMode ? parseInt(document.getElementById('numbers-zindex').value) || 1200 : 1200;
+
+      if (kmlLayer && map.hasLayer(kmlLayer)) kmlLayer.setZIndex(kmlZ);
+      if (pngLayer && map.hasLayer(pngLayer)) pngLayer.setZIndex(pngZ);
+      if (heatmapLayer && map.hasLayer(heatmapLayer) && heatmapLayer._canvas) heatmapLayer._canvas.style.zIndex = heatmapZ;
+      if (strikeLayer && map.hasLayer(strikeLayer)) strikeLayer.setZIndex(lightningZ);
+      if (numberOverlay && map.hasLayer(numberOverlay)) numberOverlay.setZIndex(numbersZ);
+    }
+
+    function updateOverlay(filtered) {
+      if (numberOverlay) map.removeLayer(numberOverlay);
+      if (!document.getElementById('number-overlay-toggle').checked) return;
+
+      const density = parseInt(document.getElementById('density-slider').value);
+      const UK_BBOX = [-15, 49, 8, 61];
+      const [minLng, minLat, maxLng, maxLat] = UK_BBOX;
+
+      const latStep = (maxLat - minLat) / density;
+      const lngStep = (maxLng - minLng) / density;
+      const grid = new Map();
+
+      for (let i = 0; i < density; i++) {
+        for (let j = 0; j < density; j++) grid.set(`${i}_${j}`, 0);
+      }
+
+      filtered.forEach(s => {
+        const lat = s.coordinates[1];
+        const lng = s.coordinates[0];
+        if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+          const i = Math.floor((lat - minLat) / latStep);
+          const j = Math.floor((lng - minLng) / lngStep);
+          const key = `${i}_${j}`;
+          if (grid.has(key)) grid.set(key, grid.get(key) + 1);
+        }
+      });
+
+      numberOverlay = L.layerGroup();
+      grid.forEach((count, key) => {
+        const [i, j] = key.split('_').map(Number);
+        const cellLat = minLat + (i + 0.5) * latStep;
+        const cellLng = minLng + (j + 0.5) * lngStep;
+        const label = L.marker([cellLat, cellLng], {
+          icon: L.divIcon({
+            className: 'text-labels',
+            html: `<b style="font-size:12px">${count}</b>`,
+            iconSize: [30, 20],
+            iconAnchor: [15, 10]
+          })
+        });
+        numberOverlay.addLayer(label);
+      });
+
+      numberOverlay.addTo(map);
+      updateZIndex();
+      map.invalidateSize();
+    }
+
+    function importKML(input) {
+      if (!input.files || !input.files[0]) return alert('No KML file selected.');
+      const file = input.files[0];
+      if (document.getElementById('auto-time-filter').checked && !pendingFile) {
+        showTimeFilterModal(file, 'kml');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parser = new DOMParser();
+          const kml = parser.parseFromString(e.target.result, 'text/xml');
+          const geojson = toGeoJSON.kml(kml);
+          if (kmlLayer) map.removeLayer(kmlLayer);
+
+          kmlLayer = L.geoJSON(geojson, {
+            style: function(feature) {
+              const name = feature.properties.name || '';
+              return risk_colors[name] ? {
+                color: risk_colors[name],
+                fillColor: risk_colors[name],
+                fillOpacity: 0.3
+              } : { color: 'black', fillOpacity: 0 };
+            },
+            onEachFeature: (f, l) => {
+              if (f.properties.name) l.bindPopup(f.properties.name);
+            }
+          });
+
+          kmlLayer.addTo(map);
+          kmlLayer.setZIndex(60);
+          document.getElementById('kml-layer-toggle').checked = true;
+          document.getElementById('kml-zindex').value = 60;
+          updateZIndex();
+          map.invalidateSize();
+          updateLegend();
+        } catch (error) {
+          console.error('Error processing KML file:', error);
+          alert('Failed to process KML file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function importPNG(input) {
+      if (!input.files || !input.files[0]) return alert('No PNG file selected.');
+      const file = input.files[0];
+      if (document.getElementById('auto-time-filter').checked && !pendingFile) {
+        showTimeFilterModal(file, 'png');
+        return;
+      }
+
+      const region = Object.keys(region_bounds).find(r => file.name.includes(r));
+      if (!region) {
+        alert('Region not recognized in filename.');
+        return;
+      }
+
+      const [[south, west], [north, east]] = region_bounds[region];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        if (pngLayer) map.removeLayer(pngLayer);
+        const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
+        pngLayer = L.imageOverlay(e.target.result, [[south, west], [north, east]], { opacity });
+        pngLayer.addTo(map);
+        pngLayer.setZIndex(40);
+        document.getElementById('png-layer-toggle').checked = true;
+        const pngZIndexInput = document.getElementById('png-zindex');
+        if (pngZIndexInput) pngZIndexInput.value = 40;
+        map.fitBounds([[south, west], [north, east]]);
+        updateZIndex();
+        map.invalidateSize();
+        updateLegend();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function updatePNGOpacity() {
+      const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
+      if (pngLayer) pngLayer.setOpacity(opacity);
+    }
+
+    function switchBaseMap(style) {
+      Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+      baseLayers[style]?.addTo(map) || baseLayers.mapbox.addTo(map);
+      updateZIndex();
+      map.invalidateSize();
+    }
+
+    function updateSpeedTextbox() {
+      const sliderValue = parseFloat(document.getElementById('speed-slider').value);
+      const minutesPerSecond = sliderValue;
+      document.getElementById('playback-minutes').value = minutesPerSecond.toFixed(2);
+    }
+
+    function updateSpeedSlider() {
+      const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
+      const sliderValue = Math.min(Math.max(minutesPerSecond, 0.01), 5);
+      document.getElementById('speed-slider').value = sliderValue;
+    }
+
+    function playAnimation() {
+      if (isPlaying) return;
+      isPlaying = true;
+      const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
+      const slider = document.getElementById('history-slider');
+      const interval = document.getElementById('number-overlay-toggle').checked ? 10 : 10;
+      let maxMinutes, currentValue, minutesPerFrame;
+
+      if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+        const start = new Date(customFilterStart);
+        const end = new Date(customFilterEnd);
+        maxMinutes = (end - start) / (60 * 1000);
+        currentValue = parseInt(slider.value) || 0;
+        minutesPerFrame = minutesPerSecond * (interval / 1000);
+        slider.max = Math.max(maxMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
+      } else {
+        maxMinutes = parseInt(document.getElementById('max-history-hours').value) * 60;
+        currentValue = parseInt(slider.value) || 0;
+        minutesPerFrame = minutesPerSecond * (interval / 1000);
+        slider.max = maxMinutes;
+      }
+
+      updateHistory();
+
+      animationInterval = setInterval(() => {
+        currentValue += minutesPerFrame;
+        if (currentValue >= maxMinutes) {
+          stopAnimation();
+          slider.value = maxMinutes;
+          updateHistory();
+          return;
+        }
+        slider.value = Math.min(currentValue, maxMinutes);
+        updateHistory();
+      }, interval);
+    }
+
+    function stopAnimation() {
+      if (animationInterval) clearInterval(animationInterval);
+      animationInterval = null;
+      isPlaying = false;
+      updateHistory();
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement) {
+        document.body.classList.add('fullscreen');
+        isFullScreen = true;
+        document.querySelector('.time-slider-container button[onclick="toggleFullScreen()"]').innerText = '⛶  Exit Fullscreen';
+      } else {
+        document.body.classList.remove('fullscreen');
+        isFullScreen = false;
+        document.querySelector('.time-slider-container button[onclick="toggleFullScreen()"]').innerText = '⛶  Fullscreen';
+      }
+      map.invalidateSize();
+    });
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+
+    const mapDiv = document.getElementById('map');
+    mapDiv.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      mapDiv.classList.add('dropzone');
+    });
+
+    mapDiv.addEventListener('dragleave', () => mapDiv.classList.remove('dropzone'));
+
+    mapDiv.addEventListener('drop', (e) => {
+      e.preventDefault();
+      mapDiv.classList.remove('dropzone');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+
+      if (file.name.endsWith('.kml')) {
+        document.getElementById('auto-time-filter').checked ? showTimeFilterModal(file, 'kml') : importKML({ files: [file] });
+      } else if (file.name.endsWith('.png')) {
+        document.getElementById('auto-time-filter').checked ? showTimeFilterModal(file, 'png') : importPNG({ files: [file] });
+      } else {
+        alert('Unsupported file format. Use .kml or .png.');
+      }
+    });
+
+    document.getElementById('history-slider').addEventListener('input', () => {
+      if (isPlaying) {
+        if (animationInterval) clearInterval(animationInterval);
+
+        const newValue = parseInt(document.getElementById('history-slider').value);
+        isPlaying = true;
+        const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
+        const interval = document.getElementById('number-overlay-toggle').checked ? 10 : 10;
+        let maxMinutes, currentValue, minutesPerFrame;
+
+        if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+          const start = new Date(customFilterStart);
+          const end = new Date(customFilterEnd);
+          maxMinutes = (end - start) / (60 * 1000);
+          currentValue = newValue;
+          minutesPerFrame = minutesPerSecond * (interval / 1000);
+          document.getElementById('history-slider').max = Math.max(maxMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
+        } else {
+          maxMinutes = parseInt(document.getElementById('max-history-hours').value) * 60;
+          currentValue = newValue;
+          minutesPerFrame = minutesPerSecond * (interval / 1000);
+          document.getElementById('history-slider').max = maxMinutes;
+        }
+
+        updateHistory();
+
+        animationInterval = setInterval(() => {
+          currentValue += minutesPerFrame;
+          if (currentValue >= maxMinutes) {
+            stopAnimation();
+            document.getElementById('history-slider').value = maxMinutes;
+            updateHistory();
+            return;
+          }
+          document.getElementById('history-slider').value = Math.min(currentValue, maxMinutes);
+          updateHistory();
+        }, interval);
+      } else {
+        updateHistory();
+      }
+    });
+
+    updateHistorySliderMax();
+    setRefreshInterval();
+    fetchData();
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <title>Lightning Strike Visualiser⚡</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      background: #f4f7fa;
+    }
+    h2 {
+      margin: 10px 20px;
+      color: #1a2a44;
+      font-weight: 600;
+    }
+    #map { 
+      height: calc(100vh - 220px); 
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin: 0 20px;
+    }
+    .controls {
+      padding: 10px;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 20px;
+    }
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.8em;
+      color: #1a2a44;
+      font-weight: 500;
+    }
+    .controls input, .controls select, .controls button {
+      margin-top: 3px;
+      padding: 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 0.8em;
+      transition: all 0.2s;
+    }
+    .controls input[type="checkbox"] {
+      margin-top: 3px;
+    }
+    .controls input[type="number"] {
+      width: 60px;
+    }
+    .controls button, #remove-filter {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      cursor: pointer;
+      padding: 6px 12px;
+      font-size: 0.8em;
+      border-radius: 4px;
+    }
+    .controls button:hover, #remove-filter:hover {
+      background: #2563eb;
+    }
+    .time-slider-container {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80vw;
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .time-slider-container .animator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .time-slider-container button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px;
+      cursor: pointer;
+      font-size: 0.8em;
+      transition: all 0.2s;
+    }
+    .time-slider-container button:hover {
+      background: #2563eb;
+    }
+    .slider {
+      width: 100%;
+    }
+    .speed-slider {
+      width: 80px;
+    }
+    .time-slider-container .status-info {
+      font-size: 0.75em;
+      color: #1a2a44;
+      margin: 0;
+    }
+    .legend {
+      background: rgba(255,255,255,0.95);
+      padding: 8px;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      font-size: 0.75em;
+      color: #1a2a44;
+      max-width: 200px;
+      position: absolute;
+      top: 100px;
+      right: 10px;
+      z-index: 1002;
+    }
+    .legend h4 {
+      margin: 0 0 6px;
+      font-weight: 600;
+      font-size: 0.85em;
+    }
+    .legend div {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .color-box {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      border-radius: 3px;
+    }
+    .gradient-bar {
+      width: 100%;
+      height: 16px;
+      border-radius: 3px;
+      margin-top: 4px;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1002;
+      max-width: 350px;
+    }
+    .modal h3 {
+      margin-top: 0;
+      font-size: 1em;
+    }
+    .modal button {
+      margin: 8px 4px 0 0;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #3b82f6;
+      color: white;
+      font-size: 0.8em;
+    }
+    .modal button:hover {
+      background: #2563eb;
+    }
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1001;
+    }
+    #map.dropzone {
+      border: 2px dashed #3b82f6;
+      background: rgba(59, 134, 246, 0.1);
+    }
+    .fullscreen #map {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .fullscreen .controls,
+    .fullscreen h2 {
+      display: none;
+    }
+    .fullscreen .time-slider-container {
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80vw;
+    }
+    #expert-controls {
+      display: none;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 10px;
+      background: #f9fafb;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    #expert-controls label {
+      font-size: 0.75em;
+    }
+    #expert-controls input[type="number"],
+    #expert-controls input[type="range"] {
+      width: 50px;
+      padding: 4px;
+    }
+    #expert-controls input[type="file"] {
+      font-size: 0.7em;
+    }
+    .playback-speed-input {
+      width: 60px;
+      padding: 4px;
+      font-size: 0.8em;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="controls">
+    <label>Start Time: <input type="datetime-local" id="start-time"></label>
+    <label>End Time: <input type="datetime-local" id="end-time"></label>
+    <button onclick="applyFilter()">Apply Filter</button>
+    <button id="remove-filter" onclick="removeTimeFilter()" style="display: none;">Remove Time Filter</button>
+    <label>Color by age: <input type="checkbox" id="color-mode" checked onchange="updateStrikeColors()"></label>
+    <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"></label>
+    <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"></label>
+    <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"></label>
+    <label>Map Style:
+      <select id="map-style" onchange="switchBaseMap(this.value)">
         <option value="mapbox" selected>Mapbox (Handry Outlook)</option>
         <option value="custom">Custom Map Style</option>
         <option value="osm">OpenStreetMap</option>
