@@ -81,7 +81,6 @@
     .controls button:hover, #remove-filter:hover {
       background: #2563eb;
     }
-    /* Initially hide 3D heatmap controls */
     #heatmap-3d-toggle-label,
     #heatmap-frequency-slider-label,
     #heatmap-height-slider-label {
@@ -257,19 +256,22 @@
       padding: 4px;
       font-size: 0.8em;
     }
+    .lightning-flash-2d,
+.lightning-flash-3d {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+  animation: flash 2.5s ease-out;
+  z-index: 999; /* Ensure it appears above other elements */
+}
+    @keyframes flash {
+      0% { transform: scale(0.1); opacity: 1; }
+      100% { transform: scale(2); opacity: 0; }
+    }
   </style>
 </head>
-  <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-M5QDT7XR39"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-M5QDT7XR39');
-</script>
 <body>
-  <!-- HTML controls section remains as provided in the previous response -->
   <div class="controls">
     <label>Start Time: <input type="datetime-local" id="start-time"></label>
     <label>End Time: <input type="datetime-local" id="end-time"></label>
@@ -293,7 +295,8 @@
         <option value="maptiler-light">MapTiler Light</option>
       </select>
     </label>
-    <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"></label>
+    <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"></label> 
+    <label>Sound: <input type="checkbox" id="sound-toggle" onchange="toggleSound()"></label>
     <label>Number Overlay Resolution: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"></label>
     <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"></label>
     <label id="heatmap-frequency-slider-label">3D Heatmap Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"></label>
@@ -353,6 +356,7 @@
     <div id="normal-tutorial">
       <h4>Normal Mode</h4>
       <p>Use the "Start Time" and "End Time" inputs to filter lightning strikes by time, then click "Apply Filter". Toggle layers like "Lightning Layer", "Heatmap", and "Overlay Numbers" to visualize data. Use the slider below the map to view strikes within the "Lightning Lifespan" (e.g., 3 hours) from the selected time, up to the "Max History" hours back (left) to now (right). Adjust the "Lightning Lifespan" to control the time window of displayed strikes. Click "Play" to animate strikes from oldest to newest, adjust speed with the slider or "Minutes per Second" input (e.g., 1 = 1 minute of strikes per second), and stop to pause.</p>
+      <p>Enable "Sound" to play a thunder sound for each new strike within the map's view. </p>
       <p>Enable "3D Mode" to view the map as a 3D globe with terrain using Mapbox's Handry Outlook style, occupying the full map container. In 3D mode, the "Heatmap" checkbox controls a 2D heatmap, and the "3D Heatmap" checkbox enables a 3D terrain-like surface. Both can be enabled simultaneously. Adjust "3D Heatmap Resolution" and "3D Heatmap Tower Height" sliders (visible only in 3D mode) for the 3D heatmap, and "Heatmap Blur" for the 2D heatmap. Overlay numbers, KML, and PNG layers are also supported in 3D mode.</p>
     </div>
     <div id="expert-tutorial">
@@ -473,7 +477,7 @@
     logo.style.position = 'absolute';
     logo.style.top = '10px';
     logo.style.left = '10px';
-    logo.style.zIndex = '1000';
+    logo.style.zIndex = '10000';
     logo.style.width = '100px';
     logo.style.pointerEvents = 'none';
     mapContainer.appendChild(logo);
@@ -487,7 +491,7 @@
     legendControl.addTo(map);
 
     let strikeData = [];
-    let strikeLayer = L.layerGroup().addTo( map);
+    let strikeLayer = L.layerGroup().addTo(map);
     let heatmapLayer = null;
     let numberOverlay = null;
     let numberOverlay3D = [];
@@ -513,31 +517,95 @@
     let showAllStrikes = false;
     let strikeLayer3D = [];
     let heatmapLayer3D = null;
+    let lastRenderedStrikes = new Set();
+    let thunderAudio = new Audio('https://handry-outlook.github.io/Lightning-Strike-Visualiser-/mouse-click-117076-%5BAudioTrimmer.com%5D.mp3');
+    thunderAudio.preload = 'auto';
+    let soundEnabled = false;
+    let lightningEffectEnabled = false;
+    let lastSoundTime = 0;
+    const SOUND_COOLDOWN = 500;
+
+    function toggleSound() {
+      soundEnabled = document.getElementById('sound-toggle').checked;
+    }
+
+    function toggleLightningEffect() {
+      lightningEffectEnabled = document.getElementById('lightning-effect-toggle').checked;
+    }
+
+    function playThunderSound() {
+      if (!soundEnabled) return;
+      const now = Date.now();
+      if (now - lastSoundTime < SOUND_COOLDOWN) return;
+      thunderAudio.currentTime = 0;
+      thunderAudio.play().catch(error => console.error('Error playing sound:', error));
+      lastSoundTime = now;
+    }
+
+    function addLightningFlash2D(lat, lng) {
+  if (!lightningEffectEnabled) return;
+  if (!map || !map.getPanes().overlayPane) return;
+
+  // Ensure coordinates are in [latitude, longitude] order for Leaflet
+  const point = map.latLngToContainerPoint([lat, lng]);
+  if (!point || isNaN(point.x) || isNaN(point.y)) return; // Skip if point is invalid
+
+  const flash = document.createElement('div');
+  flash.className = 'lightning-flash-2d';
+  flash.style.width = '50px';
+  flash.style.height = '50px';
+  flash.style.left = `${point.x - 25}px`; // Center the flash
+  flash.style.top = `${point.y - 25}px`;
+  flash.style.zIndex = '1000';
+
+  map.getPanes().overlayPane.appendChild(flash);
+  setTimeout(() => flash.remove(), 2500); // Match animation duration (2.5s)
+}
+
+function addLightningFlash3D(lng, lat) {
+  if (!lightningEffectEnabled) return;
+  if (!map3D) return;
+
+  const el = document.createElement('div');
+  el.className = 'lightning-flash-3d';
+  el.style.width = '50px';
+  el.style.height = '50px';
+  el.style.transform = 'translate(-50%, -50%)'; // Center the flash
+
+  const marker = new mapboxgl.Marker({
+    element: el,
+    anchor: 'center'
+  })
+    .setLngLat([lng, lat])
+    .addTo(map3D);
+
+  setTimeout(() => marker.remove(), 2500); // Match animation duration (2.5s)
+}
 
     function toggle3DMode() {
-  is3DMode = document.getElementById('3d-mode-toggle').checked;
-  const mapDiv = document.getElementById('map');
-  const map3DDiv = document.getElementById('map-3d');
-  mapDiv.style.display = is3DMode ? 'none' : 'block';
-  map3DDiv.style.display = is3DMode ? 'block' : 'none';
-  document.getElementById('heatmap-3d-toggle').parentElement.style.display = is3DMode ? 'flex' : 'none';
-  document.getElementById('heatmap-frequency-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
-  document.getElementById('heatmap-height-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
-  
-  if (is3DMode) {
-    map3D.jumpTo({ center: [-4.5, 57.5], zoom: 5 });
-    map3D.resize();
-    update3DView();
-    toggleKMLLayer();
-    togglePNGLayer();
-    updateOverlay(currentFiltered);
-    updateLegend();
-  } else {
-    map.invalidateSize();
-    updateHistory();
-    updateLegend();
-  }
-}
+      is3DMode = document.getElementById('3d-mode-toggle').checked;
+      const mapDiv = document.getElementById('map');
+      const map3DDiv = document.getElementById('map-3d');
+      mapDiv.style.display = is3DMode ? 'none' : 'block';
+      map3DDiv.style.display = is3DMode ? 'block' : 'none';
+      document.getElementById('heatmap-3d-toggle').parentElement.style.display = is3DMode ? 'flex' : 'none';
+      document.getElementById('heatmap-frequency-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
+      document.getElementById('heatmap-height-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
+      
+      if (is3DMode) {
+        map3D.jumpTo({ center: [-4.5, 57.5], zoom: 5 });
+        map3D.resize();
+        update3DView();
+        toggleKMLLayer();
+        togglePNGLayer();
+        updateOverlay(currentFiltered);
+        updateLegend();
+      } else {
+        map.invalidateSize();
+        updateHistory();
+        updateLegend();
+      }
+    }
 
     function update3DView() {
       strikeLayer3D.forEach(marker => marker.remove());
@@ -546,9 +614,16 @@
       if (map3D.getSource('heatmap-3d')) map3D.removeSource('heatmap-3d');
       if (map3D.getLayer('heatmap-2d')) map3D.removeLayer('heatmap-2d');
       if (map3D.getSource('heatmap-2d')) map3D.removeSource('heatmap-2d');
+      map3D.resize();
+      const currentBounds = map3D.getBounds();
+      const newStrikes = new Set();
 
       if (document.getElementById('lightning-layer-toggle').checked) {
         currentFiltered.forEach(s => {
+          const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
+          newStrikes.add(strikeKey);
+          const isNewStrike = !lastRenderedStrikes.has(strikeKey);
+          const inBounds = currentBounds.contains([s.coordinates[0], s.coordinates[1]]);
           const el = document.createElement('div');
           el.className = 'marker';
           el.style.backgroundColor = document.getElementById('color-mode').checked ? getColorFromAge((new Date(document.getElementById('end-time').value) - s.time) / (parseFloat(document.getElementById('lightning-lifespan').value) * 3600 * 1000)) : 'black';
@@ -560,8 +635,14 @@
             .setPopup(new mapboxgl.Popup().setText(s.time.toISOString()))
             .addTo(map3D);
           strikeLayer3D.push(marker);
+          if (isNewStrike && inBounds) {
+            playThunderSound();
+            addLightningFlash3D(s.coordinates[0], s.coordinates[1]);
+          }
         });
       }
+
+      lastRenderedStrikes = newStrikes;
 
       const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
       const heatmap3DEnabled = document.getElementById('heatmap-3d-toggle').checked;
@@ -756,7 +837,9 @@
         slider.max = sliderMax;
         slider.min = 0;
         slider.value = sliderValue;
-
+        if (!is3DMode) {
+    map.invalidateSize(); // Ensure map is updated
+  }
         document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
         document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
       } else {
@@ -785,6 +868,8 @@
 
       strikeLayer.clearLayers();
       strikeCircles = [];
+      const currentBounds = is3DMode ? map3D.getBounds() : map.getBounds();
+      const newStrikes = new Set();
 
       currentFiltered = strikeData.filter(s => {
         if (showAllStrikes) {
@@ -794,6 +879,12 @@
       });
 
       currentFiltered.forEach(s => {
+        const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
+        newStrikes.add(strikeKey);
+        const isNewStrike = !lastRenderedStrikes.has(strikeKey);
+        const inBounds = is3DMode ? 
+          currentBounds.contains([s.coordinates[0], s.coordinates[1]]) :
+          currentBounds.contains([s.coordinates[1], s.coordinates[0]]);
         const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
         const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
         const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
@@ -804,7 +895,13 @@
         }).bindPopup(s.time.toISOString());
         strikeLayer.addLayer(circle);
         strikeCircles.push({ circle, strike: s });
+        if (isNewStrike && inBounds && document.getElementById('lightning-layer-toggle').checked) {
+          playThunderSound();
+          if (!is3DMode) addLightningFlash2D(s.coordinates[1], s.coordinates[0]);
+        }
       });
+
+      lastRenderedStrikes = newStrikes;
 
       updateHeatmap(currentFiltered);
       updateOverlay(currentFiltered);
@@ -1081,6 +1178,9 @@
 
       strikeLayer.clearLayers();
       strikeCircles = [];
+      const currentBounds = is3DMode ? map3D.getBounds() : map.getBounds();
+      const newStrikes = new Set();
+
       currentFiltered = strikeData.filter(s => {
         if (showAllStrikes) {
           return s.time >= new Date(end.getTime() - parseInt(document.getElementById('max-history-hours').value) * 3600 * 1000) && s.time <= end;
@@ -1089,6 +1189,12 @@
       });
 
       currentFiltered.forEach(s => {
+        const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
+        newStrikes.add(strikeKey);
+        const isNewStrike = !lastRenderedStrikes.has(strikeKey);
+        const inBounds = is3DMode ? 
+          currentBounds.contains([s.coordinates[0], s.coordinates[1]]) :
+          currentBounds.contains([s.coordinates[1], s.coordinates[0]]);
         const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
         const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
         const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
@@ -1100,7 +1206,13 @@
         }).bindPopup(s.time.toISOString());
         strikeLayer.addLayer(circle);
         strikeCircles.push({ circle, strike: s });
+        if (isNewStrike && inBounds && document.getElementById('lightning-layer-toggle').checked) {
+          playThunderSound();
+          if (!is3DMode) addLightningFlash2D(s.coordinates[1], s.coordinates[0]);
+        }
       });
+
+      lastRenderedStrikes = newStrikes;
 
       updateHeatmap(currentFiltered);
       updateOverlay(currentFiltered);
@@ -1206,7 +1318,7 @@
       }
       updateLegend();
     }
-
+       
     function toggleKMLLayer() {
       const toggle = document.getElementById('kml-layer-toggle').checked;
       if (is3DMode) {
@@ -1371,268 +1483,211 @@
       }
     }
 
-    function importKML(input) {
-      if (!input.files || !input.files[0]) return alert('No KML file selected.');
-      const file = input.files[0];
-      if (document.getElementById('auto-time-filter').checked && !pendingFile) {
-        showTimeFilterModal(file, 'kml');
-        return;
-      }
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const parser = new DOMParser();
-          const kml = parser.parseFromString(e.target.result, 'text/xml');
-          kmlGeoJSON = toGeoJSON.kml(kml);
-          if (kmlLayer) map.removeLayer(kmlLayer);
-
-          kmlLayer = L.geoJSON(kmlGeoJSON, {
-            style: function(feature) {
-              const name = feature.properties.name || '';
-              return risk_colors[name] ? {
-                color: risk_colors[name],
-                fillColor: risk_colors[name],
-                fillOpacity: 0.3
-              } : { color: 'black', fillOpacity: 0 };
-            },
-            onEachFeature: (f, l) => {
-              if (f.properties.name) l.bindPopup(f.properties.name);
-            }
-          });
-
-          if (document.getElementById('kml-layer-toggle').checked && !is3DMode) {
-            kmlLayer.addTo(map);
-            kmlLayer.setZIndex(60);
-          }
-          document.getElementById('kml-layer-toggle').checked = true;
-          document.getElementById('kml-zindex').value = 60;
-          updateZIndex();
-          map.invalidateSize();
-          if (is3DMode) toggleKMLLayer();
-          updateLegend();
-        } catch (error) {
-          console.error('Error processing KML file:', error);
-          alert('Failed to process KML file.');
-        }
-      };
-      reader.readAsText(file);
+  function importKML(input) {
+    if (!input.files || !input.files[0]) return alert('No KML file selected.');
+    const file = input.files[0];
+    if (document.getElementById('auto-time-filter').checked && !pendingFile) {
+      showTimeFilterModal(file, 'kml');
+      return;
     }
 
-    function importPNG(input) {
-      if (!input.files || !input.files[0]) return alert('No PNG file selected.');
-      const file = input.files[0];
-      if (document.getElementById('auto-time-filter').checked && !pendingFile) {
-        showTimeFilterModal(file, 'png');
-        return;
-      }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const parser = new DOMParser();
+        const kml = parser.parseFromString(e.target.result, 'text/xml');
+        kmlGeoJSON = toGeoJSON.kml(kml);
+        if (kmlLayer) map.removeLayer(kmlLayer);
 
-      const region = Object.keys(region_bounds).find(r => file.name.includes(r));
-      if (!region) {
-        alert('Region not recognized in filename.');
-        return;
-      }
+        kmlLayer = L.geoJSON(kmlGeoJSON, {
+          style: function(feature) {
+            const name = feature.properties.name || '';
+            return risk_colors[name] ? {
+              color: risk_colors[name],
+              fillColor: risk_colors[name],
+              fillOpacity: 0.3
+            } : { color: 'black', fillOpacity: 0 };
+          },
+          onEachFeature: (f, l) => {
+            if (f.properties.name) l.bindPopup(f.properties.name);
+          }
+        });
 
-      const [[south, west], [north, east]] = region_bounds[region];
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        if (pngLayer) map.removeLayer(pngLayer);
-        const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
-        pngLayer = L.imageOverlay(e.target.result, [[south, west], [north, east]], { opacity });
+        if (document.getElementById('kml-layer-toggle').checked && !is3DMode) {
+          kmlLayer.addTo(map);
+          kmlLayer.setZIndex(60);
+        }
+        if (is3DMode) toggleKMLLayer();
+        updateZIndex();
+        updateLegend();
+      } catch (error) {
+        console.error('Error parsing KML:', error);
+        alert('Failed to parse KML file.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function importPNG(input) {
+    if (!input.files || !input.files[0]) return alert('No PNG file selected.');
+    const file = input.files[0];
+    if (document.getElementById('auto-time-filter').checked && !pendingFile) {
+      showTimeFilterModal(file, 'png');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
         pngImage = e.target.result;
-        pngBounds = [[south, west], [north, east]];
+        let bounds = region_bounds['UK'];
+        for (const [region, regionBounds] of Object.entries(region_bounds)) {
+          if (file.name.toLowerCase().includes(region.toLowerCase())) {
+            bounds = regionBounds;
+            break;
+          }
+        }
+        pngBounds = bounds;
+
+        if (pngLayer) map.removeLayer(pngLayer);
+        pngLayer = L.imageOverlay(pngImage, bounds, {
+          opacity: parseFloat(document.getElementById('png-opacity-slider').value)
+        });
+
         if (document.getElementById('png-layer-toggle').checked && !is3DMode) {
           pngLayer.addTo(map);
           pngLayer.setZIndex(40);
         }
-        document.getElementById('png-layer-toggle').checked = true;
-        const pngZIndexInput = document.getElementById('png-zindex');
-        if (pngZIndexInput) pngZIndexInput.value = 40;
-        map.fitBounds([[south, west], [north, east]]);
-        updateZIndex();
-        map.invalidateSize();
         if (is3DMode) togglePNGLayer();
+        updateZIndex();
         updateLegend();
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function updatePNGOpacity() {
-      const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
-      if (pngLayer && !is3DMode) pngLayer.setOpacity(opacity);
-      if (is3DMode && map3D.getLayer('png-layer')) {
-        map3D.setPaintProperty('png-layer', 'raster-opacity', opacity);
+      } catch (error) {
+        console.error('Error loading PNG:', error);
+        alert('Failed to load PNG file.');
       }
-    }
+    };
+    reader.readAsDataURL(file);
+  }
 
-    function switchBaseMap(style) {
-      if (is3DMode) return;
-      Object.values(baseLayers).forEach(layer => {
-        if (map.hasLayer(layer)) map.removeLayer(layer);
-      });
-      baseLayers[style]?.addTo(map) || baseLayers.mapbox.addTo(map);
-      updateZIndex();
+  function updatePNGOpacity() {
+    const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
+    if (pngLayer && !is3DMode) {
+      pngLayer.setOpacity(opacity);
+    }
+    if (is3DMode && map3D.getLayer('png-layer')) {
+      map3D.setPaintProperty('png-layer', 'raster-opacity', opacity);
+    }
+  }
+
+  function switchBaseMap(style) {
+    Object.values(baseLayers).forEach(layer => {
+      if (map.hasLayer(layer)) map.removeLayer(layer);
+    });
+    baseLayers[style].addTo(map);
+    updateZIndex();
+    map.invalidateSize();
+  }
+
+  function playAnimation() {
+    if (isPlaying) return;
+    isPlaying = true;
+    stopAnimation();
+    const slider = document.getElementById('history-slider');
+    let currentValue = parseInt(slider.value);
+    const maxValue = parseInt(slider.max);
+    const step = parseFloat(document.getElementById('speed-slider').value) * 60 * 1000 / 1000;
+
+    animationInterval = setInterval(() => {
+      currentValue += step;
+      if (currentValue >= maxValue) {
+        currentValue = maxValue;
+        stopAnimation();
+      }
+      slider.value = currentValue;
+      updateHistory();
+    }, 1000);
+  }
+
+  function stopAnimation() {
+    if (animationInterval) {
+      clearInterval(animationInterval);
+      animationInterval = null;
+    }
+    isPlaying = false;
+  }
+
+  function updateSpeedSlider() {
+    const speedSlider = document.getElementById('speed-slider');
+    const speedTextbox = document.getElementById('playback-minutes');
+    const minutesPerSecond = parseFloat(speedSlider.value) * 60;
+    speedTextbox.value = minutesPerSecond.toFixed(2);
+  }
+
+  function updateSpeedTextbox() {
+    const speedSlider = document.getElementById('speed-slider');
+    const speedTextbox = document.getElementById('playback-minutes');
+    const minutesPerSecond = parseFloat(speedTextbox.value);
+    if (minutesPerSecond >= 0.01) {
+      speedSlider.value = minutesPerSecond / 60;
+    }
+  }
+
+  function toggleFullScreen() {
+    isFullScreen = !isFullScreen;
+    document.body.classList.toggle('fullscreen', isFullScreen);
+    if (is3DMode) {
+      map3D.resize();
+    } else {
       map.invalidateSize();
     }
+  }
 
-    function updateSpeedTextbox() {
-      const sliderValue = parseFloat(document.getElementById('speed-slider').value);
-      const minutesPerSecond = sliderValue;
-      document.getElementById('playback-minutes').value = minutesPerSecond.toFixed(2);
-    }
-
-    function updateSpeedSlider() {
-      const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
-      const sliderValue = Math.min(Math.max(minutesPerSecond, 0.01), 5);
-      document.getElementById('speed-slider').value = sliderValue;
-    }
-
-    function playAnimation() {
-      if (isPlaying) return;
-      isPlaying = true;
-      const minutesPerSecond = parseFloat(document.getElementById('playback-minutes').value) || 1;
-      const slider = document.getElementById('history-slider');
-      const interval = document.getElementById('number-overlay-toggle').checked ? 1000 : 10;
-      let maxMinutes, currentValue, minutesPerFrame;
-
-      if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
-        const start = new Date(customFilterStart);
-        const end = new Date(customFilterEnd);
-        maxMinutes = (end - start) / (60 * 1000);
-        currentValue = parseInt(slider.value) || 0;
-        minutesPerFrame = minutesPerSecond * (interval / 1000);
-        slider.max = Math.max(maxMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
-      } else {
-        maxMinutes = parseInt(document.getElementById('max-history-hours').value) * 60;
-        currentValue = parseInt(slider.value) || 0;
-        minutesPerFrame = minutesPerSecond * (interval / 1000);
-        slider.max = maxMinutes;
-      }
-
-      updateHistory();
-
-      animationInterval = setInterval(() => {
-        currentValue += minutesPerFrame;
-        if (currentValue >= maxMinutes) {
-          stopAnimation();
-          slider.value = maxMinutes;
-          updateHistory();
-          return;
-        }
-        slider.value = Math.min(currentValue, maxMinutes);
-        updateHistory();
-      }, interval);
-    }
-
-    function stopAnimation() {
-      if (animationInterval) {
-        clearInterval(animationInterval);
-        animationInterval = null;
-      }
-      isPlaying = false;
-    }
-
-    function toggleFullScreen() {
-      const container = document.body;
-      isFullScreen = !isFullScreen;
-      if (isFullScreen) {
-        if (container.requestFullscreen) {
-          container.requestFullscreen();
-        } else if (container.webkitRequestFullscreen) {
-          container.webkitRequestFullscreen();
-        } else if (container.msRequestFullscreen) {
-          container.msRequestFullscreen();
-        }
-        container.classList.add('fullscreen');
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) {
-          document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
-          document.msExitFullscreen();
-        }
-        container.classList.remove('fullscreen');
-      }
-      if (is3DMode) {
-        map3D.resize();
-      } else {
-        map.invalidateSize();
-      }
-    }
-
-    // Initialize map drag-and-drop for KML and PNG files
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      mapContainer.addEventListener(eventName, preventDefaults, false);
-      document.getElementById('map-3d').addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      mapContainer.addEventListener(eventName, () => {
-        mapContainer.classList.add('dropzone');
-      }, false);
-      document.getElementById('map-3d').addEventListener(eventName, () => {
-        document.getElementById('map-3d').classList.add('dropzone');
-      }, false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-      mapContainer.addEventListener(eventName, () => {
-        mapContainer.classList.remove('dropzone');
-      }, false);
-      document.getElementById('map-3d').addEventListener(eventName, () => {
-        document.getElementById('map-3d').classList.remove('dropzone');
-      }, false);
-    });
-
-    mapContainer.addEventListener('drop', handleDrop, false);
-    document.getElementById('map-3d').addEventListener('drop', handleDrop, false);
-
-    function handleDrop(e) {
-      const dt = e.dataTransfer;
-      const file = dt.files[0];
-      if (!file) return;
-
-      const extension = file.name.split('.').pop().toLowerCase();
-      if (extension === 'kml') {
-        showTimeFilterModal(file, 'kml');
-      } else if (extension === 'png') {
-        showTimeFilterModal(file, 'png');
-      } else {
-        alert('Unsupported file type. Please upload a KML or PNG file.');
-      }
-    }
-
-    // Initialize the application
-    fetchData();
-    setRefreshInterval();
+  // Initialize map event listeners
+  map.on('moveend', () => {
+    if (isAdjustingHistory) return;
     updateHistory();
+  });
 
-    // Event listeners for input changes
-    document.getElementById('lightning-lifespan').addEventListener('input', () => {
-      if (lastFilterMode === 'slider') {
-        updateHistory();
-      } else {
-        applyFilter();
-      }
-    });
+  map3D.on('moveend', () => {
+    if (isAdjustingHistory) return;
+    update3DView();
+  });
 
-    document.getElementById('max-history-hours').addEventListener('input', updateHistorySliderMax);
+  // Initialize application
+  fetchData();
+  setRefreshInterval();
+  updateHistorySliderMax();
+  toggleAutoLatest();
 
-    document.getElementById('history-slider').addEventListener('input', () => {
-      if (!isPlaying) updateHistory();
-    });
+  // Drag and drop support
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    mapContainer.addEventListener(eventName, e => e.preventDefault());
+    document.getElementById('map-3d').addEventListener(eventName, e => e.preventDefault());
+  });
 
-    // Ensure proper cleanup on page unload
-    window.addEventListener('unload', () => {
-      if (refreshTimer) clearInterval(refreshTimer);
-      if (animationInterval) clearInterval(animationInterval);
-    });
-  </script>
+  mapContainer.addEventListener('dragenter', () => mapContainer.classList.add('dropzone'));
+  mapContainer.addEventListener('dragleave', () => mapContainer.classList.remove('dropzone'));
+  mapContainer.addEventListener('drop', handleDrop);
+
+  document.getElementById('map-3d').addEventListener('dragenter', () => document.getElementById('map-3d').classList.add('dropzone'));
+  document.getElementById('map-3d').addEventListener('dragleave', () => document.getElementById('map-3d').classList.remove('dropzone'));
+  document.getElementById('map-3d').addEventListener('drop', handleDrop);
+
+  function handleDrop(e) {
+    mapContainer.classList.remove('dropzone');
+    document.getElementById('map-3d').classList.remove('dropzone');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.name.endsWith('.kml')) {
+      importKML({ files: [file] });
+    } else if (file.name.endsWith('.png')) {
+      importPNG({ files: [file] });
+    } else {
+      alert('Unsupported file type. Please upload a KML or PNG file.');
+    }
+  }
+
+</script>
 </body>
 </html>
