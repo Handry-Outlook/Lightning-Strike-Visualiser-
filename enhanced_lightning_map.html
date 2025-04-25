@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link href="https://cdn.maptiles.com/maptiler-sdk-js/v3.0.1/maptiler-sdk.css" rel="stylesheet" />
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -21,12 +22,12 @@
     }
     #map, #map-3d {
       position: absolute;
-      top: 220px;
-      bottom: 100px;
+      top: 180px;
+      bottom: 0px;
       left: 20px;
       right: 20px;
       width: calc(100vw - 40px);
-      height: calc(100vh - 320px);
+      height: calc(100vh - 200px);
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
@@ -41,7 +42,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      margin: 10px 20px;
+      margin: 10px 10px;
       position: relative;
       z-index: 1003;
     }
@@ -169,7 +170,7 @@
     .modal {
       display: none;
       position: fixed;
-      top: 50%;
+      top: 60%;
       left: 50%;
       transform: translate(-50%, -50%);
       background: white;
@@ -177,7 +178,7 @@
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       z-index: 1002;
-      max-width: 350px;
+      max-width: 570px;
     }
     .modal h3 {
       margin-top: 0;
@@ -260,17 +261,34 @@
 .lightning-flash-3d {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 50%);
   pointer-events: none;
   animation: flash 2.5s ease-out;
-  z-index: 999; /* Ensure it appears above other elements */
+  z-index: 999;
 }
-    @keyframes flash {
-      0% { transform: scale(0.1); opacity: 1; }
-      100% { transform: scale(2); opacity: 0; }
+@keyframes flash {
+  0% { transform: scale(0.1); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+    .nowcast-cluster {
+      border: 2px solid;
+      border-radius: 50%;
+      opacity: 0.5;
+    }
+    .nowcast-cone {
+      opacity: 0.5;
     }
   </style>
 </head>
+<!-- Google tag (gtag.js) -->
+ <script async src="https://www.googletagmanager.com/gtag/js?id=G-M5QDT7XR39"></script>
+ <script>
+   window.dataLayer = window.dataLayer || [];
+   function gtag(){dataLayer.push(arguments);}
+   gtag('js', new Date());
+ 
+   gtag('config', 'G-M5QDT7XR39');
+ </script>
 <body>
   <div class="controls">
     <label>Start Time: <input type="datetime-local" id="start-time"></label>
@@ -295,9 +313,21 @@
         <option value="maptiler-light">MapTiler Light</option>
       </select>
     </label>
-    <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"></label> 
-    <label>Sound: <input type="checkbox" id="sound-toggle" onchange="toggleSound()"></label>
+    <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"></label>
     <label>Number Overlay Resolution: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"></label>
+    <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"></label>
+    <label id="heatmap-frequency-slider-label">3D Heatmap Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"></label>
+    <label id="heatmap-height-slider-label">3D Heatmap Tower Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="updateHeatmap(currentFiltered)"></label>
+    <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked></label>
+    <label>Auto-refresh every:
+      <select id="refresh-interval" onchange="setRefreshInterval()">
+        <option value="0">Off</option>
+        <option value="0.5">30 seconds</option>
+        <option value="1" selected>1 minute</option>
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+        <option value="15">15 minutes</option>
+        < Number Overlay Resolution: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"></label>
     <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"></label>
     <label id="heatmap-frequency-slider-label">3D Heatmap Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"></label>
     <label id="heatmap-height-slider-label">3D Heatmap Tower Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="updateHeatmap(currentFiltered)"></label>
@@ -318,6 +348,8 @@
     <label>Lightning Lifespan: <input type="number" id="lightning-lifespan" value="3" min="0.1" step="0.1"> hours <span title="Strikes will be shown only within this period from the selected time.">ℹ️</span></label>
     <label>Max History: <input type="number" id="max-history-hours" value="48" min="1" step="1" onchange="updateHistorySliderMax()"> hours <span title="Maximum hours back for history slider.">ℹ️</span></label>
     <label><button id="view-mode" onclick="toggleViewMode()">Enable all strikes</button></label>
+    <label>Sound: <input type="checkbox" id="sound-toggle" onchange="toggleSound()"></label>
+    <label>Nowcast: <input type="checkbox" id="nowcast-toggle" checked onchange="toggleNowcast()"></label>
     <a href="https://handry-outlook.github.io/Convective-Outlook/lightning_strikes_chart.html" target="_blank"><button>View Customisable Strikes Chart</button></a>
     <a href="https://handry-outlook.github.io/Convective-Outlook/interactive_map.html" target="_blank"><button>View Latest Radar and Forecast</button></a>
     <button onclick="showTutorial()">Help</button>
@@ -341,12 +373,12 @@
     <label><input type="range" id="history-slider" class="slider" min="0" max="2880" value="2880" oninput="updateHistory()"> <span id="history-label">Now</span></label>
     <p id="history-time"></p>
     <div class="animator">
-      <button onclick="playAnimation()">▶️ Play</button>
-      <button onclick="stopAnimation()">⏹️ Stop</button>
-      <button onclick="toggleFullScreen()">⛶ Fullscreen</button>
-      <label>Speed: <input type="range" id="speed-slider" class="speed-slider" min="0.0167" max="5" step="0.0167" value="1" oninput="updateSpeedTextbox()"></label>
-      <label>Minutes per second: <input type="number" id="playback-minutes" class="playback-speed-input" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
-    </div>
+  <button onclick="playAnimation()">▶️ Play</button>
+  <button onclick="stopAnimation()">⏹️ Stop</button>
+  <button onclick="toggleFullScreen()">⛶ Fullscreen</button>
+  <label>Speed: <input type="range" id="speed-slider" class="speed-slider" min="1" max="100" step="1" value="50" oninput="updateSpeedTextbox()"></label>
+  <label>Minutes per second: <input type="number" id="playback-minutes" class="playback-speed-input" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
+</div>
     <p id="time-range" class="status-info"></p>
     <p id="last-update" class="status-info"></p>
     <p id="current-time" class="status-info"></p>
@@ -356,8 +388,9 @@
     <div id="normal-tutorial">
       <h4>Normal Mode</h4>
       <p>Use the "Start Time" and "End Time" inputs to filter lightning strikes by time, then click "Apply Filter". Toggle layers like "Lightning Layer", "Heatmap", and "Overlay Numbers" to visualize data. Use the slider below the map to view strikes within the "Lightning Lifespan" (e.g., 3 hours) from the selected time, up to the "Max History" hours back (left) to now (right). Adjust the "Lightning Lifespan" to control the time window of displayed strikes. Click "Play" to animate strikes from oldest to newest, adjust speed with the slider or "Minutes per Second" input (e.g., 1 = 1 minute of strikes per second), and stop to pause.</p>
-      <p>Enable "Sound" to play a thunder sound for each new strike within the map's view. </p>
+      <p>Enable "Sound" to play a thunder sound for each new strike within the map's view.</p>
       <p>Enable "3D Mode" to view the map as a 3D globe with terrain using Mapbox's Handry Outlook style, occupying the full map container. In 3D mode, the "Heatmap" checkbox controls a 2D heatmap, and the "3D Heatmap" checkbox enables a 3D terrain-like surface. Both can be enabled simultaneously. Adjust "3D Heatmap Resolution" and "3D Heatmap Tower Height" sliders (visible only in 3D mode) for the 3D heatmap, and "Heatmap Blur" for the 2D heatmap. Overlay numbers, KML, and PNG layers are also supported in 3D mode.</p>
+      <p>Enable "Nowcast" to display predicted lightning movement based on recent strike clusters. Nowcast shows circles at cluster centers and cones indicating the predicted direction of movement, colored by confidence (purple for very high, red for high, orange for moderate, yellow for low). This feature works in both 2D and 3D modes and updates dynamically when applying filters.</p>
     </div>
     <div id="expert-tutorial">
       <h4>Expert Mode</h4>
@@ -365,6 +398,7 @@
       <p>For KML files, ensure polygon names match risk levels: 'Low risk', 'Slight risk', 'Enhanced risk', 'Moderate risk', 'High risk' for correct colors.</p>
       <p>For PNG files, the filename should include the region name (e.g., 'England', 'Wales') to set image bounds.</p>
     </div>
+
     <button onclick="closeTutorial()">Close</button>
   </div>
   <div id="modal" class="modal">
@@ -452,24 +486,26 @@
 
     map = L.map('map', { layers: [baseLayers.mapbox], zoomControl: false }).setView([57.5, -4.5], 6);
 
-    map3D = new mapboxgl.Map({
-      container: 'map-3d',
-      style: 'mapbox://styles/handry-outlook/cm9457ty1009d01sk37353ux2',
-      center: [-4.5, 57.5],
-      zoom: 5,
-      projection: 'globe',
-      accessToken: mapboxAccessToken
-    });
+   map3D = new mapboxgl.Map({
+  container: 'map-3d',
+  style: 'mapbox://styles/handry-outlook/cm9457ty1009d01sk37353ux2',
+  center: [-4.5, 57.5],
+  zoom: 5,
+  projection: 'globe',
+  accessToken: mapboxAccessToken
+});
 
-    map3D.on('load', () => {
-      map3D.addSource('mapbox-dem', {
-        'type': 'raster-dem',
-        'url': 'mapbox://mapbox.terrain-rgb',
-        'tileSize': 512,
-        'maxzoom': 14
-      });
-      map3D.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1 });
-    });
+map3D.on('load', () => {
+  map3D.addSource('mapbox-dem', {
+    'type': 'raster-dem',
+    'url': 'mapbox://mapbox.terrain-rgb',
+    'tileSize': 512,
+    'maxzoom': 14
+  });
+  map3D.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 12 });
+  map3D.resize(); // Ensure 3D map is sized correctly
+});
+map.invalidateSize(); // Ensure 2D map is sized correctly
 
     const mapContainer = document.getElementById('map');
     const logo = document.createElement('img');
@@ -523,7 +559,10 @@
     let soundEnabled = false;
     let lightningEffectEnabled = false;
     let lastSoundTime = 0;
-    const SOUND_COOLDOWN = 500;
+    const SOUND_COOLDOWN = 50;
+    let nowcastLayer = L.layerGroup();
+    let nowcastLayer3D = [];
+    let currentNowcasts = [];
 
     function toggleSound() {
       soundEnabled = document.getElementById('sound-toggle').checked;
@@ -543,193 +582,299 @@
     }
 
     function addLightningFlash2D(lat, lng) {
-  if (!lightningEffectEnabled) return;
-  if (!map || !map.getPanes().overlayPane) return;
+  if (!lightningEffectEnabled || !map || !map.getPanes().overlayPane) return;
 
-  // Ensure coordinates are in [latitude, longitude] order for Leaflet
+  // Ensure map size is valid
+  map.invalidateSize();
+
+  // Convert [latitude, longitude] to container coordinates
   const point = map.latLngToContainerPoint([lat, lng]);
-  if (!point || isNaN(point.x) || isNaN(point.y)) return; // Skip if point is invalid
+  if (!point || isNaN(point.x) || isNaN(point.y)) {
+    console.warn(`Invalid container point for lat=${lat}, lng=${lng}:`, point);
+    return;
+  }
+
+  // Calculate base size based on zoom level to maintain consistent appearance
+  const zoom = map.getZoom();
+  const baseSize = 50 * Math.pow(2, (10 - zoom) / 2); // Adjust size based on zoom
 
   const flash = document.createElement('div');
   flash.className = 'lightning-flash-2d';
-  flash.style.width = '50px';
-  flash.style.height = '50px';
-  flash.style.left = `${point.x - 25}px`; // Center the flash
-  flash.style.top = `${point.y - 25}px`;
+  flash.style.width = `${baseSize}px`;
+  flash.style.height = `${baseSize}px`;
+  flash.style.left = `${point.x - baseSize / 2}px`; // Center the flash
+  flash.style.top = `${point.y - baseSize / 2}px`; // Center the flash
   flash.style.zIndex = '1000';
-
+  flash.style.transformOrigin = 'center'; // Ensure scaling is centered
   map.getPanes().overlayPane.appendChild(flash);
-  setTimeout(() => flash.remove(), 2500); // Match animation duration (2.5s)
+  setTimeout(() => flash.remove(), 2500);
 }
 
 function addLightningFlash3D(lng, lat) {
-  if (!lightningEffectEnabled) return;
-  if (!map3D) return;
+  if (!lightningEffectEnabled || !map3D) return;
+
+  // Ensure map is resized
+  map3D.resize();
+
+  // Calculate size based on zoom level
+  const zoom = map3D.getZoom();
+  const baseSize = 50 * Math.pow(2, (10 - zoom) / 2); // Adjust size based on zoom
 
   const el = document.createElement('div');
   el.className = 'lightning-flash-3d';
-  el.style.width = '50px';
-  el.style.height = '50px';
+  el.style.width = `${baseSize}px`;
+  el.style.height = `${baseSize}px`;
   el.style.transform = 'translate(-50%, -50%)'; // Center the flash
-
+  el.style.transformOrigin = 'center'; // Ensure scaling is centered
   const marker = new mapboxgl.Marker({
     element: el,
     anchor: 'center'
   })
     .setLngLat([lng, lat])
     .addTo(map3D);
-
-  setTimeout(() => marker.remove(), 2500); // Match animation duration (2.5s)
+  setTimeout(() => marker.remove(), 2500);
 }
 
     function toggle3DMode() {
-      is3DMode = document.getElementById('3d-mode-toggle').checked;
-      const mapDiv = document.getElementById('map');
-      const map3DDiv = document.getElementById('map-3d');
-      mapDiv.style.display = is3DMode ? 'none' : 'block';
-      map3DDiv.style.display = is3DMode ? 'block' : 'none';
-      document.getElementById('heatmap-3d-toggle').parentElement.style.display = is3DMode ? 'flex' : 'none';
-      document.getElementById('heatmap-frequency-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
-      document.getElementById('heatmap-height-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
-      
-      if (is3DMode) {
-        map3D.jumpTo({ center: [-4.5, 57.5], zoom: 5 });
-        map3D.resize();
-        update3DView();
-        toggleKMLLayer();
-        togglePNGLayer();
-        updateOverlay(currentFiltered);
-        updateLegend();
-      } else {
-        map.invalidateSize();
-        updateHistory();
-        updateLegend();
-      }
-    }
+  is3DMode = document.getElementById('3d-mode-toggle').checked;
+  const mapDiv = document.getElementById('map');
+  const map3DDiv = document.getElementById('map-3d');
+  mapDiv.style.display = is3DMode ? 'none' : 'block';
+  map3DDiv.style.display = is3DMode ? 'block' : 'none';
+  document.getElementById('heatmap-3d-toggle').parentElement.style.display = is3DMode ? 'flex' : 'none';
+  document.getElementById('heatmap-frequency-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
+  document.getElementById('heatmap-height-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
+  
+  if (is3DMode) {
+    map3D.jumpTo({ center: [-4.5, 57.5], zoom: 5 });
+    map3D.resize();
+    update3DView();
+    toggleKMLLayer();
+    togglePNGLayer();
+    updateOverlay(currentFiltered);
+    toggleNowcast();
+    updateLegend();
+  } else {
+    map.invalidateSize();
+    updateHistory();
+    updateLegend();
+  }
+}
 
     function update3DView() {
-      strikeLayer3D.forEach(marker => marker.remove());
-      strikeLayer3D = [];
-      if (map3D.getLayer('heatmap-3d')) map3D.removeLayer('heatmap-3d');
-      if (map3D.getSource('heatmap-3d')) map3D.removeSource('heatmap-3d');
-      if (map3D.getLayer('heatmap-2d')) map3D.removeLayer('heatmap-2d');
-      if (map3D.getSource('heatmap-2d')) map3D.removeSource('heatmap-2d');
-      map3D.resize();
-      const currentBounds = map3D.getBounds();
-      const newStrikes = new Set();
+  // Clear existing layers
+  strikeLayer3D.forEach(marker => marker.remove());
+  strikeLayer3D = [];
+  if (map3D.getLayer('heatmap-3d')) map3D.removeLayer('heatmap-3d');
+  if (map3D.getSource('heatmap-3d')) map3D.removeSource('heatmap-3d');
+  if (map3D.getLayer('heatmap-2d')) map3D.removeLayer('heatmap-2d');
+  if (map3D.getSource('heatmap-2d')) map3D.removeSource('heatmap-2d');
+  nowcastLayer3D.forEach(layer => {
+    if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
+    if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
+  });
+  nowcastLayer3D = [];
+  map3D.resize();
+  const currentBounds = map3D.getBounds();
+  const newStrikes = new Set();
 
-      if (document.getElementById('lightning-layer-toggle').checked) {
-        currentFiltered.forEach(s => {
-          const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
-          newStrikes.add(strikeKey);
-          const isNewStrike = !lastRenderedStrikes.has(strikeKey);
-          const inBounds = currentBounds.contains([s.coordinates[0], s.coordinates[1]]);
-          const el = document.createElement('div');
-          el.className = 'marker';
-          el.style.backgroundColor = document.getElementById('color-mode').checked ? getColorFromAge((new Date(document.getElementById('end-time').value) - s.time) / (parseFloat(document.getElementById('lightning-lifespan').value) * 3600 * 1000)) : 'black';
-          el.style.width = '10px';
-          el.style.height = '10px';
-          el.style.borderRadius = '50%';
-          const marker = new mapboxgl.Marker(el)
-            .setLngLat([s.coordinates[0], s.coordinates[1]])
-            .setPopup(new mapboxgl.Popup().setText(s.time.toISOString()))
-            .addTo(map3D);
-          strikeLayer3D.push(marker);
-          if (isNewStrike && inBounds) {
-            playThunderSound();
-            addLightningFlash3D(s.coordinates[0], s.coordinates[1]);
-          }
-        });
+  // Render nowcast layers first
+  if (document.getElementById('nowcast-toggle').checked) {
+    currentNowcasts = calculateLightningNowcast(currentFiltered);
+    currentNowcasts.forEach((cluster, index) => {
+      const confidenceColor = cluster.confidenceScore > 0.75 ? 'purple' :
+                              cluster.confidenceScore > 0.5 ? 'red' :
+                              cluster.confidenceScore > 0.25 ? 'orange' : '#5aac91';
+      const radiusKm = cluster.confidenceScore * 5 + 5;
+      const coneRadiusKm = cluster.confidenceScore * 30 + 30;
+      const radiusDeg = radiusKm / 111;
+
+      // Render cluster circle
+      map3D.addSource(`nowcast-circle-${index}`, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [cluster.baseLon, cluster.baseLat]
+          },
+          properties: { radius: radiusDeg }
+        }
+      });
+      map3D.addLayer({
+        id: `nowcast-circle-${index}`,
+        type: 'circle',
+        source: `nowcast-circle-${index}`,
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            5, (radiusKm * 1000) / 1000, // Adjusted for better size match
+            10, (radiusKm * 1000) / 250  // Adjusted for better size match
+          ],
+          'circle-color': confidenceColor,
+          'circle-opacity': 0.5,
+          'circle-stroke-color': confidenceColor,
+          'circle-stroke-width': 2,
+          'circle-stroke-opacity': 0.8
+        }
+      });
+      nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
+
+      // Render cone
+      const cone = turf.sector(
+        [cluster.baseLon, cluster.baseLat],
+        coneRadiusKm,
+        cluster.directionDeg - 15,
+        cluster.directionDeg + 15,
+        { units: 'kilometers' }
+      );
+      map3D.addSource(`nowcast-cone-${index}`, {
+        type: 'geojson',
+        data: cone
+      });
+      map3D.addLayer({
+        id: `nowcast-cone-${index}`,
+        type: 'fill',
+        source: `nowcast-cone-${index}`,
+        paint: {
+          'fill-color': confidenceColor,
+          'fill-opacity': 0.3
+        }
+      });
+      nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
+    });
+  }
+
+  // Render KML and PNG layers (if enabled) before lightning
+  toggleKMLLayer();
+  togglePNGLayer();
+
+  // Render lightning layer after nowcast
+  if (document.getElementById('lightning-layer-toggle').checked) {
+    currentFiltered.forEach(s => {
+      const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
+      newStrikes.add(strikeKey);
+      const isNewStrike = !lastRenderedStrikes.has(strikeKey);
+      const inBounds = is3DMode ? 
+    currentBounds.contains([s.coordinates[0], s.coordinates[1]]) :
+    currentBounds.contains([s.coordinates[1], s.coordinates[0]]);
+      const el = document.createElement('div');
+      el.className = 'marker';
+      el.style.backgroundColor = document.getElementById('color-mode').checked ? getColorFromAge((new Date(document.getElementById('end-time').value) - s.time) / (parseFloat(document.getElementById('lightning-lifespan').value) * 3600 * 1000)) : 'black';
+      el.style.width = '10px';
+      el.style.height = '10px';
+      el.style.borderRadius = '50%';
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([s.coordinates[0], s.coordinates[1]])
+        .setPopup(new mapboxgl.Popup().setText(s.time.toISOString()))
+        .addTo(map3D);
+      strikeLayer3D.push(marker);
+      if (isNewStrike && inBounds) {
+  playThunderSound();
+  addLightningFlash3D(s.coordinates[0], s.coordinates[1]);
+}
+      if (isNewStrike && inBounds && document.getElementById('lightning-layer-toggle').checked) {
+    playThunderSound();
+    if (!is3DMode) addLightningFlash2D(s.coordinates[1], s.coordinates[0]);
+  }
+});
+  }
+
+  lastRenderedStrikes = newStrikes;
+
+  // Render heatmap layers
+  const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
+  const heatmap3DEnabled = document.getElementById('heatmap-3d-toggle').checked;
+  const blur = parseInt(document.getElementById('blur-slider').value);
+
+  if (heatmap2DEnabled) {
+    const heatmapData = {
+      type: 'FeatureCollection',
+      features: currentFiltered.map(s => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [s.coordinates[0], s.coordinates[1]]
+        },
+        properties: { intensity: 1 }
+      }))
+    };
+    map3D.addSource('heatmap-2d', {
+      type: 'geojson',
+      data: heatmapData
+    });
+    map3D.addLayer({
+      id: 'heatmap-2d',
+      type: 'heatmap',
+      source: 'heatmap-2d',
+      paint: {
+        'heatmap-weight': ['get', 'intensity'],
+        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
+        'heatmap-color': [
+          'interpolate',
+          ['linear'],
+          ['heatmap-density'],
+          0, 'rgba(0, 18, 25, 0)',
+          0.1, '#001219',
+          0.2, '#0A9396',
+          0.3, '#94D2BD',
+          0.4, '#E9D8A6',
+          0.5, '#c89578',
+          0.6, '#EE9B00',
+          0.7, '#CA6702',
+          0.8, '#BB3E03',
+          0.9, '#AE2012',
+          1, '#9B2226'
+        ],
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, blur, 9, blur * 2],
+        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 1, 9, 0.7]
       }
+    });
+  }
 
-      lastRenderedStrikes = newStrikes;
-
-      const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
-      const heatmap3DEnabled = document.getElementById('heatmap-3d-toggle').checked;
-      const blur = parseInt(document.getElementById('blur-slider').value);
-
-      if (heatmap2DEnabled) {
-        const heatmapData = {
-          type: 'FeatureCollection',
-          features: currentFiltered.map(s => ({
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [s.coordinates[0], s.coordinates[1]]
-            },
-            properties: { intensity: 1 }
-          }))
-        };
-        map3D.addSource('heatmap-2d', {
-          type: 'geojson',
-          data: heatmapData
-        });
-        map3D.addLayer({
-          id: 'heatmap-2d',
-          type: 'heatmap',
-          source: 'heatmap-2d',
-          paint: {
-            'heatmap-weight': ['get', 'intensity'],
-            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 9, 3],
-            'heatmap-color': [
-              'interpolate',
-              ['linear'],
-              ['heatmap-density'],
-              0, 'rgba(0, 18, 25, 0)',
-              0.1, '#001219',
-              0.2, '#0A9396',
-              0.3, '#94D2BD',
-              0.4, '#E9D8A6',
-              0.5, '#c89578',
-              0.6, '#EE9B00',
-              0.7, '#CA6702',
-              0.8, '#BB3E03',
-              0.9, '#AE2012',
-              1, '#9B2226'
-            ],
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, blur, 9, blur * 2],
-            'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 7, 1, 9, 0.7]
-          }
-        });
+  if (heatmap3DEnabled) {
+    const frequency = parseInt(document.getElementById('heatmap-frequency-slider').value);
+    const maxHeight = parseInt(document.getElementById('heatmap-height-slider').value);
+    const gridData = generateHeatmapGrid(currentFiltered, frequency);
+    map3D.addSource('heatmap-3d', {
+      type: 'geojson',
+      data: gridData
+    });
+    map3D.addLayer({
+      id: 'heatmap-3d',
+      type: 'fill-extrusion',
+      source: 'heatmap-3d',
+      paint: {
+        'fill-extrusion-color': [
+          'interpolate',
+          ['linear'],
+          ['get', 'intensity'],
+          0, '#001219',
+          0.1, '#001219',
+          0.2, '#0A9396',
+          0.3, '#94D2BD',
+          0.4, '#E9D8A6',
+          0.5, '#c89578',
+          0.6, '#EE9B00',
+          0.7, '#CA6702',
+          0.8, '#BB3E03',
+          0.9, '#AE2012',
+          1, '#9B2226'
+        ],
+        'fill-extrusion-height': ['*', ['get', 'intensity'], maxHeight],
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.7
       }
+    });
+  }
 
-      if (heatmap3DEnabled) {
-        const frequency = parseInt(document.getElementById('heatmap-frequency-slider').value);
-        const maxHeight = parseInt(document.getElementById('heatmap-height-slider').value);
-        const gridData = generateHeatmapGrid(currentFiltered, frequency);
-        map3D.addSource('heatmap-3d', {
-          type: 'geojson',
-          data: gridData
-        });
-        map3D.addLayer({
-          id: 'heatmap-3d',
-          type: 'fill-extrusion',
-          source: 'heatmap-3d',
-          paint: {
-            'fill-extrusion-color': [
-              'interpolate',
-              ['linear'],
-              ['get', 'intensity'],
-              0, '#001219',
-              0.1, '#001219',
-              0.2, '#0A9396',
-              0.3, '#94D2BD',
-              0.4, '#E9D8A6',
-              0.5, '#c89578',
-              0.6, '#EE9B00',
-              0.7, '#CA6702',
-              0.8, '#BB3E03',
-              0.9, '#AE2012',
-              1, '#9B2226'
-            ],
-            'fill-extrusion-height': ['*', ['get', 'intensity'], maxHeight],
-            'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.7
-          }
-        });
-      }
-      updateLegend();
-    }
+  // Render number overlay
+  updateOverlay(currentFiltered);
+
+  updateLegend();
+}
 
     function generateHeatmapGrid(data, frequency) {
       const UK_BBOX = [-15, 49, 8, 61];
@@ -838,8 +983,8 @@ function addLightningFlash3D(lng, lat) {
         slider.min = 0;
         slider.value = sliderValue;
         if (!is3DMode) {
-    map.invalidateSize(); // Ensure map is updated
-  }
+          map.invalidateSize();
+        }
         document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
         document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
       } else {
@@ -905,11 +1050,10 @@ function addLightningFlash3D(lng, lat) {
 
       updateHeatmap(currentFiltered);
       updateOverlay(currentFiltered);
+      updateNowcast(currentFiltered);
       updateZIndex();
       updateLegend();
       if (is3DMode) update3DView();
-      if (is3DMode) toggleKMLLayer();
-      if (is3DMode) togglePNGLayer();
 
       setTimeout(() => { isAdjustingHistory = false; }, 1000);
     }
@@ -1042,9 +1186,9 @@ function addLightningFlash3D(lng, lat) {
         document.getElementById('last-update').innerText = `Last update: ${lastUpdateTime.toLocaleString()}`;
         
         if (lastFilterMode === 'slider') {
-          updateHistory();
-        } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
-          applyFilter();
+    updateHistory(); // Calls updateNowcast()
+  } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
+    applyFilter(); // Calls updateNowcast()
         }
       } catch (error) {
         console.error('Error fetching lightning data:', error);
@@ -1074,6 +1218,7 @@ function addLightningFlash3D(lng, lat) {
       const lightningEnabled = document.getElementById('lightning-layer-toggle').checked;
       const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
       const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
+      const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
 
       if (lightningEnabled) {
         legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
@@ -1119,6 +1264,16 @@ function addLightningFlash3D(lng, lat) {
             <div><div class="color-box" style="background: ${color}"></div>${name}</div>
           `;
         });
+      }
+
+      if (nowcastEnabled) {
+        legendDiv.innerHTML += '<h4>Nowcast</h4>';
+        legendDiv.innerHTML += `
+          <div><div class="color-box" style="background: purple"></div>Very High Confidence</div>
+          <div><div class="color-box" style="background: red"></div>High Confidence</div>
+          <div><div class="color-box" style="background: orange"></div>Moderate Confidence</div>
+          <div><div class="color-box" style="background: yellow"></div>Low Confidence</div>
+        `;
       }
 
       legendDiv.style.display = legendDiv.innerHTML ? 'block' : 'none';
@@ -1216,6 +1371,7 @@ function addLightningFlash3D(lng, lat) {
 
       updateHeatmap(currentFiltered);
       updateOverlay(currentFiltered);
+      updateNowcast(currentFiltered);
       document.getElementById('time-range').innerText = `Showing strikes from ${start.toISOString()} to ${end.toISOString()}`;
       document.getElementById('history-label').innerText = formatTimeAgo(0);
       document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
@@ -1223,8 +1379,6 @@ function addLightningFlash3D(lng, lat) {
       updateZIndex();
       updateLegend();
       if (is3DMode) update3DView();
-      if (is3DMode) toggleKMLLayer();
-      if (is3DMode) togglePNGLayer();
     }
 
     function updateStrikeColors() {
@@ -1400,19 +1554,51 @@ function addLightningFlash3D(lng, lat) {
     }
 
     function updateZIndex() {
-      const expertMode = document.getElementById('expert-mode').checked;
-      const lightningZ = expertMode ? parseInt(document.getElementById('lightning-zindex').value) || 1000 : 1000;
-      const heatmapZ = expertMode ? parseInt(document.getElementById('heatmap-zindex').value) || 70 : 70;
-      const kmlZ = expertMode ? parseInt(document.getElementById('kml-zindex').value) || 60 : 60;
-      const pngZ = expertMode ? parseInt(document.getElementById('png-zindex').value) || 40 : 40;
-      const numbersZ = expertMode ? parseInt(document.getElementById('numbers-zindex').value) || 1200 : 1200;
+  const expertMode = document.getElementById('expert-mode').checked;
+  const lightningZ = expertMode ? parseInt(document.getElementById('lightning-zindex').value) || 1000 : 1000;
+  const heatmapZ = expertMode ? parseInt(document.getElementById('heatmap-zindex').value) || 70 : 70;
+  const kmlZ = expertMode ? parseInt(document.getElementById('kml-zindex').value) || 60 : 60;
+  const pngZ = expertMode ? parseInt(document.getElementById('png-zindex').value) || 40 : 40;
+  const numbersZ = expertMode ? parseInt(document.getElementById('numbers-zindex').value) || 1200 : 1200;
+  const nowcastZ = lightningZ - 10; // Ensure nowcast is below lightning
 
-      if (kmlLayer && map.hasLayer(kmlLayer)) kmlLayer.setZIndex(kmlZ);
-      if (pngLayer && map.hasLayer(pngLayer)) pngLayer.setZIndex(pngZ);
-      if (heatmapLayer && map.hasLayer(heatmapLayer) && heatmapLayer._canvas) heatmapLayer._canvas.style.zIndex = heatmapZ;
-      if (strikeLayer && map.hasLayer(strikeLayer)) strikeLayer.setZIndex(lightningZ);
-      if (numberOverlay && map.hasLayer(numberOverlay)) numberOverlay.setZIndex(numbersZ);
-    }
+  // Remove and re-add layers in correct order to enforce rendering
+  if (nowcastLayer && map.hasLayer(nowcastLayer)) map.removeLayer(nowcastLayer);
+  if (strikeLayer && map.hasLayer(strikeLayer)) map.removeLayer(strikeLayer);
+  if (kmlLayer && map.hasLayer(kmlLayer)) map.removeLayer(kmlLayer);
+  if (pngLayer && map.hasLayer(pngLayer)) map.removeLayer(pngLayer);
+  if (heatmapLayer && map.hasLayer(heatmapLayer)) map.removeLayer(heatmapLayer);
+  if (numberOverlay && map.hasLayer(numberOverlay)) map.removeLayer(numberOverlay);
+
+  // Add layers back in desired order: nowcast, kml, png, heatmap, lightning, numbers
+  if (nowcastLayer && document.getElementById('nowcast-toggle').checked) {
+    nowcastLayer.eachLayer(layer => {
+      if (layer.setZIndex) layer.setZIndex(nowcastZ);
+    });
+    nowcastLayer.setZIndex(nowcastZ);
+    map.addLayer(nowcastLayer);
+  }
+  if (kmlLayer && document.getElementById('kml-layer-toggle').checked) {
+    kmlLayer.setZIndex(kmlZ);
+    map.addLayer(kmlLayer);
+  }
+  if (pngLayer && document.getElementById('png-layer-toggle').checked) {
+    pngLayer.setZIndex(pngZ);
+    map.addLayer(pngLayer);
+  }
+  if (heatmapLayer && document.getElementById('heatmap-toggle').checked) {
+    heatmapLayer._canvas.style.zIndex = heatmapZ;
+    map.addLayer(heatmapLayer);
+  }
+  if (strikeLayer && document.getElementById('lightning-layer-toggle').checked) {
+    strikeLayer.setZIndex(lightningZ);
+    map.addLayer(strikeLayer);
+  }
+  if (numberOverlay && document.getElementById('number-overlay-toggle').checked) {
+    numberOverlay.setZIndex(numbersZ);
+    map.addLayer(numberOverlay);
+  }
+}
 
     function updateOverlay(filtered) {
       if (numberOverlay) {
@@ -1464,230 +1650,632 @@ function addLightningFlash3D(lng, lat) {
         numberOverlay = L.layerGroup();
         grid.forEach((count, key) => {
           if (count === 0) return;
-          const [i, j] = key.split('_').map(Number);
+          const[i, j] = key.split('_').map(Number);
           const cellLat = minLat + (i + 0.5) * latStep;
           const cellLng = minLng + (j + 0.5) * lngStep;
-          const label = L.marker([cellLat, cellLng], {
-            icon: L.divIcon({
-              className: 'text-labels',
-              html: `<b style="font-size:12px">${count}</b>`,
-              iconSize: [30, 20],
-              iconAnchor: [15, 10]
-            })
+          const text = L.divIcon({
+            html: `<b style="font-size:12px;color:white;-webkit-text-stroke:1px black;">${count}</b>`,
+            className: ''
           });
-          numberOverlay.addLayer(label);
+          const marker = L.marker([cellLat, cellLng], { icon: text });
+          numberOverlay.addLayer(marker);
         });
         numberOverlay.addTo(map);
-        updateZIndex();
+        numberOverlay.setZIndex(parseInt(document.getElementById('numbers-zindex').value) || 1200);
+      }
+      updateZIndex();
+    }
+
+    function switchBaseMap(style) {
+      Object.values(baseLayers).forEach(layer => {
+        if (map.hasLayer(layer)) map.removeLayer(layer);
+      });
+      baseLayers[style].addTo(map);
+      updateZIndex();
+      map.invalidateSize();
+    }
+
+    function playAnimation() {
+  if (isPlaying) return;
+  isPlaying = true;
+  const slider = document.getElementById('history-slider');
+  let currentValue = parseFloat(slider.value);
+  const maxValue = parseFloat(slider.max);
+  const speed = parseFloat(document.getElementById('speed-slider').value); // Minutes per second
+  let lastFrameTime = performance.now();
+
+  function animate(currentTime) {
+    if (!isPlaying) return;
+
+    const deltaTime = (currentTime - lastFrameTime) / 1000; // Time since last frame in seconds
+    lastFrameTime = currentTime;
+
+    // Increment slider value: speed (min/sec) * deltaTime (sec) = minutes to advance
+    currentValue += speed * deltaTime;
+
+    if (currentValue >= maxValue) {
+      currentValue = maxValue;
+      slider.value = currentValue;
+      updateHistory();
+      stopAnimation();
+      return;
+    }
+
+    slider.value = currentValue;
+    updateHistory();
+
+    animationInterval = requestAnimationFrame(animate);
+  }
+
+  animationInterval = requestAnimationFrame(animate);
+}
+
+function stopAnimation() {
+  if (animationInterval) {
+    cancelAnimationFrame(animationInterval);
+    animationInterval = null;
+  }
+  isPlaying = false;
+}
+
+    function toggleFullScreen() {
+      const container = document.body;
+      isFullScreen = !isFullScreen;
+      if (isFullScreen) {
+        container.classList.add('fullscreen');
+        if (document.requestFullscreen) {
+          container.requestFullscreen();
+        } else if (document.webkitRequestFullscreen) {
+          container.webkitRequestFullscreen();
+        } else if (document.msRequestFullscreen) {
+          container.msRequestFullscreen();
+        }
+      } else {
+        container.classList.remove('fullscreen');
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+      }
+      if (is3DMode) {
+        map3D.resize();
+      } else {
         map.invalidateSize();
       }
     }
 
-
-  function importKML(input) {
-    if (!input.files || !input.files[0]) return alert('No KML file selected.');
-    const file = input.files[0];
-    if (document.getElementById('auto-time-filter').checked && !pendingFile) {
-      showTimeFilterModal(file, 'kml');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const parser = new DOMParser();
-        const kml = parser.parseFromString(e.target.result, 'text/xml');
-        kmlGeoJSON = toGeoJSON.kml(kml);
-        if (kmlLayer) map.removeLayer(kmlLayer);
-
-        kmlLayer = L.geoJSON(kmlGeoJSON, {
-          style: function(feature) {
-            const name = feature.properties.name || '';
-            return risk_colors[name] ? {
-              color: risk_colors[name],
-              fillColor: risk_colors[name],
-              fillOpacity: 0.3
-            } : { color: 'black', fillOpacity: 0 };
-          },
-          onEachFeature: (f, l) => {
-            if (f.properties.name) l.bindPopup(f.properties.name);
-          }
-        });
-
-        if (document.getElementById('kml-layer-toggle').checked && !is3DMode) {
-          kmlLayer.addTo(map);
-          kmlLayer.setZIndex(60);
-        }
-        if (is3DMode) toggleKMLLayer();
-        updateZIndex();
-        updateLegend();
-      } catch (error) {
-        console.error('Error parsing KML:', error);
-        alert('Failed to parse KML file.');
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  function importPNG(input) {
-    if (!input.files || !input.files[0]) return alert('No PNG file selected.');
-    const file = input.files[0];
-    if (document.getElementById('auto-time-filter').checked && !pendingFile) {
-      showTimeFilterModal(file, 'png');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        pngImage = e.target.result;
-        let bounds = region_bounds['UK'];
-        for (const [region, regionBounds] of Object.entries(region_bounds)) {
-          if (file.name.toLowerCase().includes(region.toLowerCase())) {
-            bounds = regionBounds;
-            break;
-          }
-        }
-        pngBounds = bounds;
-
-        if (pngLayer) map.removeLayer(pngLayer);
-        pngLayer = L.imageOverlay(pngImage, bounds, {
-          opacity: parseFloat(document.getElementById('png-opacity-slider').value)
-        });
-
-        if (document.getElementById('png-layer-toggle').checked && !is3DMode) {
-          pngLayer.addTo(map);
-          pngLayer.setZIndex(40);
-        }
-        if (is3DMode) togglePNGLayer();
-        updateZIndex();
-        updateLegend();
-      } catch (error) {
-        console.error('Error loading PNG:', error);
-        alert('Failed to load PNG file.');
-      }
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function updatePNGOpacity() {
-    const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
-    if (pngLayer && !is3DMode) {
-      pngLayer.setOpacity(opacity);
-    }
-    if (is3DMode && map3D.getLayer('png-layer')) {
-      map3D.setPaintProperty('png-layer', 'raster-opacity', opacity);
-    }
-  }
-
-  function switchBaseMap(style) {
-    Object.values(baseLayers).forEach(layer => {
-      if (map.hasLayer(layer)) map.removeLayer(layer);
-    });
-    baseLayers[style].addTo(map);
-    updateZIndex();
-    map.invalidateSize();
-  }
-
-  function playAnimation() {
-    if (isPlaying) return;
-    isPlaying = true;
+    function updateSpeedSlider() {
+  const slider = document.getElementById('speed-slider');
+  const textbox = document.getElementById('playback-minutes');
+  let value = parseFloat(textbox.value) || 1;
+  value = Math.max(1, Math.min(100, value)); // Clamp between 0.01 and 10
+  slider.value = value;
+  textbox.value = value.toFixed(2);
+  if (isPlaying) {
     stopAnimation();
-    const slider = document.getElementById('history-slider');
-    let currentValue = parseInt(slider.value);
-    const maxValue = parseInt(slider.max);
-    const step = parseFloat(document.getElementById('speed-slider').value) * 60 * 1000 / 1000;
+    playAnimation();
+  }
+}
 
-    animationInterval = setInterval(() => {
-      currentValue += step;
-      if (currentValue >= maxValue) {
-        currentValue = maxValue;
-        stopAnimation();
+function updateSpeedTextbox() {
+  const slider = document.getElementById('speed-slider');
+  const textbox = document.getElementById('playback-minutes');
+  const value = parseFloat(slider.value);
+  textbox.value = value.toFixed(2); // Ensure two decimal places
+  if (isPlaying) {
+    stopAnimation();
+    playAnimation();
+  }
+}
+
+    function updatePNGOpacity() {
+      const opacity = parseFloat(document.getElementById('png-opacity-slider').value);
+      if (is3DMode && map3D.getLayer('png-layer')) {
+        map3D.setPaintProperty('png-layer', 'raster-opacity', opacity);
+      } else if (pngLayer && map.hasLayer(pngLayer)) {
+        pngLayer.setOpacity(opacity);
       }
-      slider.value = currentValue;
-      updateHistory();
-    }, 1000);
-  }
-
-  function stopAnimation() {
-    if (animationInterval) {
-      clearInterval(animationInterval);
-      animationInterval = null;
     }
-    isPlaying = false;
-  }
 
-  function updateSpeedSlider() {
-    const speedSlider = document.getElementById('speed-slider');
-    const speedTextbox = document.getElementById('playback-minutes');
-    const minutesPerSecond = parseFloat(speedSlider.value) * 60;
-    speedTextbox.value = minutesPerSecond.toFixed(2);
-  }
+    function importKML(input) {
+      const file = input.files[0];
+      if (!file) return;
 
-  function updateSpeedTextbox() {
-    const speedSlider = document.getElementById('speed-slider');
-    const speedTextbox = document.getElementById('playback-minutes');
-    const minutesPerSecond = parseFloat(speedTextbox.value);
-    if (minutesPerSecond >= 0.01) {
-      speedSlider.value = minutesPerSecond / 60;
+      if (document.getElementById('auto-time-filter').checked) {
+        showTimeFilterModal(file, 'kml');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const text = e.target.result;
+        const kml = new DOMParser().parseFromString(text, 'text/xml');
+        kmlGeoJSON = toGeoJSON.kml(kml);
+        kmlLayer = L.geoJSON(kmlGeoJSON, {
+          style: feature => ({
+            fillColor: risk_colors[feature.properties.name] || 'black',
+            fillOpacity: 0.3,
+            weight: 2,
+            color: risk_colors[feature.properties.name] || 'black'
+          })
+        });
+        if (document.getElementById('kml-layer-toggle').checked) {
+          if (is3DMode) {
+            toggleKMLLayer();
+          } else {
+            kmlLayer.addTo(map);
+            kmlLayer.setZIndex(parseInt(document.getElementById('kml-zindex').value) || 60);
+          }
+        }
+        updateLegend();
+        updateZIndex();
+      };
+      reader.readAsText(file);
+    }
+
+    function importPNG(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      if (document.getElementById('auto-time-filter').checked) {
+        showTimeFilterModal(file, 'png');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const region = Object.keys(region_bounds).find(r => file.name.toLowerCase().includes(r.toLowerCase())) || 'UK';
+        pngBounds = region_bounds[region];
+        pngImage = e.target.result;
+        if (is3DMode) {
+          togglePNGLayer();
+        } else {
+          pngLayer = L.imageOverlay(pngImage, pngBounds, {
+            opacity: parseFloat(document.getElementById('png-opacity-slider').value)
+          });
+          if (document.getElementById('png-layer-toggle').checked) {
+            pngLayer.addTo(map);
+            pngLayer.setZIndex(parseInt(document.getElementById('png-zindex').value) || 40);
+          }
+        }
+        updateLegend();
+        updateZIndex();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function toggleNowcast() {
+  const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
+  if (nowcastEnabled) {
+    updateNowcast(currentFiltered);
+  } else {
+    if (!is3DMode) nowcastLayer.clearLayers();
+    else {
+      nowcastLayer3D.forEach(layer => {
+        if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
+        if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
+      });
+      nowcastLayer3D = [];
     }
   }
+  updateLegend();
+}
 
-  function toggleFullScreen() {
-    isFullScreen = !isFullScreen;
-    document.body.classList.toggle('fullscreen', isFullScreen);
+    function updateNowcast(filtered) {
+  nowcastLayer.clearLayers();
+  nowcastLayer3D.forEach(layer => {
+    if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
+    if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
+  });
+  nowcastLayer3D = [];
+
+  if (!document.getElementById('nowcast-toggle').checked) return;
+
+  currentNowcasts = calculateLightningNowcast(filtered);
+
+  console.log(`Rendering ${currentNowcasts.length} nowcast cones`);
+
+  currentNowcasts.forEach((cluster, index) => {
+    const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
+                            cluster.confidenceScore > 0.8 ? 'red' :
+                            cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
+    const radiusKm = cluster.confidenceScore * 5 + 5;
+    const coneRadiusKm = cluster.confidenceScore * 30 + 30;
+    const radiusDeg = radiusKm / 111;
+
+    console.log(`Cone ${index}: lat=${cluster.baseLat.toFixed(2)}, lon=${cluster.baseLon.toFixed(2)}, coneRadius=${coneRadiusKm.toFixed(1)}km, circleRadius=${radiusKm.toFixed(1)}km, direction=${cluster.directionDeg.toFixed(1)}°, confidence=${(cluster.confidenceScore * 100).toFixed(1)}%`);
+
     if (is3DMode) {
-      map3D.resize();
+      // Render cluster circle
+      map3D.addSource(`nowcast-circle-${index}`, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [cluster.baseLon, cluster.baseLat]
+          },
+          properties: { radius: radiusDeg }
+        }
+      });
+      map3D.addLayer({
+        id: `nowcast-circle-${index}`,
+        type: 'circle',
+        source: `nowcast-circle-${index}`,
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            5, (radiusKm * 1000) / 1000,
+            10, (radiusKm * 1000) / 250
+          ],
+          'circle-color': confidenceColor,
+          'circle-opacity': 0.5,
+          'circle-stroke-color': confidenceColor,
+          'circle-stroke-width': 2,
+          'circle-stroke-opacity': 0.8
+        }
+      });
+      nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
+
+      // Render cone
+      const cone = turf.sector(
+        [cluster.baseLon, cluster.baseLat],
+        coneRadiusKm,
+        cluster.directionDeg - 15,
+        cluster.directionDeg + 15,
+        { units: 'kilometers' }
+      );
+      map3D.addSource(`nowcast-cone-${index}`, {
+        type: 'geojson',
+        data: cone
+      });
+      map3D.addLayer({
+        id: `nowcast-cone-${index}`,
+        type: 'fill',
+        source: `nowcast-cone-${index}`,
+        paint: {
+          'fill-color': confidenceColor,
+          'fill-opacity': 0.3
+        }
+      });
+      nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
     } else {
-      map.invalidateSize();
+      // Render cluster circle
+      const circle = L.circle([cluster.baseLat, cluster.baseLon], {
+        radius: radiusDeg * 111 * 1000,
+        color: confidenceColor,
+        fillColor: confidenceColor,
+        fillOpacity: 0.5,
+        weight: 2,
+        className: 'nowcast-cluster'
+      }).bindPopup(`
+        <b>Nowcast Cluster</b><br>
+        Confidence: ${(cluster.confidenceScore * 100).toFixed(1)}%<br>
+        Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
+        Direction: ${cluster.directionDeg.toFixed(1)}°
+      `);
+      nowcastLayer.addLayer(circle);
+
+      // Render cone
+      const cone = turf.sector(
+        [cluster.baseLon, cluster.baseLat],
+        coneRadiusKm,
+        cluster.directionDeg - 15,
+        cluster.directionDeg + 15,
+        { units: 'kilometers' }
+      );
+      const coneLayer = L.geoJSON(cone, {
+        style: {
+          color: confidenceColor,
+          fillColor: confidenceColor,
+          fillOpacity: 0.3,
+          weight: 1,
+          className: 'nowcast-cone'
+        }
+      });
+      nowcastLayer.addLayer(coneLayer);
     }
+  });
+
+  if (!is3DMode && document.getElementById('nowcast-toggle').checked) {
+    nowcastLayer.addTo(map);
+  }
+  updateZIndex();
+  updateLegend();
+}
+
+    function calculateLightningNowcast(lightningData) {
+  if (!lightningData || lightningData.length === 0) return [];
+
+  const maxDistance = 50; // Max distance for clustering (km)
+  const minClusterSize = 3; // Minimum strikes per cluster
+  const maxTimeRange = 1 * 3600 * 1000; // 3 hours
+  const binSize = 5 * 60 * 1000; // 5-minute bins
+  const decayConstant = 2; // Decay for weighting recent strikes
+  const ransacIterations = 100; // RANSAC iterations for regression
+  const ransacThreshold = 0.1; // RANSAC threshold for inliers
+  const inactivityThreshold = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+  // Use animationEnd if defined (during animation), otherwise current time
+  const referenceTime = animationEnd ? new Date(animationEnd) : new Date();
+
+  console.log(`Processing ${lightningData.length} strikes`);
+
+  // Form clusters based on spatial and temporal proximity
+  const clusters = [];
+  const used = new Set();
+  for (let i = 0; i < lightningData.length; i++) {
+    if (used.has(i)) continue;
+    const cluster = [lightningData[i]];
+    used.add(i);
+    for (let j = i + 1; j < lightningData.length; j++) {
+      if (used.has(j)) continue;
+      const dist = Math.sqrt(
+        Math.pow((lightningData[j].coordinates[0] - lightningData[i].coordinates[0]) * 111 * Math.cos(lightningData[i].coordinates[1] * Math.PI / 180), 2) +
+        Math.pow((lightningData[j].coordinates[1] - lightningData[i].coordinates[1]) * 111, 2)
+      );
+      if (dist <= maxDistance && Math.abs(lightningData[j].time - lightningData[i].time) <= maxTimeRange) {
+        cluster.push(lightningData[j]);
+        used.add(j);
+      }
+    }
+    if (cluster.length >= minClusterSize) clusters.push(cluster);
   }
 
-  // Initialize map event listeners
-  map.on('moveend', () => {
-    if (isAdjustingHistory) return;
-    updateHistory();
-  });
+  console.log(`Formed ${clusters.length} clusters`);
 
-  map3D.on('moveend', () => {
-    if (isAdjustingHistory) return;
-    update3DView();
-  });
+  const clusterInfos = [];
+  clusters.forEach((cluster, c) => {
+    const minTime = Math.min(...cluster.map(s => s.time.getTime()));
+    const maxTime = Math.max(...cluster.map(s => s.time.getTime()));
+    const lastStrikeTime = new Date(maxTime); // Most recent strike in the cluster
 
-  // Initialize application
-  fetchData();
-  setRefreshInterval();
-  updateHistorySliderMax();
-  toggleAutoLatest();
-
-  // Drag and drop support
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    mapContainer.addEventListener(eventName, e => e.preventDefault());
-    document.getElementById('map-3d').addEventListener(eventName, e => e.preventDefault());
-  });
-
-  mapContainer.addEventListener('dragenter', () => mapContainer.classList.add('dropzone'));
-  mapContainer.addEventListener('dragleave', () => mapContainer.classList.remove('dropzone'));
-  mapContainer.addEventListener('drop', handleDrop);
-
-  document.getElementById('map-3d').addEventListener('dragenter', () => document.getElementById('map-3d').classList.add('dropzone'));
-  document.getElementById('map-3d').addEventListener('dragleave', () => document.getElementById('map-3d').classList.remove('dropzone'));
-  document.getElementById('map-3d').addEventListener('drop', handleDrop);
-
-  function handleDrop(e) {
-    mapContainer.classList.remove('dropzone');
-    document.getElementById('map-3d').classList.remove('dropzone');
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    if (file.name.endsWith('.kml')) {
-      importKML({ files: [file] });
-    } else if (file.name.endsWith('.png')) {
-      importPNG({ files: [file] });
-    } else {
-      alert('Unsupported file type. Please upload a KML or PNG file.');
+    // Skip clusters where the last strike is older than 15 minutes
+    if (referenceTime - lastStrikeTime > inactivityThreshold) {
+      console.log(`Cluster ${c} skipped: last strike at ${lastStrikeTime.toISOString()} is too old`);
+      return;
     }
-  }
 
-</script>
+    console.log(`Cluster ${c}: ${cluster.length} strikes, time span ${(maxTime - minTime) / 1000}s`);
+
+    // Create time bins for centroid calculation
+    const bins = [];
+    for (let t = minTime; t < maxTime; t += binSize) {
+      const binStart = t;
+      const binEnd = t + binSize;
+      const binStrikes = cluster.filter(s => s.time.getTime() >= binStart && s.time.getTime() < binEnd);
+      if (binStrikes.length > 0) {
+        let sumLat = 0, sumLon = 0, sumWeight = 0;
+        binStrikes.forEach(s => {
+          const weight = Math.exp(-decayConstant * (maxTime - s.time.getTime()) / (maxTime - minTime));
+          sumLat += s.coordinates[1] * weight;
+          sumLon += s.coordinates[0] * weight;
+          sumWeight += weight;
+        });
+        const centroidLat = sumLat / sumWeight;
+        const centroidLon = sumLon / sumWeight;
+        const binTime = (binStart + binEnd) / 2;
+        bins.push({ time: binTime, lat: centroidLat, lon: centroidLon, count: binStrikes.length });
+      }
+    }
+
+    if (bins.length === 0) return;
+    console.log(`Cluster ${c}: ${bins.length} bins`);
+
+    let speedLatDegPerSec = 0, speedLonDegPerSec = 0, regressionScore = 0, speedKmH = 0, directionDeg = 0;
+    if (bins.length >= 2) {
+      const ransacModel = ransacRegression(bins, ransacIterations, ransacThreshold);
+      speedLatDegPerSec = ransacModel.slopeLat;
+      speedLonDegPerSec = ransacModel.slopeLon;
+      regressionScore = ransacModel.r2;
+
+      const latFactor = Math.cos(bins[0].lat * Math.PI / 180);
+      const speedLatKmH = speedLatDegPerSec * 111 * 3600;
+      const speedLonKmH = speedLonDegPerSec * 111 * latFactor * 3600;
+      speedKmH = Math.sqrt(speedLatKmH * speedLatKmH + speedLonKmH * speedLonKmH);
+      directionDeg = (Math.atan2(speedLonKmH, speedLatKmH) * 180 / Math.PI + 360) % 360;
+    } else {
+      // Single bin: assume stationary cluster with default direction
+      regressionScore = 0.3;
+      directionDeg = 0; // Default to north
+    }
+
+    console.log(`Cluster ${c}: speed=${speedKmH.toFixed(1)} km/h, direction=${directionDeg.toFixed(1)}°, regressionScore=${regressionScore.toFixed(2)}`);
+
+    const clusterSizeScore = Math.min(cluster.length / 50, 1);
+    const velocityScore = Math.min(speedKmH / 100, 1);
+    const timeSpanScore = Math.min((maxTime - minTime) / maxTimeRange, 1);
+    const confidenceScore = (clusterSizeScore * 0.4 + velocityScore * 0.2 + regressionScore * 0.2 + timeSpanScore * 0.2) * (bins.length >= 2 ? 1 : 0.6);
+
+    const baseLat = bins[bins.length - 1].lat;
+    const baseLon = bins[bins.length - 1].lon;
+
+    // Moderate speed and direction with nearby clusters
+    let moderatedSpeedKmH = speedKmH;
+    let moderatedDirectionDeg = directionDeg;
+    let neighborSpeeds = [speedKmH * confidenceScore * 2]; // Increase weight of own cluster
+    let neighborWeights = confidenceScore * 2;
+    let neighborSinSum = Math.sin(directionDeg * Math.PI / 180) * confidenceScore * 2;
+    let neighborCosSum = Math.cos(directionDeg * Math.PI / 180) * confidenceScore * 2;
+    let neighborCount = 1;
+
+    const latFactorCluster = Math.cos(baseLat * Math.PI / 180);
+    for (let nc = 0; nc < clusterInfos.length; nc++) {
+      const otherCluster = clusterInfos[nc];
+      const distToNeighbor = Math.sqrt(
+        Math.pow((otherCluster.baseLon - baseLon) * 111 * latFactorCluster, 2) +
+        Math.pow((otherCluster.baseLat - baseLat) * 111, 2)
+      );
+      if (distToNeighbor <= 200) { // Reduced from 400 km
+        const weight = otherCluster.confidenceScore / (distToNeighbor + 1);
+        neighborSpeeds.push(otherCluster.speedKmH * weight);
+        neighborSinSum += Math.sin(otherCluster.directionDeg * Math.PI / 180) * weight;
+        neighborCosSum += Math.cos(otherCluster.directionDeg * Math.PI / 180) * weight;
+        neighborWeights += weight;
+        neighborCount++;
+      }
+    }
+
+    if (neighborCount > 1) {
+      moderatedSpeedKmH = neighborSpeeds.reduce((a, b) => a + b, 0) / neighborWeights;
+      const moderatedDirectionRad = Math.atan2(neighborSinSum / neighborWeights, neighborCosSum / neighborWeights);
+      moderatedDirectionDeg = (moderatedDirectionRad * 180 / Math.PI + 360) % 360;
+    }
+
+    clusterInfos.push({
+      baseLat,
+      baseLon,
+      speedKmH: moderatedSpeedKmH,
+      directionDeg: moderatedDirectionDeg,
+      confidenceScore,
+      clusterSize: cluster.length,
+      timeSpan: maxTime - minTime,
+      lastStrikeTime // Store for reference
+    });
+  });
+
+  console.log(`Generated ${clusterInfos.length} nowcast clusters`);
+  return clusterInfos;
+}
+
+    function ransacRegression(bins, iterations, threshold) {
+      let bestModel = { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0 };
+      let maxInliers = 0;
+
+      for (let i = 0; i < iterations; i++) {
+        const sample = randomSample(bins, 2);
+        const model = fitLinearModel(sample);
+        const inliers = bins.filter(b => {
+          const t = (b.time - sample[0].time) / 1000;
+          const predLat = model.interceptLat + model.slopeLat * t;
+          const predLon = model.interceptLon + model.slopeLon * t;
+          return Math.abs(b.lat - predLat) < threshold && Math.abs(b.lon - predLon) < threshold;
+        });
+
+        if (inliers.length > maxInliers) {
+          maxInliers = inliers.length;
+          bestModel = fitLinearModel(inliers.length >= 2 ? inliers : sample);
+        }
+      }
+
+      return bestModel;
+    }
+
+    function fitLinearModel(bins) {
+      let sumT = 0, sumLat = 0, sumLon = 0, sumTLat = 0, sumTLon = 0, sumT2 = 0, sumWeight = 0;
+      const n = bins.length;
+      const baseTime = bins[0].time;
+      const decayConstant = 2;
+      const maxTime = Math.max(...bins.map(b => b.time));
+      const minTime = Math.min(...bins.map(b => b.time));
+
+      bins.forEach(b => {
+        const t = (b.time - baseTime) / 1000;
+        const weight = Math.exp(-decayConstant * (maxTime - b.time) / (maxTime - minTime));
+        sumT += t * weight;
+        sumLat += b.lat * weight;
+        sumLon += b.lon * weight;
+        sumTLat += t * b.lat * weight;
+        sumTLon += t * b.lon * weight;
+        sumT2 += t * t * weight;
+        sumWeight += weight;
+      });
+
+      const denominator = sumT2 * sumWeight - sumT * sumT;
+      const slopeLat = denominator !== 0 ? (sumTLat * sumWeight - sumT * sumLat) / denominator : 0;
+      const slopeLon = denominator !== 0 ? (sumTLon * sumWeight - sumT * sumLon) / denominator : 0;
+      const interceptLat = (sumLat - slopeLat * sumT) / sumWeight;
+      const interceptLon = (sumLon - slopeLon * sumT) / sumWeight;
+
+      let ssTotLat = 0, ssResLat = 0;
+      const meanLat = sumLat / sumWeight;
+      bins.forEach(b => {
+        const t = (b.time - baseTime) / 1000;
+        const weight = Math.exp(-decayConstant * (maxTime - b.time) / (maxTime - minTime));
+        ssTotLat += weight * Math.pow(b.lat - meanLat, 2);
+        ssResLat += weight * Math.pow(b.lat - (interceptLat + slopeLat * t), 2);
+      });
+      const r2 = ssTotLat > 0 ? 1 - ssResLat / ssTotLat : 0;
+
+      return { slopeLat, slopeLon, interceptLat, interceptLon, r2 };
+    }
+
+    function randomSample(array, n) {
+      const result = [];
+      const indices = Array.from({ length: array.length }, (_, i) => i);
+      for (let i = 0; i < n && indices.length > 0; i++) {
+        const idx = Math.floor(Math.random() * indices.length);
+        result.push(array[indices.splice(idx, 1)[0]]);
+      }
+      return result;
+    }
+
+    function initializeDragAndDrop() {
+      const mapDiv = document.getElementById('map');
+      const map3DDiv = document.getElementById('map-3d');
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+        mapDiv.addEventListener(evt, handleDragDrop, false);
+        map3DDiv.addEventListener(evt, handleDragDrop, false);
+      });
+    }
+
+    function handleDragDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const mapDiv = document.getElementById('map');
+      const map3DDiv = document.getElementById('map-3d');
+
+      if (e.type === 'dragenter' || e.type === 'dragover') {
+        mapDiv.classList.add('dropzone');
+        map3DDiv.classList.add('dropzone');
+      } else if (e.type === 'dragleave') {
+        mapDiv.classList.remove('dropzone');
+        map3DDiv.classList.remove('dropzone');
+      } else if (e.type === 'drop') {
+        mapDiv.classList.remove('dropzone');
+        map3DDiv.classList.remove('dropzone');
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        if (file.name.endsWith('.kml')) {
+          document.getElementById('kml-file').files = e.dataTransfer.files;
+          importKML(document.getElementById('kml-file'));
+        } else if (file.name.endsWith('.png')) {
+          document.getElementById('png-file').files = e.dataTransfer.files;
+          importPNG(document.getElementById('png-file'));
+        }
+      }
+    }
+
+    map.on('moveend', () => {
+      if (!is3DMode && document.getElementById('lightning-layer-toggle').checked) {
+        const currentBounds = map.getBounds();
+        currentFiltered.forEach(s => {
+          const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
+          const isNewStrike = !lastRenderedStrikes.has(strikeKey);
+          const inBounds = currentBounds.contains([s.coordinates[1], s.coordinates[0]]);
+          if (isNewStrike && inBounds) {
+            playThunderSound();
+            addLightningFlash2D(s.coordinates[1], s.coordinates[0]);
+          }
+        });
+      }
+    });
+
+    map3D.on('moveend', () => {
+      if (is3DMode && document.getElementById('lightning-layer-toggle').checked) {
+        update3DView();
+      }
+    });
+
+    initializeDragAndDrop();
+    fetchData();
+    setRefreshInterval();
+  </script>
 </body>
 </html>
