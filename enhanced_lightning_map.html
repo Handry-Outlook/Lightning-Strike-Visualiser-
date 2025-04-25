@@ -684,7 +684,7 @@ function addLightningFlash3D(lng, lat) {
     currentNowcasts.forEach((cluster, index) => {
       const confidenceColor = cluster.confidenceScore > 0.75 ? 'purple' :
                               cluster.confidenceScore > 0.5 ? 'red' :
-                              cluster.confidenceScore > 0.25 ? 'orange' : '#5aac91';
+                              cluster.confidenceScore > 0.25 ? 'orange' : 'yellow';
       const radiusKm = cluster.confidenceScore * 5 + 5;
       const coneRadiusKm = cluster.confidenceScore * 30 + 30;
       const radiusDeg = radiusKm / 111;
