@@ -1896,8 +1896,7 @@ function updateSpeedTextbox() {
   updateLegend();
 }
 
-function updateNowcast(filtered) {
-  // Clear existing layers
+    function updateNowcast(filtered) {
   nowcastLayer.clearLayers();
   nowcastLayer3D.forEach(layer => {
     if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
@@ -1905,85 +1904,33 @@ function updateNowcast(filtered) {
   });
   nowcastLayer3D = [];
 
-  // Remove existing click and cursor handlers to prevent duplicates
-  map3D.off('click', 'nowcast-click-handler');
-  map3D.off('mouseenter', 'nowcast-cursor-handler');
-  map3D.off('mouseleave', 'nowcast-cursor-handler');
-
-  // Clear existing popups
-  if (!window.nowcastPopups) window.nowcastPopups = [];
-  window.nowcastPopups.forEach(popup => popup.remove());
-  window.nowcastPopups = [];
-
   if (!document.getElementById('nowcast-toggle').checked) return;
 
-  // Calculate nowcasts and filter for confidence > 50%
-  currentNowcasts = calculateLightningNowcast(filtered).filter(
-    cluster => cluster.confidenceScore > 0.50
-  );
+  currentNowcasts = calculateLightningNowcast(filtered);
 
-  console.log(`Rendering ${currentNowcasts.length} nowcast clusters with confidence > 50%`);
-
-  // Store cluster metadata for popup access
-  const clusterMetadata = {};
-
-  // Helper function to create popup content
-  const createPopupContent = (cluster) => `
-    <b>Nowcast Cluster</b><br>
-    Strikes: ${cluster.clusterSize}<br>
-    Last Strike: ${cluster.lastStrikeTime.toLocaleString()}<br>
-    Confidence: ${(cluster.confidenceScore * 100).toFixed(1)}%<br>
-    Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
-    Direction: ${cluster.directionDeg.toFixed(1)}°<br>
-    Circle Radius: ${cluster.radiusKm.toFixed(1)} km<br>
-    Cone Radius: ${cluster.coneRadiusKm.toFixed(1)} km
-  `;
-
-  // Helper function to show all popups
-  const showAllPopups = () => {
-    window.nowcastPopups.forEach(popup => popup.remove());
-    window.nowcastPopups = [];
-    currentNowcasts.forEach((cluster, index) => {
-      const popup = new mapboxgl.Popup({ closeOnClick: false })
-        .setLngLat([cluster.baseLon, cluster.baseLat])
-        .setHTML(createPopupContent(cluster))
-        .addTo(map3D);
-      window.nowcastPopups.push(popup);
-    });
-  };
-
-  // Helper function to hide all popups
-  const hideAllPopups = () => {
-    window.nowcastPopups.forEach(popup => popup.remove());
-    window.nowcastPopups = [];
-  };
+  console.log(`Rendering ${currentNowcasts.length} nowcast cones`);
 
   currentNowcasts.forEach((cluster, index) => {
     const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
                             cluster.confidenceScore > 0.8 ? 'red' :
                             cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
-    const circleOpacity = 0.3 + cluster.confidenceScore * 0.3; // Dynamic opacity
-    const coneOpacity = 0.2 + cluster.confidenceScore * 0.2; // Dynamic opacity
-    const radiusKm = cluster.radiusKm;
-    const coneRadiusKm = cluster.coneRadiusKm;
-    const coneAngle = cluster.coneAngle; // Use dynamic cone angle
+    const radiusKm = cluster.confidenceScore * 5 + 5;
+    const coneRadiusKm = cluster.confidenceScore * 30 + 30;
     const radiusDeg = radiusKm / 111;
 
-    // Store metadata for popup
-    clusterMetadata[`nowcast-circle-${index}`] = { ...cluster, type: 'circle' };
-    clusterMetadata[`nowcast-cone-${index}`] = { ...cluster, type: 'cone' };
-
-    // Popup content
-    const popupContent = createPopupContent(cluster);
+    console.log(`Cone ${index}: lat=${cluster.baseLat.toFixed(2)}, lon=${cluster.baseLon.toFixed(2)}, coneRadius=${coneRadiusKm.toFixed(1)}km, circleRadius=${radiusKm.toFixed(1)}km, direction=${cluster.directionDeg.toFixed(1)}°, confidence=${(cluster.confidenceScore * 100).toFixed(1)}%`);
 
     if (is3DMode) {
-      // Cluster circle
+      // Render cluster circle
       map3D.addSource(`nowcast-circle-${index}`, {
         type: 'geojson',
         data: {
           type: 'Feature',
-          geometry: { type: 'Point', coordinates: [cluster.baseLon, cluster.baseLat] },
-          properties: { radius: radiusDeg, clusterIndex: index }
+          geometry: {
+            type: 'Point',
+            coordinates: [cluster.baseLon, cluster.baseLat]
+          },
+          properties: { radius: radiusDeg }
         }
       });
       map3D.addLayer({
@@ -1991,32 +1938,33 @@ function updateNowcast(filtered) {
         type: 'circle',
         source: `nowcast-circle-${index}`,
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, (radiusKm * 1000) / 1000, 10, (radiusKm * 1000) / 250],
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            5, (radiusKm * 1000) / 1000,
+            10, (radiusKm * 1000) / 250
+          ],
           'circle-color': confidenceColor,
-          'circle-opacity': circleOpacity,
+          'circle-opacity': 0.5,
           'circle-stroke-color': confidenceColor,
           'circle-stroke-width': 2,
-          'circle-stroke-opacity': circleOpacity + 0.2
-        },
-        metadata: { interactive: true }
+          'circle-stroke-opacity': 0.8
+        }
       });
       nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
 
-      // Cone
+      // Render cone
       const cone = turf.sector(
         [cluster.baseLon, cluster.baseLat],
         coneRadiusKm,
-        cluster.directionDeg - coneAngle,
-        cluster.directionDeg + coneAngle,
+        cluster.directionDeg - 15,
+        cluster.directionDeg + 15,
         { units: 'kilometers' }
       );
       map3D.addSource(`nowcast-cone-${index}`, {
         type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: cone.geometry,
-          properties: { clusterIndex: index }
-        }
+        data: cone
       });
       map3D.addLayer({
         id: `nowcast-cone-${index}`,
@@ -2024,76 +1972,71 @@ function updateNowcast(filtered) {
         source: `nowcast-cone-${index}`,
         paint: {
           'fill-color': confidenceColor,
-          'fill-opacity': coneOpacity
-        },
-        metadata: { interactive: true }
+          'fill-opacity': 0.5
+        }
       });
       nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
     } else {
-      // Cluster circle (2D mode)
+      // Render cluster circle
       const circle = L.circle([cluster.baseLat, cluster.baseLon], {
         radius: radiusDeg * 111 * 1000,
         color: confidenceColor,
         fillColor: confidenceColor,
-        fillOpacity: circleOpacity,
+        fillOpacity: 0.5,
         weight: 2,
         className: 'nowcast-cluster'
-      }).bindPopup(popupContent);
+      }).bindPopup(`
+        <b>Nowcast Cluster</b><br>
+        Confidence: ${(cluster.confidenceScore * 100).toFixed(1)}%<br>
+        Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
+        Direction: ${cluster.directionDeg.toFixed(1)}°
+      `);
       nowcastLayer.addLayer(circle);
 
-      // Cone
+      // Render cone
       const cone = turf.sector(
         [cluster.baseLon, cluster.baseLat],
         coneRadiusKm,
-        cluster.directionDeg - coneAngle,
-        cluster.directionDeg + coneAngle,
+        cluster.directionDeg - 15,
+        cluster.directionDeg + 15,
         { units: 'kilometers' }
       );
       const coneLayer = L.geoJSON(cone, {
         style: {
           color: confidenceColor,
           fillColor: confidenceColor,
-          fillOpacity: coneOpacity,
+          fillOpacity: 0.5,
           weight: 1,
           className: 'nowcast-cone'
         }
-      }).bindPopup(popupContent);
+      });
       nowcastLayer.addLayer(coneLayer);
     }
   });
 
-  if (is3DMode) {
-    // Track popup state
-    let arePopupsVisible = false;
+  if (!is3DMode && document.getElementById('nowcast-toggle').checked) {
+    nowcastLayer.addTo(map);
+  }
+  updateZIndex();
+  updateLegend();
+}
 
-    // Click handler for individual popups
-    map3D.on('click', 'nowcast-click-handler', (e) => {
-      const features = map3D.queryRenderedFeatures(e.point, {
-        layers: nowcastLayer3D.map(layer => layer.id)
-      });
-      if (features.length > 0) {
-        const feature = features[0];
-        const layerId = feature.layer.id;
-        const cluster = clusterMetadata[layerId];
-        if (cluster) {
-          // Remove existing popup for this cluster,    
-function calculateLightningNowcast(lightningData) {
+    function calculateLightningNowcast(lightningData) {
   if (!lightningData || lightningData.length === 0) return [];
 
   const maxDistance = 50; // Max distance for clustering (km)
   const minClusterSize = 3; // Minimum strikes per cluster
-  const maxTimeRange = 1 * 3600 * 1000; // 1 hour
+  const maxTimeRange = 1 * 3600 * 1000; // 3 hours
   const binSize = 5 * 60 * 1000; // 5-minute bins
   const decayConstant = 2; // Decay for weighting recent strikes
   const ransacIterations = 100; // RANSAC iterations for regression
   const ransacThreshold = 0.1; // RANSAC threshold for inliers
-  const inactivityThreshold = 15 * 60 * 1000; // 15 minutes
-  const mergeDistance = 20; // Distance for merging clusters (km)
+  const inactivityThreshold = 15 * 60 * 1000; // 15 minutes in milliseconds
 
   // Use animationEnd if defined (during animation), otherwise current time
   const referenceTime = animationEnd ? new Date(animationEnd) : new Date();
 
-  console.log(`Processing ${lightningData.length} strikes for nowcast at ${referenceTime.toISOString()}`);
+  console.log(`Processing ${lightningData.length} strikes`);
 
   // Form clusters based on spatial and temporal proximity
   const clusters = [];
@@ -2104,10 +2047,9 @@ function calculateLightningNowcast(lightningData) {
     used.add(i);
     for (let j = i + 1; j < lightningData.length; j++) {
       if (used.has(j)) continue;
-      const dist = turf.distance(
-        turf.point([lightningData[i].coordinates[0], lightningData[i].coordinates[1]]),
-        turf.point([lightningData[j].coordinates[0], lightningData[j].coordinates[1]]),
-        { units: 'kilometers' }
+      const dist = Math.sqrt(
+        Math.pow((lightningData[j].coordinates[0] - lightningData[i].coordinates[0]) * 111 * Math.cos(lightningData[i].coordinates[1] * Math.PI / 180), 2) +
+        Math.pow((lightningData[j].coordinates[1] - lightningData[i].coordinates[1]) * 111, 2)
       );
       if (dist <= maxDistance && Math.abs(lightningData[j].time - lightningData[i].time) <= maxTimeRange) {
         cluster.push(lightningData[j]);
@@ -2117,39 +2059,13 @@ function calculateLightningNowcast(lightningData) {
     if (cluster.length >= minClusterSize) clusters.push(cluster);
   }
 
-  console.log(`Formed ${clusters.length} initial clusters`);
-
-  // Merge nearby clusters
-  const mergedClusters = [];
-  const usedClusters = new Set();
-  clusters.forEach((cluster, i) => {
-    if (usedClusters.has(i)) return;
-    let merged = [...cluster];
-    const center = turf.centerOfMass(turf.featureCollection(
-      cluster.map(s => turf.point([s.coordinates[0], s.coordinates[1]]))
-    ));
-    for (let j = i + 1; j < clusters.length; j++) {
-      if (usedClusters.has(j)) continue;
-      const otherCenter = turf.centerOfMass(turf.featureCollection(
-        clusters[j].map(s => turf.point([s.coordinates[0], s.coordinates[1]]))
-      ));
-      const dist = turf.distance(center, otherCenter, { units: 'kilometers' });
-      if (dist < mergeDistance) {
-        merged.push(...clusters[j]);
-        usedClusters.add(j);
-      }
-    }
-    usedClusters.add(i);
-    mergedClusters.push(merged);
-  });
-
-  console.log(`Merged into ${mergedClusters.length} clusters`);
+  console.log(`Formed ${clusters.length} clusters`);
 
   const clusterInfos = [];
-  mergedClusters.forEach((cluster, c) => {
+  clusters.forEach((cluster, c) => {
     const minTime = Math.min(...cluster.map(s => s.time.getTime()));
     const maxTime = Math.max(...cluster.map(s => s.time.getTime()));
-    const lastStrikeTime = new Date(maxTime);
+    const lastStrikeTime = new Date(maxTime); // Most recent strike in the cluster
 
     // Skip clusters where the last strike is older than 15 minutes
     if (referenceTime - lastStrikeTime > inactivityThreshold) {
@@ -2158,14 +2074,6 @@ function calculateLightningNowcast(lightningData) {
     }
 
     console.log(`Cluster ${c}: ${cluster.length} strikes, time span ${(maxTime - minTime) / 1000}s`);
-
-    // Calculate spatial spread for dynamic radius
-    const coords = cluster.map(s => [s.coordinates[0], s.coordinates[1]]);
-    const center = turf.centerOfMass(turf.featureCollection(coords.map(c => turf.point(c))));
-    const distances = coords.map(c => turf.distance(turf.point(c), center, { units: 'kilometers' }));
-    const spreadKm = distances.length > 0 ? Math.sqrt(distances.reduce((sum, d) => sum + d * d, 0) / distances.length) : 5;
-    const radiusKm = Math.min(Math.max(spreadKm * 0.5, 5), 20); // Circle radius: 5–20 km
-    const coneRadiusKm = Math.min(Math.max(spreadKm * 2, 30), 100); // Cone radius: 30–100 km
 
     // Create time bins for centroid calculation
     const bins = [];
@@ -2188,10 +2096,7 @@ function calculateLightningNowcast(lightningData) {
       }
     }
 
-    if (bins.length === 0) {
-      console.log(`Cluster ${c} has no valid bins`);
-      return;
-    }
+    if (bins.length === 0) return;
     console.log(`Cluster ${c}: ${bins.length} bins`);
 
     let speedLatDegPerSec = 0, speedLonDegPerSec = 0, regressionScore = 0, speedKmH = 0, directionDeg = 0;
@@ -2207,14 +2112,13 @@ function calculateLightningNowcast(lightningData) {
       speedKmH = Math.sqrt(speedLatKmH * speedLatKmH + speedLonKmH * speedLonKmH);
       directionDeg = (Math.atan2(speedLonKmH, speedLatKmH) * 180 / Math.PI + 360) % 360;
     } else {
+      // Single bin: assume stationary cluster with default direction
       regressionScore = 0.3;
-      directionDeg = 0;
-      console.log(`Cluster ${c}: insufficient bins for regression, defaulting to low score`);
+      directionDeg = 0; // Default to north
     }
 
     console.log(`Cluster ${c}: speed=${speedKmH.toFixed(1)} km/h, direction=${directionDeg.toFixed(1)}°, regressionScore=${regressionScore.toFixed(2)}`);
 
-    // Calculate confidence score
     const clusterSizeScore = Math.min(cluster.length / 50, 1);
     const velocityScore = Math.min(speedKmH / 100, 1);
     const timeSpanScore = Math.min((maxTime - minTime) / maxTimeRange, 1);
@@ -2226,7 +2130,7 @@ function calculateLightningNowcast(lightningData) {
     // Moderate speed and direction with nearby clusters
     let moderatedSpeedKmH = speedKmH;
     let moderatedDirectionDeg = directionDeg;
-    let neighborSpeeds = [speedKmH * confidenceScore * 2];
+    let neighborSpeeds = [speedKmH * confidenceScore * 2]; // Increase weight of own cluster
     let neighborWeights = confidenceScore * 2;
     let neighborSinSum = Math.sin(directionDeg * Math.PI / 180) * confidenceScore * 2;
     let neighborCosSum = Math.cos(directionDeg * Math.PI / 180) * confidenceScore * 2;
@@ -2235,12 +2139,11 @@ function calculateLightningNowcast(lightningData) {
     const latFactorCluster = Math.cos(baseLat * Math.PI / 180);
     for (let nc = 0; nc < clusterInfos.length; nc++) {
       const otherCluster = clusterInfos[nc];
-      const distToNeighbor = turf.distance(
-        turf.point([baseLon, baseLat]),
-        turf.point([otherCluster.baseLon, otherCluster.baseLat]),
-        { units: 'kilometers' }
+      const distToNeighbor = Math.sqrt(
+        Math.pow((otherCluster.baseLon - baseLon) * 111 * latFactorCluster, 2) +
+        Math.pow((otherCluster.baseLat - baseLat) * 111, 2)
       );
-      if (distToNeighbor <= 200) {
+      if (distToNeighbor <= 200) { // Reduced from 400 km
         const weight = otherCluster.confidenceScore / (distToNeighbor + 1);
         neighborSpeeds.push(otherCluster.speedKmH * weight);
         neighborSinSum += Math.sin(otherCluster.directionDeg * Math.PI / 180) * weight;
@@ -2254,11 +2157,7 @@ function calculateLightningNowcast(lightningData) {
       moderatedSpeedKmH = neighborSpeeds.reduce((a, b) => a + b, 0) / neighborWeights;
       const moderatedDirectionRad = Math.atan2(neighborSinSum / neighborWeights, neighborCosSum / neighborWeights);
       moderatedDirectionDeg = (moderatedDirectionRad * 180 / Math.PI + 360) % 360;
-      console.log(`Cluster ${c}: moderated speed=${moderatedSpeedKmH.toFixed(1)} km/h, direction=${moderatedDirectionDeg.toFixed(1)}°`);
     }
-
-    // Dynamic cone angle based on confidence
-    const coneAngle = 15 + (1 - confidenceScore) * 15; // 15° to 30°
 
     clusterInfos.push({
       baseLat,
@@ -2268,16 +2167,12 @@ function calculateLightningNowcast(lightningData) {
       confidenceScore,
       clusterSize: cluster.length,
       timeSpan: maxTime - minTime,
-      lastStrikeTime,
-      radiusKm,
-      coneRadiusKm,
-      coneAngle // Add cone angle for rendering
+      lastStrikeTime // Store for reference
     });
   });
 
   console.log(`Generated ${clusterInfos.length} nowcast clusters`);
   return clusterInfos;
-
 }
 
     function ransacRegression(bins, iterations, threshold) {
