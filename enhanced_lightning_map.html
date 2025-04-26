@@ -681,9 +681,9 @@ function addLightningFlash3D(lng, lat) {
   if (document.getElementById('nowcast-toggle').checked) {
     currentNowcasts = calculateLightningNowcast(currentFiltered);
     currentNowcasts.forEach((cluster, index) => {
-      const confidenceColor = cluster.confidenceScore > 0.75 ? 'purple' :
-                              cluster.confidenceScore > 0.5 ? 'red' :
-                              cluster.confidenceScore > 0.25 ? 'orange' : 'yellow';
+      const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
+                              cluster.confidenceScore > 0.8 ? 'red' :
+                              cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
       const radiusKm = cluster.confidenceScore * 5 + 5;
       const coneRadiusKm = cluster.confidenceScore * 30 + 30;
       const radiusDeg = radiusKm / 111;
@@ -1896,7 +1896,8 @@ function updateSpeedTextbox() {
   updateLegend();
 }
 
-    function updateNowcast(filtered) {
+function updateNowcast(filtered) {
+  // Clear existing layers
   nowcastLayer.clearLayers();
   nowcastLayer3D.forEach(layer => {
     if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
@@ -1904,20 +1905,76 @@ function updateSpeedTextbox() {
   });
   nowcastLayer3D = [];
 
+  // Remove existing click and cursor handlers to prevent duplicates
+  map3D.off('click', 'nowcast-click-handler');
+  map3D.off('mouseenter', 'nowcast-cursor-handler');
+  map3D.off('mouseleave', 'nowcast-cursor-handler');
+
+  // Clear existing popups
+  if (!window.nowcastPopups) window.nowcastPopups = [];
+  window.nowcastPopups.forEach(popup => popup.remove());
+  window.nowcastPopups = [];
+
   if (!document.getElementById('nowcast-toggle').checked) return;
 
+  // Calculate nowcasts and filter for confidence > 50%
   currentNowcasts = calculateLightningNowcast(filtered).filter(
-    cluster => cluster.confidenceScore > 0.55
+    cluster => cluster.confidenceScore > 0.50
   );
+
+  console.log(`Rendering ${currentNowcasts.length} nowcast clusters with confidence > 50%`);
+
+  // Store cluster metadata for popup access
+  const clusterMetadata = {};
+
+  // Helper function to create popup content
+  const createPopupContent = (cluster) => `
+    <b>Nowcast Cluster</b><br>
+    Strikes: ${cluster.clusterSize}<br>
+    Last Strike: ${cluster.lastStrikeTime.toLocaleString()}<br>
+    Confidence: ${(cluster.confidenceScore * 100).toFixed(1)}%<br>
+    Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
+    Direction: ${cluster.directionDeg.toFixed(1)}°<br>
+    Circle Radius: ${cluster.radiusKm.toFixed(1)} km<br>
+    Cone Radius: ${cluster.coneRadiusKm.toFixed(1)} km
+  `;
+
+  // Helper function to show all popups
+  const showAllPopups = () => {
+    window.nowcastPopups.forEach(popup => popup.remove());
+    window.nowcastPopups = [];
+    currentNowcasts.forEach((cluster, index) => {
+      const popup = new mapboxgl.Popup({ closeOnClick: false })
+        .setLngLat([cluster.baseLon, cluster.baseLat])
+        .setHTML(createPopupContent(cluster))
+        .addTo(map3D);
+      window.nowcastPopups.push(popup);
+    });
+  };
+
+  // Helper function to hide all popups
+  const hideAllPopups = () => {
+    window.nowcastPopups.forEach(popup => popup.remove());
+    window.nowcastPopups = [];
+  };
 
   currentNowcasts.forEach((cluster, index) => {
     const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
                             cluster.confidenceScore > 0.8 ? 'red' :
                             cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
+    const circleOpacity = 0.3 + cluster.confidenceScore * 0.3; // Dynamic opacity
+    const coneOpacity = 0.2 + cluster.confidenceScore * 0.2; // Dynamic opacity
     const radiusKm = cluster.radiusKm;
     const coneRadiusKm = cluster.coneRadiusKm;
     const coneAngle = cluster.coneAngle; // Use dynamic cone angle
     const radiusDeg = radiusKm / 111;
+
+    // Store metadata for popup
+    clusterMetadata[`nowcast-circle-${index}`] = { ...cluster, type: 'circle' };
+    clusterMetadata[`nowcast-cone-${index}`] = { ...cluster, type: 'cone' };
+
+    // Popup content
+    const popupContent = createPopupContent(cluster);
 
     if (is3DMode) {
       // Cluster circle
@@ -1926,7 +1983,7 @@ function updateSpeedTextbox() {
         data: {
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [cluster.baseLon, cluster.baseLat] },
-          properties: { radius: radiusDeg }
+          properties: { radius: radiusDeg, clusterIndex: index }
         }
       });
       map3D.addLayer({
@@ -1936,11 +1993,12 @@ function updateSpeedTextbox() {
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, (radiusKm * 1000) / 1000, 10, (radiusKm * 1000) / 250],
           'circle-color': confidenceColor,
-          'circle-opacity': 0.5,
+          'circle-opacity': circleOpacity,
           'circle-stroke-color': confidenceColor,
           'circle-stroke-width': 2,
-          'circle-stroke-opacity': 0.8
-        }
+          'circle-stroke-opacity': circleOpacity + 0.2
+        },
+        metadata: { interactive: true }
       });
       nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
 
@@ -1948,65 +2006,78 @@ function updateSpeedTextbox() {
       const cone = turf.sector(
         [cluster.baseLon, cluster.baseLat],
         coneRadiusKm,
-        cluster.directionDeg - coneAngle, // Use dynamic angle
-        cluster.directionDeg + coneAngle, // Use dynamic angle
+        cluster.directionDeg - coneAngle,
+        cluster.directionDeg + coneAngle,
         { units: 'kilometers' }
       );
-      map3D.addSource(`nowcast-cone-${index}`, { type: 'geojson', data: cone });
+      map3D.addSource(`nowcast-cone-${index}`, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: cone.geometry,
+          properties: { clusterIndex: index }
+        }
+      });
       map3D.addLayer({
         id: `nowcast-cone-${index}`,
         type: 'fill',
         source: `nowcast-cone-${index}`,
-        paint: { 'fill-color': confidenceColor, 'fill-opacity': 0.5 }
+        paint: {
+          'fill-color': confidenceColor,
+          'fill-opacity': coneOpacity
+        },
+        metadata: { interactive: true }
       });
       nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
     } else {
-      // Cluster circle
+      // Cluster circle (2D mode)
       const circle = L.circle([cluster.baseLat, cluster.baseLon], {
         radius: radiusDeg * 111 * 1000,
         color: confidenceColor,
         fillColor: confidenceColor,
-        fillOpacity: 0.5,
+        fillOpacity: circleOpacity,
         weight: 2,
         className: 'nowcast-cluster'
-      }).bindPopup(`
-        <b>Nowcast Cluster</b><br>
-        Confidence: ${(cluster.confidenceScore * 100).toFixed(1)}%<br>
-        Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
-        Direction: ${cluster.directionDeg.toFixed(1)}°<br>
-        Circle Radius: ${radiusKm.toFixed(1)} km<br>
-        Cone Radius: ${coneRadiusKm.toFixed(1)} km
-      `);
+      }).bindPopup(popupContent);
       nowcastLayer.addLayer(circle);
 
       // Cone
       const cone = turf.sector(
         [cluster.baseLon, cluster.baseLat],
         coneRadiusKm,
-        cluster.directionDeg - coneAngle, // Use dynamic angle
-        cluster.directionDeg + coneAngle, // Use dynamic angle
+        cluster.directionDeg - coneAngle,
+        cluster.directionDeg + coneAngle,
         { units: 'kilometers' }
       );
       const coneLayer = L.geoJSON(cone, {
         style: {
           color: confidenceColor,
           fillColor: confidenceColor,
-          fillOpacity: 0.5,
+          fillOpacity: coneOpacity,
           weight: 1,
           className: 'nowcast-cone'
         }
-      });
+      }).bindPopup(popupContent);
       nowcastLayer.addLayer(coneLayer);
     }
   });
 
-  if (!is3DMode && document.getElementById('nowcast-toggle').checked) {
-    nowcastLayer.addTo(map);
-  }
-  updateZIndex();
-  updateLegend();
-}
-   function calculateLightningNowcast(lightningData) {
+  if (is3DMode) {
+    // Track popup state
+    let arePopupsVisible = false;
+
+    // Click handler for individual popups
+    map3D.on('click', 'nowcast-click-handler', (e) => {
+      const features = map3D.queryRenderedFeatures(e.point, {
+        layers: nowcastLayer3D.map(layer => layer.id)
+      });
+      if (features.length > 0) {
+        const feature = features[0];
+        const layerId = feature.layer.id;
+        const cluster = clusterMetadata[layerId];
+        if (cluster) {
+          // Remove existing popup for this cluster,    
+function calculateLightningNowcast(lightningData) {
   if (!lightningData || lightningData.length === 0) return [];
 
   const maxDistance = 50; // Max distance for clustering (km)
