@@ -58,6 +58,29 @@
     #top-bar button:hover {
       background: #2563eb;
     }
+    .logo {
+  width: 80px;
+  pointer-events: none;
+  z-index: 1002;
+}
+
+/* Desktop: Keep logo at bottom-right of time slider */
+@media (min-width: 769px) {
+  .logo {
+    position: absolute;
+    bottom: 20px; /* Align with bottom of time-slider-container */
+    right: 8px; /* Align with right edge of time-slider-container */
+  }
+}
+
+/* Mobile: Move logo to top-left of map */
+@media (max-width: 768px) {
+  .logo {
+    position: absolute;
+    top: 60px; /* Just below the top-bar (60px height) */
+    left: 10px; /* Align with left edge with some padding */
+  }
+}
     #map, #map-3d {
       position: absolute;
       top: 0;
@@ -107,7 +130,7 @@
       #settings-button {
         position: fixed;
         bottom: 70px;
-        right: 10px;
+        right: 50px;
         background: #3b82f6;
         color: white;
         border: none;
@@ -261,20 +284,20 @@
       margin-top: 4px;
     }
     .legend {
-      background: rgba(255,255,255,0.95);
-      padding: 8px;
-      border-radius: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      font-size: 0.75em;
-      color: #1a2a44;
-      max-width: 125px;
-      min-width: 110px;
-      position: absolute;
-      top: 60px;
-      right: 10px;
-      z-index: 1002;
-      display: block;
-    }
+  background: rgba(255,255,255,0.95);
+  padding: 8px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  font-size: 0.75em;
+  color: #1a2a44;
+  max-width: 125px;
+  min-width: 110px;
+  position: absolute;
+  top: 60px;
+  right: 10px;
+  z-index: 1002;
+  display: none; /* Initially hidden */
+}
     .legend-item {
       display: flex;
       align-items: center;
@@ -383,6 +406,7 @@
   <div id="top-bar">
     <h2>Lightning Map⚡</h2>
     <div>
+      <button onclick="toggleLegend()">Legend</button>
       <button onclick="showTutorial()">Help</button>
       <button onclick="showUserLocation()">📍</button>
       <button class="fullscreen-toggle" onclick="toggleFullScreen()">⛶</button>
@@ -584,12 +608,12 @@
       })
     };
 
-    map = L.map('map', { layers: [baseLayers.mapbox], zoomControl: false }).setView([57.5, -4.5], 6);
+    map = L.map('map', { layers: [baseLayers.mapbox], zoomControl: false }).setView([53.5, -4.5], 6);
 
    map3D = new mapboxgl.Map({
   container: 'map-3d',
   style: 'mapbox://styles/handry-outlook/cm9457ty1009d01sk37353ux2',
-  center: [-4.5, 57.5],
+  center: [-4.5, 53.5],
   zoom: 5,
   projection: 'globe',
   accessToken: mapboxAccessToken
@@ -608,28 +632,25 @@ map3D.on('load', () => {
 map.invalidateSize(); // Ensure 2D map is sized correctly
 
      const timeSliderContainer = document.querySelector('.time-slider-container');
-  const logo = document.createElement('img');
-  logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png';
-  logo.className = 'logo';
-  logo.style.width = '80px'; // Smaller size to fit over text
-  logo.style.position = 'absolute';
-  logo.style.bottom = '20px'; // Align with bottom of container (matches padding)
-  logo.style.right = '8px'; // Align with right edge (matches padding)
-  logo.style.zIndex = '1002'; // Same as time-slider-container
-  logo.style.pointerEvents = 'none';
-  timeSliderContainer.appendChild(logo);
+ const logo = document.createElement('img');
+logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png';
+logo.className = 'logo';
+logo.style.width = '80px';
+logo.style.pointerEvents = 'none';
 
-// Insert the logo before the status-info-container
-const statusInfoContainer = timeSliderContainer.querySelector('.status-info-container');
-timeSliderContainer.insertBefore(logo, statusInfoContainer);
+// Append logo to the map container for mobile positioning
+const mapDiv = document.getElementById('map');
+mapDiv.appendChild(logo);
+
 
     const legendControl = L.control({ position: 'topright' });
-    legendControl.onAdd = function (map) {
-      const div = L.DomUtil.create('div', 'legend');
-      div.innerHTML = '<h4>Legend</h4>';
-      return div;
-    };
-    legendControl.addTo(map);
+legendControl.onAdd = function (map) {
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = '<h4>Legend</h4>';
+  div.style.display = 'none'; // Initially hidden
+  return div;
+};
+legendControl.addTo(map);
 
     let strikeData = [];
     let strikeLayer = L.layerGroup().addTo(map);
@@ -670,6 +691,7 @@ timeSliderContainer.insertBefore(logo, statusInfoContainer);
     let currentNowcasts = [];
     let minNowcastConfidence = 0.5;
     let userLocationMarker = null;
+    let isLegendVisible = false; // Legend is initially disabled
     
 function toggleControls() {
     const controlPanel = document.getElementById('control-panel');
@@ -818,7 +840,7 @@ function addLightningFlash3D(lng, lat) {
     }
     
     if (is3DMode) {
-      map3D.jumpTo({ center: [-4.5, 57.5], zoom: 5 });
+      map3D.jumpTo({ center: [-4.5, 53.5], zoom: 5 });
       map3D.resize();
       update3DView();
       toggleKMLLayer();
@@ -1439,94 +1461,99 @@ function addLightningFlash3D(lng, lat) {
 }
 
     function updateLegend() {
-      const legendDiv = document.querySelector('.legend');
-      legendDiv.innerHTML = '';
-      const colorMode = document.getElementById('color-mode').checked;
-      const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
-      const heatmap3DEnabled = is3DMode && document.getElementById('heatmap-3d-toggle').checked;
-      const lightningEnabled = document.getElementById('lightning-layer-toggle').checked;
-      const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
-      const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
-      const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
+  const legendDiv = document.querySelector('.legend');
+  legendDiv.innerHTML = '';
+  const colorMode = document.getElementById('color-mode').checked;
+  const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
+  const heatmap3DEnabled = is3DMode && document.getElementById('heatmap-3d-toggle').checked;
+  const lightningEnabled = document.getElementById('lightning-layer-toggle').checked;
+  const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
+  const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
+  const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
 
-      if (lightningEnabled) {
-        legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
-        if (colorMode) {
-          legendDiv.innerHTML += `
-            <div><div class="color-box" style="background: #ffd700"></div>Newest</div>
-            <div><div class="color-box" style="background: #ff69b4"></div></div>
-            <div><div class="color-box" style="background: #ff00ff"></div></div>
-            <div><div class="color-box" style="background: #800080"></div></div>
-            <div><div class="color-box" style="background: #4b0082"></div>Oldest</div>
-          `;
-        } else {
-          legendDiv.innerHTML += `
-            <div><div class="color-box" style="background: black"></div>Strikes</div>
-          `;
-        }
-      }
-
-      if (heatmap2DEnabled) {
-        legendDiv.innerHTML += `
-          <h4>2D Heatmap</h4>
-          <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
-          <div style="display: flex; justify-content: space-between; margin-top: 4px">
-            <span>Low</span><span>High</span>
-          </div>
-        `;
-      }
-
-      if (heatmap3DEnabled) {
-        legendDiv.innerHTML += `
-          <h4>3D Heatmap</h4>
-          <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
-          <div style="display: flex; justify-content: space-between; margin-top: 4px">
-            <span>Low</span><span>High</span>
-          </div>
-        `;
-      }
-
-      if (kmlEnabled && kmlLayer) {
-  legendDiv.innerHTML += '<h4>Risk Levels</h4>';
-  Object.entries(risk_colors).forEach(([name, color]) => {
-    const isSevere = name === 'Severe risk';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: ${isSevere ? 'none' : color}; border: 2px solid ${color};"></div>${name}</div>
-    `;
-  });
-}
-
-      if (nowcastEnabled) {
-        legendDiv.innerHTML += '<h4>Nowcast</h4>';
-        legendDiv.innerHTML += `
-          <div><div class="color-box" style="background: purple"></div>Very High Confidence</div>
-          <div><div class="color-box" style="background: red"></div>High Confidence</div>
-          <div><div class="color-box" style="background: orange"></div>Moderate Confidence</div>
-          <div><div class="color-box" style="background: yellow"></div>Low Confidence</div>
-        `;
-      }
-
-      legendDiv.style.display = legendDiv.innerHTML ? 'block' : 'none';
-
-      if (is3DMode) {
-        let map3DLegend = document.getElementById('map3d-legend');
-        if (!map3DLegend) {
-          map3DLegend = document.createElement('div');
-          map3DLegend.id = 'map3d-legend';
-          map3DLegend.className = 'legend';
-          map3DLegend.style.position = 'absolute';
-          map3DLegend.style.top = '100px';
-          map3DLegend.style.right = '10px';
-          map3DLegend.style.zIndex = '1002';
-          document.getElementById('map-3d').appendChild(map3DLegend);
-        }
-        map3DLegend.innerHTML = legendDiv.innerHTML;
-      } else {
-        const map3DLegend = document.getElementById('map3d-legend');
-        if (map3DLegend) map3DLegend.remove();
-      }
+  if (lightningEnabled) {
+    legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
+    if (colorMode) {
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: #ffd700"></div>Newest</div>
+        <div><div class="color-box" style="background: #ff69b4"></div></div>
+        <div><div class="color-box" style="background: #ff00ff"></div></div>
+        <div><div class="color-box" style="background: #800080"></div></div>
+        <div><div class="color-box" style="background: #4b0082"></div>Oldest</div>
+      `;
+    } else {
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: black"></div>Strikes</div>
+      `;
     }
+  }
 
+  if (heatmap2DEnabled) {
+    legendDiv.innerHTML += `
+      <h4>2D Heatmap</h4>
+      <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
+      <div style="display: flex; justify-content: space-between; margin-top: 4px">
+        <span>Low</span><span>High</span>
+      </div>
+    `;
+  }
+
+  if (heatmap3DEnabled) {
+    legendDiv.innerHTML += `
+      <h4>3D Heatmap</h4>
+      <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
+      <div style="display: flex; justify-content: space-between; margin-top: 4px">
+        <span>Low</span><span>High</span>
+      </div>
+    `;
+  }
+
+  if (kmlEnabled && kmlLayer) {
+    legendDiv.innerHTML += '<h4>Risk Levels</h4>';
+    Object.entries(risk_colors).forEach(([name, color]) => {
+      const isSevere = name === 'Severe risk';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: ${isSevere ? 'none' : color}; border: 2px solid ${color};"></div>${name}</div>
+      `;
+    });
+  }
+
+  if (nowcastEnabled) {
+    legendDiv.innerHTML += '<h4>Nowcast</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: purple"></div>Very High Confidence</div>
+      <div><div class="color-box" style="background: red"></div>High Confidence</div>
+      <div><div class="color-box" style="background: orange"></div>Moderate Confidence</div>
+      <div><div class="color-box" style="background: yellow"></div>Low Confidence</div>
+    `;
+  }
+
+  // Show or hide based on isLegendVisible and content
+  legendDiv.style.display = (isLegendVisible && legendDiv.innerHTML) ? 'block' : 'none';
+
+  if (is3DMode) {
+    let map3DLegend = document.getElementById('map3d-legend');
+    if (!map3DLegend) {
+      map3DLegend = document.createElement('div');
+      map3DLegend.id = 'map3d-legend';
+      map3DLegend.className = 'legend';
+      map3DLegend.style.position = 'absolute';
+      map3DLegend.style.top = '100px';
+      map3DLegend.style.right = '10px';
+      map3DLegend.style.zIndex = '1002';
+      document.getElementById('map-3d').appendChild(map3DLegend);
+    }
+    map3DLegend.innerHTML = legendDiv.innerHTML;
+    map3DLegend.style.display = (isLegendVisible && legendDiv.innerHTML) ? 'block' : 'none';
+  } else {
+    const map3DLegend = document.getElementById('map3d-legend');
+    if (map3DLegend) map3DLegend.remove();
+  }
+}
+    function toggleLegend() {
+  isLegendVisible = !isLegendVisible;
+  updateLegend(); // Update visibility based on new state
+}
     function applyFilter() {
       lastFilterMode = 'inputs';
       let startInput = document.getElementById('start-time').value;
@@ -2588,4 +2615,4 @@ function updateSpeedTextbox() {
     setRefreshInterval();
   </script>
 </body>
-</html>
+</html> 
