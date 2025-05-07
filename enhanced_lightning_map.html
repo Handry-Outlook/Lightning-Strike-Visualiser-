@@ -5,11 +5,77 @@
   <title>Lightning Strike Visualiser⚡</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link href="https://cdn.maptiles.com/maptiler-sdk-js/v3.0.1/maptiler-sdk.css" rel="stylesheet" />
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <style>
+    .draw-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .draw-toolbar button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+  }
+  .draw-toolbar button:hover {
+    background: #2563eb;
+  }
+  .draw-toolbar select {
+    padding: 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  #polygon-controls {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 15px;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  body.dark-mode #polygon-controls {
+    background: #2a2a2a;
+    color: #e0e0e0;
+  }
+  .leaflet-draw {
+    z-index: 1003;
+  }
+  .leaflet-draw-toolbar {
+    display: none !important; /* Hide default Leaflet.draw toolbar */
+  }
+  .polygon-popup input, .polygon-popup select, .polygon-popup button {
+    margin: 5px 0;
+    padding: 5px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  @media (max-width: 768px) {
+    .draw-toolbar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    #top-bar .draw-toolbar {
+      display: none;
+    }
+    #control-panel .draw-toolbar {
+      display: flex;
+    }
+  }
+  @media (min-width: 769px) {
+    #control-panel .draw-toolbar {
+      display: none;
+    }
+    #top-bar .draw-toolbar {
+      display: flex;
+    }
+  }
     body {
       font-family: 'Inter', sans-serif;
       margin: 0;
@@ -484,6 +550,37 @@
       transform: translateX(-50%);
       width: 90%;
     }
+    #map {
+    position: absolute;
+    top: 60px;
+    bottom: 0;
+    width: 100%;
+    z-index: 1;
+    transition: opacity 0.3s ease;
+  }
+  #map3D {
+    position: absolute;
+    top: 60px;
+    bottom: 0;
+    width: 100%;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  body.three-d-mode #map {
+    opacity: 0; /* Hide 2D map but keep it functional */
+    pointer-events: none; /* Prevent interactions except for popups */
+    height: 0; /* Minimize impact on layout */
+    overflow: hidden;
+  }
+  body.three-d-mode #map3D {
+    opacity: 1; /* Show 3D map */
+  }
+  .mapboxgl-ctrl-group {
+    z-index: 1100 !important; /* Ensure mapbox-gl-draw controls are above top bar */
+    margin-top: 70px !important; /* Move controls below top bar */
+  }
+  
   </style>
 </head>
 <!-- Google tag (gtag.js) -->
@@ -496,7 +593,19 @@
 </script>
 <body>
   <div id="top-bar">
-    
+    <div class="draw-toolbar">
+  <button onclick="toggleDrawing()">Enable Drawing</button>
+  <select id="risk-level-select">
+    <option value="Low risk">Low risk</option>
+    <option value="Slight risk">Slight risk</option>
+    <option value="Enhanced risk">Enhanced risk</option>
+    <option value="Moderate risk">Moderate risk</option>
+    <option value="High risk">High risk</option>
+    <option value="Severe risk">Severe risk</option>
+  </select>
+  <button onclick="exportToKML()">Export KML</button>
+</div>
+
     <div>
       <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
       <button onclick="toggleLegend()">Legend</button>
@@ -507,6 +616,24 @@
   </div>
   <div id="control-panel" class="control-panel">
     <div class="section">
+      <div id="polygon-controls" class="section">
+  <h4>Polygon Drawing</h4>
+  <label>Enable Polygons: <input type="checkbox" id="drawn-polygons-toggle" checked onchange="toggleDrawnPolygons()"><span class="tooltip">Show/hide drawn polygons</span></label>
+  <label>Opacity: <input type="range" id="polygon-opacity" min="0" max="1" step="0.1" value="0.3" onchange="updateAllPolygonsOpacity()"><span class="tooltip">Adjust polygon fill opacity</span></label>
+  <label>Outline Thickness: <input type="range" id="polygon-weight" min="1" max="10" step="1" value="2" onchange="updateAllPolygonsWeight()"><span class="tooltip">Adjust polygon outline thickness</span></label>
+  <div class="draw-toolbar">
+    <button onclick="toggleDrawing()">Enable Drawing</button>
+    <select id="risk-level-select">
+      <option value="Low risk">Low risk</option>
+      <option value="Slight risk">Slight risk</option>
+      <option value="Enhanced risk">Enhanced risk</option>
+      <option value="Moderate risk">Moderate risk</option>
+      <option value="High risk">High risk</option>
+      <option value="Severe risk">Severe risk</option>
+    </select>
+    <button onclick="exportToKML()">Export KML</button>
+  </div>
+</div>
       <h4>Time Filter</h4>
       <label>Start Time: <input type="datetime-local" id="start-time"><span class="tooltip">Filter strikes from this time</span></label>
       <label>End Time: <input type="datetime-local" id="end-time"><span class="tooltip">Filter strikes up to this time</span></label>
@@ -599,6 +726,11 @@
     </div>
   </div>
   <button id="settings-button" onclick="toggleControls()">⚙️</button>
+  <div id="3d-draw-modal" class="modal" style="display: none;">
+  <p>Drawing is only available in 2D mode. Would you like to switch to 2D mode to draw?</p>
+  <button onclick="switchTo2DForDrawing()">Switch to 2D</button>
+  <button onclick="close3DDrawModal()">Cancel</button>
+</div>
   <div id="tutorial-modal" class="modal" style="display: none;">
     <h3>Tutorial</h3>
     <div id="normal-tutorial">
@@ -629,6 +761,9 @@
   <script src="https://cdn.maptiler.com/maptiler-sdk-js/v3.0.1/maptiler-sdk.umd.min.js"></script>
   <script src="https://cdn.maptiler.com/leaflet-maptilersdk/v4.0.2/leaflet-maptilersdk.umd.min.js"></script>
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.js"></script>
   <script>
     const mapboxAccessToken = 'pk.eyJ1IjoiaGFuZHJ5LW91dGxvb2siLCJhIjoiY2xrbnNrbmVlMXo0NDNqa2d3MTY2NW90bCJ9.AJbccNwtKvKA8il3JkE3PA';
     const maptilerApiKey = 'd6FiSbcpDtzJ4g4e0oD4';
@@ -783,6 +918,760 @@ legendControl.addTo(map);
     let minNowcastConfidence = 0.8;
     let userLocationMarker = null;
     let isLegendVisible = false; // Legend is initially disabled
+   
+  let drawnItems = L.featureGroup().addTo(map);
+  let drawControl;
+  let drawControl3D;
+  let drawnItems3D = [];
+  let isDrawingEnabled = false;
+  let editingLayerId = null;
+  
+
+  // Initialize Leaflet.draw for 2D mode
+  function initializeDrawControl() {
+    drawControl = new L.Control.Draw({
+      draw: {
+        polygon: {
+          allowIntersection: false,
+          showArea: true,
+          drawError: { color: '#b00b00', timeout: 1000 },
+          shapeOptions: { color: risk_colors['Low risk'], weight: 2, opacity: 0.8, fillOpacity: 0.3 }
+        },
+        polyline: false,
+        circle: false,
+        rectangle: false,
+        marker: false,
+        circlemarker: false
+      },
+      edit: {
+        featureGroup: drawnItems,
+        remove: true
+      }
+    });
+    map.addControl(drawControl);
+
+    map.on(L.Draw.Event.CREATED, function (e) {
+      const layer = e.layer;
+      const riskLevel = document.getElementById('risk-level-select')?.value || 'Low risk';
+      layer.feature = { type: 'Feature', properties: { name: riskLevel, source: 'leaflet' } };
+      layer.setStyle({
+        color: risk_colors[riskLevel],
+        fillColor: risk_colors[riskLevel] === risk_colors['Severe risk'] ? 'transparent' : risk_colors[riskLevel],
+        fillOpacity: parseFloat(document.getElementById('polygon-opacity')?.value || 0.3),
+        weight: parseFloat(document.getElementById('polygon-weight')?.value || 2)
+      });
+      layer._leaflet_id = layer._leaflet_id || `leaflet-${Date.now()}`;
+      drawnItems.addLayer(layer);
+      addPolygonPopup(layer);
+      if (is3DMode) syncPolygonsTo3D();
+      updateLegend();
+      console.log('Created 2D polygon:', layer._leaflet_id, layer.toGeoJSON());
+    });
+
+    map.on(L.Draw.Event.EDITED, function (e) {
+      e.layers.eachLayer(layer => {
+        if (layer && is3DMode) syncPolygonsTo3D();
+        updatePolygonPopup(layer);
+      });
+      updateLegend();
+      if (drawControl?._toolbars?.edit?._modes?.edit?.handler) {
+        drawControl._toolbars.edit._modes.edit.handler.disable();
+      }
+      editingLayerId = null;
+    });
+
+    map.on(L.Draw.Event.DELETED, function (e) {
+      if (is3DMode) syncPolygonsTo3D();
+      updateLegend();
+      editingLayerId = null;
+    });
+  }
+  function initializeDrawControl3D() {
+  // No drawing in 3D mode
+}
+  // Initialize Mapbox GL Draw for 3D mode
+  function initializeDrawControl3D2() {
+    drawControl3D = new MapboxDraw({
+      displayControlsDefault: false,
+      controls: {
+        polygon: true,
+        trash: true
+      },
+      styles: [
+        {
+          id: 'gl-draw-polygon-fill-inactive',
+          type: 'fill',
+          paint: {
+            'fill-color': '#5aac91',
+            'fill-opacity': 0.3
+          }
+        },
+        {
+          id: 'gl-draw-polygon-stroke-inactive',
+          type: 'line',
+          paint: {
+            'line-color': '#5aac91',
+            'line-width': 2,
+            
+          }
+        },
+        {
+          id: 'gl-draw-polygon-fill-active',
+          type: 'fill',
+          paint: {
+            'fill-color': '#5aac91',
+            'fill-opacity': 0.5
+          }
+        },
+        {
+          id: 'gl-draw-polygon-stroke-active',
+          type: 'line',
+          paint: {
+            'line-color': '#5aac91',
+            'line-width': 3
+          }
+        },
+        {
+          id: 'gl-draw-vertex-inactive',
+          type: 'circle',
+          paint: {
+            'circle-radius': 5,
+            'circle-color': '#fff',
+            'circle-stroke-color': '#5aac91',
+            'circle-stroke-width': 2,
+            'circle-opacity': 0, // Set to 0 to hide inactive vertices
+            'circle-stroke-opacity': 0
+          }
+        },
+        {
+          id: 'gl-draw-vertex-active',
+          type: 'circle',
+          paint: {
+            'circle-radius': 7,
+            'circle-color': '#5aac91'
+          }
+        }
+      ]
+    });
+    map3D.addControl(drawControl3D, 'top-right');
+
+    map3D.on('draw.create', function (e) {
+      const geojson = e.features[0];
+      const riskLevel = document.getElementById('risk-level-select')?.value || 'Low risk';
+      geojson.properties = { name: riskLevel, source: 'mapbox' };
+      const isSevere = riskLevel === 'Severe risk';
+      const layerId = `drawn-polygon-${geojson.id || Date.now()}`;
+      map3D.addSource(layerId, { type: 'geojson', data: geojson });
+      map3D.addLayer({
+        id: layerId,
+        type: 'fill',
+        source: layerId,
+        paint: {
+          'fill-color': risk_colors[riskLevel],
+          'fill-opacity': isSevere ? 0 : parseFloat(document.getElementById('polygon-opacity')?.value || 0.3)
+        }
+      });
+      map3D.addLayer({
+        id: `${layerId}-outline`,
+        type: 'line',
+        source: layerId,
+        paint: {
+          'line-color': risk_colors[riskLevel],
+          'line-width': parseFloat(document.getElementById('polygon-weight')?.value || 2),
+          'line-opacity': 1
+        }
+      });
+      drawnItems3D.push({
+        id: layerId,
+        outlineId: `${layerId}-outline`,
+        source: layerId
+      });
+      const leafletLayer = L.geoJSON(geojson, {
+        style: {
+          color: risk_colors[riskLevel],
+          fillColor: isSevere ? 'transparent' : risk_colors[riskLevel],
+          fillOpacity: parseFloat(document.getElementById('polygon-opacity')?.value || 0.3),
+          weight: parseFloat(document.getElementById('polygon-weight')?.value || 2)
+        }
+      });
+      leafletLayer.feature = geojson;
+      leafletLayer._leaflet_id = layerId;
+      drawnItems.addLayer(leafletLayer);
+      addPolygonPopup(leafletLayer);
+      updateLegend();
+      console.log('Created 3D polygon:', layerId, geojson);
+    });
+
+    map3D.on('draw.update', function (e) {
+      const geojson = e.features[0];
+      const layerId = `drawn-polygon-${geojson.id || Date.now()}`;
+      const leafletLayer = drawnItems.getLayer(layerId);
+      if (leafletLayer) {
+        leafletLayer.clearLayers();
+        leafletLayer.addData(geojson);
+        updatePolygonPopup(leafletLayer);
+        if (is3DMode) syncPolygonsTo3D();
+        updateLegend();
+        console.log('Updated 3D polygon:', layerId, geojson);
+      }
+    });
+
+    map3D.on('draw.delete', function (e) {
+      e.features.forEach(feature => {
+        const layerId = `drawn-polygon-${feature.id || Date.now()}`;
+        const leafletLayer = drawnItems.getLayer(layerId);
+        if (leafletLayer) {
+          drawnItems.removeLayer(leafletLayer);
+        }
+        const item = drawnItems3D.find(d => d.id === layerId);
+        if (item) {
+          if (map3D.getLayer(item.id)) map3D.removeLayer(item.id);
+          if (map3D.getLayer(item.outlineId)) map3D.removeLayer(item.outlineId);
+          if (map3D.getSource(item.source)) map3D.removeSource(item.source);
+          drawnItems3D = drawnItems3D.filter(d => d.id !== layerId);
+        }
+      });
+      updateLegend();
+      editingLayerId = null;
+      console.log('Deleted 3D polygon(s)');
+    });
+
+    // Handle clicks on 3D map polygons to open Leaflet popups
+    map3D.on('click', function (e) {
+  if (isDrawingEnabled && drawControl3D.getMode() === 'draw_polygon') return; // Ignore clicks during active drawing
+  const features = map3D.queryRenderedFeatures(e.point, {
+    layers: drawnItems3D.map(item => item.id)
+  });
+  if (features.length > 0) {
+    const layerId = features[0].layer.id;
+    const leafletLayer = drawnItems.getLayer(layerId);
+    if (leafletLayer && leafletLayer.getPopup()) {
+      console.log('Clicked 3D polygon:', layerId);
+      // Temporarily enable 2D map for popup rendering
+      map.getContainer().style.opacity = '0';
+      map.getContainer().style.height = '100%';
+      map.getContainer().style.overflow = 'visible';
+      leafletLayer.openPopup([e.lngLat.lat, e.lngLat.lng]);
+      // Revert 2D map after popup interaction
+      setTimeout(() => {
+        map.getContainer().style.opacity = '0';
+        map.getContainer().style.height = '0';
+        map.getContainer().style.overflow = 'hidden';
+      }, 100);
+    } else {
+      console.warn('No Leaflet layer or popup found for:', layerId);
+    }
+    // Prevent accidental edit mode activation
+    if (drawControl3D.getMode() !== 'draw_polygon') {
+      drawControl3D.changeMode('simple_select');
+    }
+  }
+});
+
+  }
+
+  // Toggle 3D mode
+  function toggle3DMode() {
+  is3DMode = !is3DMode;
+  const button = document.querySelector('#top-bar button[onclick="toggle3DMode()"]') || document.querySelector('#control-panel button[onclick="toggle3DMode()"]');
+  if (button) {
+    button.textContent = is3DMode ? 'Switch to 2D' : 'Switch to 3D';
+  }
+  document.body.classList.toggle('three-d-mode', is3DMode);
+  if (is3DMode) {
+    map3D.resize();
+    syncPolygonsTo3D();
+    if (isDrawingEnabled) {
+      isDrawingEnabled = false;
+      const drawButton = document.querySelector('#top-bar button[onclick="toggleDrawing()"]') || document.querySelector('#control-panel button[onclick="toggleDrawing()"]');
+      if (drawButton) {
+        drawButton.textContent = 'Enable Drawing';
+      }
+      console.log('Drawing disabled when switching to 3D mode');
+    }
+  } else {
+    map.getContainer().style.display = 'block';
+    map.getContainer().style.opacity = '1';
+    map.getContainer().style.height = 'auto';
+    map.getContainer().style.overflow = 'visible';
+    clear3DPolygons();
+    map3D.getContainer().style.opacity = '0';
+  }
+  updateLegend();
+  console.log('Toggled to', is3DMode ? '3D' : '2D', 'mode, synced polygons');
+}
+
+  // Toggle drawing mode
+ function toggleDrawing() {
+  if (is3DMode) {
+    // Show modal prompting to switch to 2D mode
+    document.getElementById('3d-draw-modal').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+    return;
+  }
+
+  isDrawingEnabled = !isDrawingEnabled;
+  const button = document.querySelector('#top-bar button[onclick="toggleDrawing()"]') || document.querySelector('#control-panel button[onclick="toggleDrawing()"]');
+  if (button) {
+    button.textContent = isDrawingEnabled ? 'Disable Drawing' : 'Enable Drawing';
+  }
+  if (isDrawingEnabled) {
+    drawControl._toolbars.draw._modes.polygon.handler.enable();
+  } else {
+    drawControl._toolbars.draw._modes.polygon.handler.disable();
+    // Disable any active edit mode to prevent vertex interaction
+    if (drawControl?._toolbars?.edit?._modes?.edit?.handler) {
+      drawControl._toolbars.edit._modes.edit.handler.disable();
+    }
+    editingLayerId = null;
+  }
+  console.log('Drawing', isDrawingEnabled ? 'enabled' : 'disabled', 'in 2D mode');
+}
+function switchTo2DForDrawing() {
+  is3DMode = false;
+  document.body.classList.remove('three-d-mode');
+  map.getContainer().style.display = 'block';
+  map.getContainer().style.opacity = '1';
+  map.getContainer().style.height = 'auto';
+  map.getContainer().style.overflow = 'visible';
+  map3D.getContainer().style.opacity = '0';
+  clear3DPolygons();
+  const button = document.querySelector('#top-bar button[onclick="toggle3DMode()"]') || document.querySelector('#control-panel button[onclick="toggle3DMode()"]');
+  if (button) {
+    button.textContent = 'Switch to 3D';
+  }
+  close3DDrawModal();
+  toggleDrawing(); // Enable drawing after switching to 2D
+  console.log('Switched to 2D mode for drawing');
+}
+
+function close3DDrawModal() {
+  document.getElementById('3d-draw-modal').style.display = 'none';
+  document.getElementById('overlay').style.display = 'none';
+}
+  // Sync 2D polygons to 3D
+  function syncPolygonsTo3D() {
+    clear3DPolygons();
+    console.log('Syncing polygons to 3D, drawnItems layers:', drawnItems.getLayers().length);
+    drawnItems.eachLayer(layer => {
+      if (!layer || !document.getElementById('drawn-polygons-toggle')?.checked) {
+        console.log('Skipping layer:', layer?._leaflet_id, 'toggle:', document.getElementById('drawn-polygons-toggle')?.checked);
+        return;
+      }
+      const geojson = layer.toGeoJSON();
+      geojson.properties = { 
+        name: layer.feature?.properties?.name || 'Low risk', 
+        source: layer.feature?.properties?.source || 'leaflet' 
+      };
+      const isSevere = geojson.properties.name === 'Severe risk';
+      const layerId = layer._leaflet_id || `drawn-polygon-${Date.now()}`;
+      if (!layer._leaflet_id) {
+        layer._leaflet_id = layerId;
+      }
+      console.log('Syncing layer:', layerId, 'GeoJSON:', geojson);
+      try {
+        map3D.addSource(layerId, { type: 'geojson', data: geojson });
+        map3D.addLayer({
+          id: layerId,
+          type: 'fill',
+          source: layerId,
+          paint: {
+            'fill-color': layer.options.color || '#5aac91',
+            'fill-opacity': isSevere ? 0 : (layer.options.fillOpacity || 0.3)
+          }
+        });
+        map3D.addLayer({
+          id: `${layerId}-outline`,
+          type: 'line',
+          source: layerId,
+          paint: {
+            'line-color': layer.options.color || '#5aac91',
+            'line-width': layer.options.weight || 2,
+            'line-opacity': 1
+          }
+        });
+        drawnItems3D.push({
+          id: layerId,
+          outlineId: `${layerId}-outline`,
+          source: layerId
+        });
+      } catch (error) {
+        console.error('Error syncing layer:', layerId, error);
+      }
+    });
+    map3D.resize();
+    console.log('Synced', drawnItems3D.length, 'polygons to 3D');
+  }
+
+  // Clear 3D polygons
+  function clear3DPolygons() {
+    console.log('Clearing 3D polygons:', drawnItems3D.length);
+    drawnItems3D.forEach(item => {
+      if (map3D.getLayer(item.id)) map3D.removeLayer(item.id);
+      if (map3D.getLayer(item.outlineId)) map3D.removeLayer(item.outlineId);
+      if (map3D.getSource(item.source)) map3D.removeSource(item.source);
+    });
+    drawnItems3D = [];
+  }
+
+  // Add or update popup for polygon customization
+  function addPolygonPopup(layer) {
+    if (!layer || !layer._leaflet_id) {
+      console.error('Invalid layer or missing _leaflet_id:', layer);
+      return;
+    }
+    const popupContent = document.createElement('div');
+    popupContent.className = 'polygon-popup';
+    const riskLevel = layer.feature?.properties?.name || 'Low risk';
+    const isEditing = editingLayerId === layer._leaflet_id;
+    popupContent.innerHTML = `
+      <label>Risk Level:
+        <select id="risk-select-${layer._leaflet_id}">
+          <option value="Low risk" ${riskLevel === 'Low risk' ? 'selected' : ''}>Low risk</option>
+          <option value="Slight risk" ${riskLevel === 'Slight risk' ? 'selected' : ''}>Slight risk</option>
+          <option value="Enhanced risk" ${riskLevel === 'Enhanced risk' ? 'selected' : ''}>Enhanced risk</option>
+          <option value="Moderate risk" ${riskLevel === 'Moderate risk' ? 'selected' : ''}>Moderate risk</option>
+          <option value="High risk" ${riskLevel === 'High risk' ? 'selected' : ''}>High risk</option>
+          <option value="Severe risk" ${riskLevel === 'Severe risk' ? 'selected' : ''}>Severe risk</option>
+        </select>
+      </label>
+      <label>Color:
+        <input type="color" id="color-input-${layer._leaflet_id}" value="${layer.options.color || '#5aac91'}">
+      </label>
+      <button id="edit-button-${layer._leaflet_id}">${isEditing ? 'Cancel Edit' : 'Edit Shape'}</button>
+      ${isEditing ? `<button id="apply-button-${layer._leaflet_id}">Apply Edit</button>` : ''}
+      <button id="delete-button-${layer._leaflet_id}">Delete</button>
+    `;
+    const riskSelect = popupContent.querySelector(`#risk-select-${layer._leaflet_id}`);
+    const colorInput = popupContent.querySelector(`#color-input-${layer._leaflet_id}`);
+    const editButton = popupContent.querySelector(`#edit-button-${layer._leaflet_id}`);
+    const applyButton = popupContent.querySelector(`#apply-button-${layer._leaflet_id}`);
+    const deleteButton = popupContent.querySelector(`#delete-button-${layer._leaflet_id}`);
+
+    if (riskSelect) {
+      riskSelect.replaceWith(riskSelect.cloneNode(true));
+      const newRiskSelect = popupContent.querySelector(`#risk-select-${layer._leaflet_id}`);
+      newRiskSelect.onchange = () => updatePolygonRisk(newRiskSelect, layer._leaflet_id);
+    }
+    if (colorInput) {
+      colorInput.onchange = () => updatePolygonColor(colorInput, layer._leaflet_id);
+    }
+    if (editButton) {
+      editButton.onclick = () => {
+        if (editingLayerId === layer._leaflet_id) {
+          cancelPolygonEdit(layer._leaflet_id);
+        } else {
+          startEditPolygon(layer._leaflet_id);
+        }
+      };
+    }
+    if (applyButton) {
+      applyButton.onclick = () => savePolygonEdit(layer._leaflet_id);
+    }
+    if (deleteButton) {
+      deleteButton.onclick = () => deletePolygon(layer._leaflet_id);
+    }
+
+    layer.bindPopup(popupContent);
+    console.log('Added popup for layer:', layer._leaflet_id);
+  }
+
+  // Update existing popup content without rebinding
+  function updatePolygonPopup(layer) {
+    if (!layer || !layer._leaflet_id || !layer.getPopup()) {
+      console.error('Cannot update popup for layer:', layer);
+      return;
+    }
+    const popupContent = layer.getPopup().getContent();
+    const riskLevel = layer.feature?.properties?.name || 'Low risk';
+    const isEditing = editingLayerId === layer._leaflet_id;
+    popupContent.innerHTML = `
+      <label>Risk Level:
+        <select id="risk-select-${layer._leaflet_id}">
+          <option value="Low risk" ${riskLevel === 'Low risk' ? 'selected' : ''}>Low risk</option>
+          <option value="Slight risk" ${riskLevel === 'Slight risk' ? 'selected' : ''}>Slight risk</option>
+          <option value="Enhanced risk" ${riskLevel === 'Enhanced risk' ? 'selected' : ''}>Enhanced risk</option>
+          <option value="Moderate risk" ${riskLevel === 'Moderate risk' ? 'selected' : ''}>Moderate risk</option>
+          <option value="High risk" ${riskLevel === 'High risk' ? 'selected' : ''}>High risk</option>
+          <option value="Severe risk" ${riskLevel === 'Severe risk' ? 'selected' : ''}>Severe risk</option>
+        </select>
+      </label>
+      <label>Color:
+        <input type="color" id="color-input-${layer._leaflet_id}" value="${layer.options.color || '#5aac91'}">
+      </label>
+      <button id="edit-button-${layer._leaflet_id}">${isEditing ? 'Cancel Edit' : 'Edit Shape'}</button>
+      ${isEditing ? `<button id="apply-button-${layer._leaflet_id}">Apply Edit</button>` : ''}
+      <button id="delete-button-${layer._leaflet_id}">Delete</button>
+    `;
+    const riskSelect = popupContent.querySelector(`#risk-select-${layer._leaflet_id}`);
+    const colorInput = popupContent.querySelector(`#color-input-${layer._leaflet_id}`);
+    const editButton = popupContent.querySelector(`#edit-button-${layer._leaflet_id}`);
+    const applyButton = popupContent.querySelector(`#apply-button-${layer._leaflet_id}`);
+    const deleteButton = popupContent.querySelector(`#delete-button-${layer._leaflet_id}`);
+
+    if (riskSelect) {
+      riskSelect.replaceWith(riskSelect.cloneNode(true));
+      const newRiskSelect = popupContent.querySelector(`#risk-select-${layer._leaflet_id}`);
+      newRiskSelect.onchange = () => updatePolygonRisk(newRiskSelect, layer._leaflet_id);
+    }
+    if (colorInput) {
+      colorInput.onchange = () => updatePolygonColor(colorInput, layer._leaflet_id);
+    }
+    if (editButton) {
+      editButton.onclick = () => {
+        if (editingLayerId === layer._leaflet_id) {
+          cancelPolygonEdit(layer._leaflet_id);
+        } else {
+          startEditPolygon(layer._leaflet_id);
+        }
+      };
+    }
+    if (applyButton) {
+      applyButton.onclick = () => savePolygonEdit(layer._leaflet_id);
+    }
+    if (deleteButton) {
+      deleteButton.onclick = () => deletePolygon(layer._leaflet_id);
+    }
+    console.log('Updated popup for layer:', layer._leaflet_id);
+  }
+
+  // Update polygon risk level
+  function updatePolygonRisk(select, layerId) {
+    const layer = drawnItems.getLayer(layerId);
+    if (!layer) {
+      console.error(`Layer with ID ${layerId} not found`);
+      return;
+    }
+    const risk = select.value;
+    layer.feature = layer.feature || { type: 'Feature', properties: {} };
+    layer.feature.properties.name = risk;
+    const isSevere = risk === 'Severe risk';
+    layer.setStyle({
+      color: risk_colors[risk],
+      fillColor: isSevere ? 'transparent' : risk_colors[risk],
+      fillOpacity: parseFloat(document.getElementById('polygon-opacity')?.value || 0.3),
+      weight: parseFloat(document.getElementById('polygon-weight')?.value || 2)
+    });
+    if (is3DMode) syncPolygonsTo3D();
+    updateLegend();
+    updatePolygonPopup(layer);
+    console.log('Updated risk level for layer:', layerId, 'to', risk);
+  }
+
+  // Update polygon color
+  function updatePolygonColor(input, layerId) {
+    const layer = drawnItems.getLayer(layerId);
+    if (!layer) {
+      console.error(`Layer with ID ${layerId} not found`);
+      return;
+    }
+    const color = input.value;
+    layer.setStyle({
+      color,
+      fillColor: layer.feature?.properties?.name === 'Severe risk' ? 'transparent' : color
+    });
+    if (is3DMode) syncPolygonsTo3D();
+    updateLegend();
+    updatePolygonPopup(layer);
+    console.log('Updated color for layer:', layerId, 'to', color);
+  }
+
+  // Start editing polygon shape
+  function startEditPolygon(layerId) {
+    const layer = drawnItems.getLayer(layerId);
+    if (!layer) {
+      console.error(`Layer with ID ${layerId} not found`);
+      return;
+    }
+    if (is3DMode && layer.feature?.properties?.source === 'mapbox') {
+      if (drawControl3D) {
+        drawControl3D.changeMode('direct_select', { featureId: layerId.replace('drawn-polygon-', '') });
+        editingLayerId = layerId;
+        updatePolygonPopup(layer);
+        layer.openPopup();
+      } else {
+        console.error('3D draw control not initialized');
+      }
+    } else {
+      if (drawControl?._toolbars?.edit?._modes?.edit?.handler) {
+        drawControl._toolbars.edit._modes.edit.handler.enable();
+        if (layer.editing) {
+          layer.editing.enable();
+        } else {
+          console.warn('Layer editing not supported for this layer:', layer);
+        }
+        editingLayerId = layerId;
+        updatePolygonPopup(layer);
+        layer.openPopup();
+      } else {
+        console.error('Edit toolbar not initialized');
+      }
+    }
+    console.log('Started editing layer:', layerId);
+  }
+
+  // Save edited polygon shape
+  function savePolygonEdit(layerId) {
+    const layer = drawnItems.getLayer(layerId);
+    if (!layer) {
+      console.error(`Layer with ID ${layerId} not found`);
+      return;
+    }
+    if (is3DMode && layer.feature?.properties?.source === 'mapbox') {
+      if (drawControl3D) {
+        drawControl3D.changeMode('simple_select');
+        const geojson = layer.toGeoJSON();
+        const sourceId = layerId;
+        if (map3D.getSource(sourceId)) {
+          map3D.getSource(sourceId).setData(geojson);
+        }
+      }
+    } else {
+      if (layer.editing) {
+        layer.editing.disable();
+      }
+      if (drawControl?._toolbars?.edit?._modes?.edit?.handler) {
+        drawControl._toolbars.edit._modes.edit.handler.save();
+        drawControl._toolbars.edit._modes.edit.handler.disable();
+      }
+    }
+    if (is3DMode) syncPolygonsTo3D();
+    updateLegend();
+    editingLayerId = null;
+    updatePolygonPopup(layer);
+    layer.openPopup();
+    console.log('Saved edits for layer:', layerId);
+  }
+
+  // Cancel editing polygon shape
+  function cancelPolygonEdit(layerId) {
+    const layer = drawnItems.getLayer(layerId);
+    if (!layer) {
+      console.error(`Layer with ID ${layerId} not found`);
+      return;
+    }
+    if (is3DMode && layer.feature?.properties?.source === 'mapbox') {
+      if (drawControl3D) {
+        drawControl3D.changeMode('simple_select');
+      }
+    } else {
+      if (layer.editing) {
+        layer.editing.disable();
+      }
+      if (drawControl?._toolbars?.edit?._modes?.edit?.handler) {
+        drawControl._toolbars.edit._modes.edit.handler.revertLayers();
+        drawControl._toolbars.edit._modes.edit.handler.disable();
+      }
+    }
+    if (is3DMode) syncPolygonsTo3D();
+    editingLayerId = null;
+    updatePolygonPopup(layer);
+    layer.openPopup();
+    console.log('Canceled edits for layer:', layerId);
+  }
+
+  // Delete polygon
+  function deletePolygon(layerId) {
+    const layer = drawnItems.getLayer(layerId);
+    if (!layer) {
+      console.error(`Layer with ID ${layerId} not found`);
+      return;
+    }
+    drawnItems.removeLayer(layer);
+    if (is3DMode && layer.feature?.properties?.source === 'mapbox') {
+      const item = drawnItems3D.find(d => d.id === layerId);
+      if (item) {
+        if (map3D.getLayer(item.id)) map3D.removeLayer(item.id);
+        if (map3D.getLayer(item.outlineId)) map3D.removeLayer(item.outlineId);
+        if (map3D.getSource(item.source)) map3D.removeSource(item.source);
+        drawnItems3D = drawnItems3D.filter(d => d.id !== layerId);
+      }
+    }
+    if (is3DMode) syncPolygonsTo3D();
+    updateLegend();
+    editingLayerId = null;
+    console.log('Deleted layer:', layerId);
+  }
+
+  // Update all polygons' opacity
+  function updateAllPolygonsOpacity() {
+    const opacity = parseFloat(document.getElementById('polygon-opacity')?.value || 0.3);
+    drawnItems.eachLayer(layer => {
+      if (layer) {
+        layer.setStyle({ fillOpacity: layer.feature?.properties?.name === 'Severe risk' ? 0 : opacity });
+      }
+    });
+    if (is3DMode) syncPolygonsTo3D();
+    updateLegend();
+    console.log('Updated opacity for all polygons:', opacity);
+  }
+
+  // Update all polygons' outline weight
+  function updateAllPolygonsWeight() {
+    const weight = parseFloat(document.getElementById('polygon-weight')?.value || 2);
+    drawnItems.eachLayer(layer => {
+      if (layer) {
+        layer.setStyle({ weight });
+      }
+    });
+    if (is3DMode) syncPolygonsTo3D();
+    updateLegend();
+    console.log('Updated weight for all polygons:', weight);
+  }
+
+  // Export drawn polygons to KML
+  function exportToKML() {
+    const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>Drawn Polygons</name>`;
+    let kmlBody = '';
+    drawnItems.eachLayer(layer => {
+      if (!layer || !layer.toGeoJSON || !layer.options?.color) return;
+      const geojson = layer.toGeoJSON();
+      const coordinates = geojson.geometry.coordinates[0]?.map(coord => `${coord[0]},${coord[1]},0`).join(' ') || '';
+      const risk = layer.feature?.properties?.name || 'Low risk';
+      kmlBody += `
+        <Placemark>
+          <name>${risk}</name>
+          <Style>
+            <LineStyle>
+              <color>ff${layer.options.color.replace('#', '')}</color>
+              <width>${layer.options.weight || 2}</width>
+            </LineStyle>
+            <PolyStyle>
+              <color>${risk === 'Severe risk' ? '00' : '7f'}${layer.options.color.replace('#', '')}</color>
+            </PolyStyle>
+          </Style>
+          <Polygon>
+            <outerBoundaryIs>
+              <LinearRing>
+                <coordinates>${coordinates}</coordinates>
+              </LinearRing>
+            </outerBoundaryIs>
+          </Polygon>
+        </Placemark>`;
+    });
+    const kmlFooter = `
+</Document>
+</kml>`;
+    const kmlContent = kmlHeader + kmlBody + kmlFooter;
+    const blob = new Blob([kmlContent], { type: 'application/vnd.google-earth.kml+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'drawn_polygons.kml';
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log('Exported polygons to KML');
+  }
+
+
+
+
+
+
+
     function toggleDarkMode() {
       document.body.classList.toggle('dark-mode');
       const button = document.querySelector('#top-bar button[onclick="toggleDarkMode()"]');
@@ -929,7 +1818,6 @@ function addLightningFlash3D(lng, lat) {
     document.getElementById('heatmap-height-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
     document.getElementById('terrain-exaggeration-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
     
-    // Remove user location marker when switching modes
     if (userLocationMarker) {
       if (is3DMode) {
         if (map.hasLayer(userLocationMarker)) map.removeLayer(userLocationMarker);
@@ -945,16 +1833,20 @@ function addLightningFlash3D(lng, lat) {
       update3DView();
       toggleKMLLayer();
       togglePNGLayer();
+      syncPolygonsTo3D();
       updateOverlay(currentFiltered);
       toggleNowcast();
       updateLegend();
       updateTerrainExaggeration();
     } else {
       map.invalidateSize();
+      map.addLayer(drawnItems);
+      clear3DPolygons();
       updateHistory();
       updateLegend();
     }
   }
+
 
     function update3DView() {
   // Clear existing layers
@@ -1637,95 +2529,55 @@ function addLightningFlash3D(lng, lat) {
 }
 
     function updateLegend() {
-  const legendDiv = document.querySelector('.legend');
-  legendDiv.innerHTML = '';
-  const colorMode = document.getElementById('color-mode').checked;
-  const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
-  const heatmap3DEnabled = is3DMode && document.getElementById('heatmap-3d-toggle').checked;
-  const lightningEnabled = document.getElementById('lightning-layer-toggle').checked;
-  const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
-  const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
-  const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
+    const legend = document.querySelector('.legend');
+    let legendHTML = '<h4>Legend</h4>';
 
-  if (lightningEnabled) {
-    legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
-    if (colorMode) {
-      legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: #ffd700"></div>Newest</div>
-        <div><div class="color-box" style="background: #ff69b4"></div></div>
-        <div><div class="color-box" style="background: #ff00ff"></div></div>
-        <div><div class="color-box" style="background: #800080"></div></div>
-        <div><div class="color-box" style="background: #4b0082"></div>Oldest</div>
-      `;
-    } else {
-      legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: black"></div>Strikes</div>
-      `;
+    if (document.getElementById('color-mode').checked && document.getElementById('lightning-layer-toggle').checked) {
+      legendHTML += `
+        <div class="legend-item"><span class="color-box" style="background: linear-gradient(to right, #EE9B00, #9B2226);"></span> Lightning Age (New to Old)</div>`;
+    } else if (document.getElementById('lightning-layer-toggle').checked) {
+      legendHTML += `
+        <div class="legend-item"><span class="color-box" style="background: black;"></span> Lightning Strikes</div>`;
     }
-  }
 
-  if (heatmap2DEnabled) {
-    legendDiv.innerHTML += `
-      <h4>2D Heatmap</h4>
-      <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
-      <div style="display: flex; justify-content: space-between; margin-top: 4px">
-        <span>Low</span><span>High</span>
-      </div>
-    `;
-  }
-
-  if (heatmap3DEnabled) {
-    legendDiv.innerHTML += `
-      <h4>3D Heatmap</h4>
-      <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
-      <div style="display: flex; justify-content: space-between; margin-top: 4px">
-        <span>Low</span><span>High</span>
-      </div>
-    `;
-  }
-
-  if (kmlEnabled && kmlLayer) {
-    legendDiv.innerHTML += '<h4>Risk Levels</h4>';
-    Object.entries(risk_colors).forEach(([name, color]) => {
-      const isSevere = name === 'Severe risk';
-      legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: ${isSevere ? 'none' : color}; border: 2px solid ${color};"></div>${name}</div>
-      `;
-    });
-  }
-
-  if (nowcastEnabled) {
-    legendDiv.innerHTML += '<h4>Nowcast</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: purple"></div>Very High Confidence</div>
-      <div><div class="color-box" style="background: red"></div>High Confidence</div>
-      <div><div class="color-box" style="background: orange"></div>Moderate Confidence</div>
-      <div><div class="color-box" style="background: yellow"></div>Low Confidence</div>
-    `;
-  }
-
-  // Show or hide based on isLegendVisible and content
-  legendDiv.style.display = (isLegendVisible && legendDiv.innerHTML) ? 'block' : 'none';
-
-  if (is3DMode) {
-    let map3DLegend = document.getElementById('map3d-legend');
-    if (!map3DLegend) {
-      map3DLegend = document.createElement('div');
-      map3DLegend.id = 'map3d-legend';
-      map3DLegend.className = 'legend';
-      map3DLegend.style.position = 'absolute';
-      map3DLegend.style.top = '100px';
-      map3DLegend.style.right = '10px';
-      map3DLegend.style.zIndex = '1002';
-      document.getElementById('map-3d').appendChild(map3DLegend);
+    if (document.getElementById('heatmap-toggle').checked && !is3DMode) {
+      legendHTML += `
+        <div class="legend-item"><span class="gradient-bar" style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226);"></span> Heatmap Intensity</div>`;
     }
-    map3DLegend.innerHTML = legendDiv.innerHTML;
-    map3DLegend.style.display = (isLegendVisible && legendDiv.innerHTML) ? 'block' : 'none';
-  } else {
-    const map3DLegend = document.getElementById('map3d-legend');
-    if (map3DLegend) map3DLegend.remove();
+
+    if (document.getElementById('heatmap-3d-toggle').checked && is3DMode) {
+      legendHTML += `
+        <div class="legend-item"><span class="gradient-bar" style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226);"></span> 3D Heatmap Height</div>`;
+    }
+
+    if (document.getElementById('nowcast-toggle').checked) {
+      legendHTML += `
+        <div class="legend-item"><span class="color-box" style="background: purple;"></span> Nowcast (>90%)</div>
+        <div class="legend-item"><span class="color-box" style="background: red;"></span> Nowcast (>80%)</div>
+        <div class="legend-item"><span class="color-box" style="background: orange;"></span> Nowcast (>70%)</div>
+        <div class="legend-item"><span class="color-box" style="background: yellow;"></span> Nowcast (>50%)</div>`;
+    }
+
+    if (document.getElementById('kml-layer-toggle').checked && kmlGeoJSON) {
+      Object.keys(risk_colors).forEach(risk => {
+        const isSevere = risk === 'Severe risk';
+        legendHTML += `
+          <div class="legend-item"><span class="color-box" style="background: ${isSevere ? 'transparent' : risk_colors[risk]}; border: 2px solid ${risk_colors[risk]};"></span> ${risk} (KML)</div>`;
+      });
+    }
+
+    if (document.getElementById('drawn-polygons-toggle').checked && drawnItems.getLayers().length > 0) {
+      drawnItems.eachLayer(layer => {
+        const risk = layer.feature.properties.name;
+        const isSevere = risk === 'Severe risk';
+        legendHTML += `
+          <div class="legend-item"><span class="color-box" style="background: ${isSevere ? 'transparent' : layer.options.color}; border: 2px solid ${layer.options.color};"></span> ${risk} (Drawn)</div>`;
+      });
+    }
+
+    legend.innerHTML = legendHTML;
+    legend.style.display = isLegendVisible ? 'block' : 'none';
   }
-}
     function toggleLegend() {
   isLegendVisible = !isLegendVisible;
   updateLegend(); // Update visibility based on new state
@@ -2194,7 +3046,7 @@ function togglePNGLayer() {
           });
           nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
 
-          const at = turf.sector(
+          const at = turf.sector(
             [cluster.baseLon, cluster.baseLat],
             coneRadiusKm,
             cluster.directionDeg - 15,
@@ -2960,10 +3812,9 @@ function updateSpeedTextbox() {
         update3DView();
       }
     });
-
+    initializeDrawControl();
     initializeDragAndDrop();
     fetchData();
     setRefreshInterval();
   </script>
-</body>
-</html> 
+<script>
