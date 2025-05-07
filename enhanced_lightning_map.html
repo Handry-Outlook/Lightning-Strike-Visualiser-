@@ -15,6 +15,11 @@
       margin: 0;
       background: #f4f7fa;
       overflow-x: hidden;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    body.dark-mode {
+      background: #1a1a1a;
+      color: #e0e0e0;
     }
     #top-bar {
       position: fixed;
@@ -29,6 +34,10 @@
       justify-content: space-between;
       align-items: center;
       box-sizing: border-box;
+      transition: background 0.3s ease;
+    }
+    body.dark-mode #top-bar {
+      background: #2a2a2a;
     }
     #top-bar h2 {
       margin: 0;
@@ -59,28 +68,24 @@
       background: #2563eb;
     }
     .logo {
-  width: 80px;
-  pointer-events: none;
-  z-index: 1002;
-}
-
-/* Desktop: Keep logo at bottom-right of time slider */
-@media (min-width: 769px) {
-  .logo {
-    position: absolute;
-    bottom: 20px; /* Align with bottom of time-slider-container */
-    right: 8px; /* Align with right edge of time-slider-container */
-  }
-}
-
-/* Mobile: Move logo to top-left of map */
-@media (max-width: 768px) {
-  .logo {
-    position: absolute;
-    top: 60px; /* Just below the top-bar (60px height) */
-    left: 10px; /* Align with left edge with some padding */
-  }
-}
+      width: 80px;
+      pointer-events: none;
+      z-index: 1002;
+    }
+    @media (min-width: 769px) {
+      .logo {
+        position: absolute;
+        bottom: 20px;
+        right: 8px;
+      }
+    }
+    @media (max-width: 768px) {
+      .logo {
+        position: absolute;
+        top: 60px;
+        left: 10px;
+      }
+    }
     #map, #map-3d {
       position: absolute;
       top: 0;
@@ -99,6 +104,11 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       z-index: 1003;
       padding: 10px;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    body.dark-mode #control-panel {
+      background: #2a2a2a;
+      color: #e0e0e0;
     }
     @media (min-width: 769px) {
       #control-panel {
@@ -153,11 +163,17 @@
       border-bottom: 1px solid #e5e7eb;
       padding-bottom: 10px;
     }
+    body.dark-mode .section {
+      border-bottom: 1px solid #444;
+    }
     .section h4 {
       margin: 0 0 10px;
       color: #1a2a44;
       font-weight: 600;
       font-size: 0.9em;
+    }
+    body.dark-mode .section h4 {
+      color: #e0e0e0;
     }
     .control-panel label {
       display: flex;
@@ -167,6 +183,9 @@
       font-weight: 500;
       margin-bottom: 8px;
       position: relative;
+    }
+    body.dark-mode .control-panel label {
+      color: #e0e0e0;
     }
     .control-panel label span.tooltip {
       display: none;
@@ -180,6 +199,9 @@
       font-size: 0.7em;
       white-space: nowrap;
     }
+    body.dark-mode .control-panel label span.tooltip {
+      background: #555;
+    }
     .control-panel label:hover span.tooltip {
       display: block;
     }
@@ -189,18 +211,47 @@
       border: 1px solid #d1d5db;
       border-radius: 4px;
       font-size: 0.8em;
+      background: #fff;
+      color: #1a2a44;
+      transition: background 0.3s ease, color 0.3s ease, border 0.3s ease;
     }
-    @media (max-width: 768px) {
-      .control-panel input, .control-panel select, .control-panel button {
-        font-size: 1.2em;
-        padding: 10px;
-      }
-      .control-panel input[type="range"] {
-        width: 100%;
-      }
+    body.dark-mode .control-panel input,
+    body.dark-mode .control-panel select,
+    body.dark-mode .control-panel button {
+      background: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+    }
+    .control-panel input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      background: #d1d5db;
+      border-radius: 4px;
+      outline: none;
+      transition: background 0.3s ease;
+    }
+    body.dark-mode .control-panel input[type="range"] {
+      background: #555;
+    }
+    .control-panel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #3b82f6;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .control-panel input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #3b82f6;
+      border-radius: 50%;
+      cursor: pointer;
     }
     .control-panel input[type="checkbox"] {
       margin-top: 3px;
+      accent-color: #3b82f6;
     }
     .control-panel button, #remove-filter {
       background: #3b82f6;
@@ -216,6 +267,10 @@
       padding: 10px;
       background: #f9fafb;
       border-radius: 6px;
+      transition: background 0.3s ease;
+    }
+    body.dark-mode #expert-controls {
+      background: #333;
     }
     .time-slider-container {
       position: fixed;
@@ -229,22 +284,23 @@
       flex-direction: column;
       gap: 6px;
       box-sizing: border-box;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    body.dark-mode .time-slider-container {
+      background: #2a2a2a;
+      color: #e0e0e0;
     }
     @media (min-width: 769px) {
-  .time-slider-container {
-    /* Map's left edge is at 340px, width is (100% - 340px) */
-    left: 340px;
-    width: calc((100% - 340px) * 0.8); /* 80% of the map's width */
-    /* Center within the map area: left + (map width - container width) / 2 */
-    left: calc(340px + ((100% - 340px) - ((100% - 340px) * 0.8)) / 2);
-  }
-}
-  @media (max-width: 768px) {
-  .time-slider-container #history-time {
-    font-size: 0.7em; /* Smaller size for mobile if desired */
-  }
-}
+      .time-slider-container {
+        left: 340px;
+        width: calc((100% - 340px) * 0.8);
+        left: calc(340px + ((100% - 340px) - ((100% - 340px) * 0.8)) / 2);
+      }
+    }
     @media (max-width: 768px) {
+      .time-slider-container #history-time {
+        font-size: 0.7em;
+      }
       .time-slider-container {
         left: 50%;
         transform: translateX(-50%);
@@ -265,22 +321,43 @@
       padding: 6px;
       cursor: pointer;
     }
-    .time-slider-container .logo {
-      width: 80px;
-      display: block;
-      margin: 0 auto 4px;
-      pointer-events: none;
-    }
     .time-slider-container button:hover {
       background: #2563eb;
     }
     .slider {
       width: 100%;
+      -webkit-appearance: none;
+      height: 8px;
+      background: #d1d5db;
+      border-radius: 4px;
+      outline: none;
+      transition: background 0.3s ease;
+    }
+    body.dark-mode .slider {
+      background: #555;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #3b82f6;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #3b82f6;
+      border-radius: 50%;
+      cursor: pointer;
     }
     .time-slider-container .status-info {
       font-size: 0.75em;
       color: #1a2a44;
       margin: 0;
+    }
+    body.dark-mode .time-slider-container .status-info {
+      color: #e0e0e0;
     }
     .status-info-container {
       display: flex;
@@ -289,20 +366,25 @@
       margin-top: 4px;
     }
     .legend {
-  background: rgba(255,255,255,0.95);
-  padding: 8px;
-  border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  font-size: 0.75em;
-  color: #1a2a44;
-  max-width: 125px;
-  min-width: 110px;
-  position: absolute;
-  top: 60px;
-  right: 10px;
-  z-index: 1002;
-  display: none; /* Initially hidden */
-}
+      background: rgba(255,255,255,0.95);
+      padding: 8px;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      font-size: 0.75em;
+      color: #1a2a44;
+      max-width: 125px;
+      min-width: 110px;
+      position: absolute;
+      top: 60px;
+      right: 10px;
+      z-index: 1002;
+      display: none;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    body.dark-mode .legend {
+      background: rgba(40,40,40,0.95);
+      color: #e0e0e0;
+    }
     .legend-item {
       display: flex;
       align-items: center;
@@ -330,19 +412,24 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       z-index: 1005;
       max-width: 90%;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    body.dark-mode .modal {
+      background: #2a2a2a;
+      color: #e0e0e0;
     }
     #tutorial-modal {
-      max-height: 80vh; /* Limit height to 80% of viewport height */
-      overflow-y: auto; /* Enable vertical scrolling */
-      width: 70%; /* Ensure it fits well on mobile */
-      max-width: 70vh; /* Cap width for larger screens */
-      padding: 20px; /* Slightly more padding for readability */
+      max-height: 80vh;
+      overflow-y: auto;
+      width: 70%;
+      max-width: 70vh;
+      padding: 20px;
     }
     @media (max-width: 768px) {
       #tutorial-modal {
-        width: 70%; /* Slightly wider on mobile for better fit */
-        max-height: 85vh; /* Slightly more height on mobile */
-        padding: 15px; /* Adjust padding for smaller screens */
+        width: 70%;
+        max-height: 85vh;
+        padding: 15px;
       }
     }
     .overlay {
@@ -411,6 +498,7 @@
   <div id="top-bar">
     <h2>Lightning Map⚡</h2>
     <div>
+      <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
       <button onclick="toggleLegend()">Legend</button>
       <button onclick="showTutorial()">Help</button>
       <button onclick="showUserLocation()">📍</button>
@@ -448,7 +536,6 @@
       </select><span class="tooltip">Choose map background</span></label>
       <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"><span class="tooltip">Switch to 3D view</span></label>
       <label id="terrain-exaggeration-slider-label" class="hidden">Terrain Exaggeration: <input type="range" id="terrain-exaggeration-slider" min="0" max="20" value="12" onchange="updateTerrainExaggeration()"><span class="tooltip">Adjust terrain height in 3D mode</span></label>
-
       <label>Number Resolution: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Adjust overlay grid size</span></label>
       <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Adjust heatmap spread</span></label>
       <label id="heatmap-frequency-slider-label">3D Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">3D heatmap detail</span></label>
@@ -470,7 +557,7 @@
       <h4>Extras</h4>
       <label>Sound: <input type="checkbox" id="sound-toggle" onchange="toggleSound()"><span class="tooltip">Play thunder sound</span></label>
       <label>Nowcast: <input type="checkbox" id="nowcast-toggle" checked onchange="toggleNowcast()"><span class="tooltip">Show lightning predictions</span></label>
-      <label>Nowcast Confidence: <input type="range" id="min-nowcast-confidence" min="0" max="1" step="0.1" value="0.5" onchange="is3DMode ? update3DView() : toggleNowcast()"><span class="tooltip">Minimum confidence for nowcast cones to be displayed</span></label>
+      <label>Nowcast Confidence: <input type="range" id="min-nowcast-confidence" min="0" max="1" step="0.01" value="0.8" onchange="is3DMode ? update3DView() : toggleNowcast()"><span class="tooltip">Minimum confidence for nowcast cones to be displayed</span></label>
     </div>
     <div class="section">
       <h4>Links</h4>
@@ -542,7 +629,6 @@
   <script src="https://cdn.maptiler.com/maptiler-sdk-js/v3.0.1/maptiler-sdk.umd.min.js"></script>
   <script src="https://cdn.maptiler.com/leaflet-maptilersdk/v4.0.2/leaflet-maptilersdk.umd.min.js"></script>
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
-
   <script>
     const mapboxAccessToken = 'pk.eyJ1IjoiaGFuZHJ5LW91dGxvb2siLCJhIjoiY2xrbnNrbmVlMXo0NDNqa2d3MTY2NW90bCJ9.AJbccNwtKvKA8il3JkE3PA';
     const maptilerApiKey = 'd6FiSbcpDtzJ4g4e0oD4';
@@ -694,10 +780,19 @@ legendControl.addTo(map);
     let nowcastLayer = L.layerGroup();
     let nowcastLayer3D = [];
     let currentNowcasts = [];
-    let minNowcastConfidence = 0.5;
+    let minNowcastConfidence = 0.8;
     let userLocationMarker = null;
     let isLegendVisible = false; // Legend is initially disabled
-    
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark-mode');
+      const button = document.querySelector('#top-bar button[onclick="toggleDarkMode()"]');
+      button.textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
+      const mapStyleSelect = document.getElementById('map-style');
+      const newMapStyle = document.body.classList.contains('dark-mode') ? 'maptiler-dark' : 'mapbox';
+      mapStyleSelect.value = newMapStyle;
+      switchBaseMap(newMapStyle);
+    }
+
 function toggleControls() {
     const controlPanel = document.getElementById('control-panel');
     controlPanel.classList.toggle('open');
@@ -869,6 +964,11 @@ function addLightningFlash3D(lng, lat) {
   if (map3D.getSource('heatmap-3d')) map3D.removeSource('heatmap-3d');
   if (map3D.getLayer('heatmap-2d')) map3D.removeLayer('heatmap-2d');
   if (map3D.getSource('heatmap-2d')) map3D.removeSource('heatmap-2d');
+  if (map3D.getLayer('png-layer')) map3D.removeLayer('png-layer');
+  if (map3D.getSource('png-source')) map3D.removeSource('png-source');
+  if (map3D.getLayer('kml-layer')) map3D.removeLayer('kml-layer');
+  if (map3D.getLayer('kml-layer-outline')) map3D.removeLayer('kml-layer-outline');
+  if (map3D.getSource('kml-source')) map3D.removeSource('kml-source');
   nowcastLayer3D.forEach(layer => {
     if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
     if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
@@ -878,9 +978,125 @@ function addLightningFlash3D(lng, lat) {
   const currentBounds = map3D.getBounds();
   const newStrikes = new Set();
 
-  minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
+  // Get user-defined lifespan and slider position
+  const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value) || 3;
+  const slider = document.getElementById('history-slider');
+  let sliderValue = parseInt(slider.value);
+  const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
 
-  // Render nowcast if enabled
+  // Determine time range based on filter mode
+  let startTime, endTime;
+  if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+    const filterStart = new Date(customFilterStart);
+    const filterEnd = new Date(customFilterEnd);
+    if (isNaN(filterStart) || isNaN(filterEnd)) {
+      console.error('Invalid custom filter dates');
+      return;
+    }
+    const totalMinutes = (filterEnd - filterStart) / (60 * 1000);
+    const sliderMax = Math.max(totalMinutes, lifespanHours * 60);
+    sliderValue = Math.min(sliderValue, sliderMax);
+    slider.max = sliderMax;
+    slider.min = 0;
+    slider.value = sliderValue;
+    endTime = new Date(filterStart.getTime() + sliderValue * 60 * 1000);
+    startTime = new Date(endTime.getTime() - lifespanHours * 3600 * 1000);
+  } else {
+    const now = new Date();
+    sliderValue = sliderValue || maxMinutes;
+    slider.max = maxMinutes;
+    slider.min = 0;
+    endTime = new Date(now.getTime() - (maxMinutes - sliderValue) * 60 * 1000);
+    startTime = new Date(endTime.getTime() - lifespanHours * 3600 * 1000);
+  }
+
+  // Update animation times
+  animationStart = startTime;
+  animationEnd = endTime;
+
+  // Filter strikes within the lifespan
+  currentFiltered = strikeData.filter(s => {
+    if (showAllStrikes) {
+      return s.time >= new Date(endTime.getTime() - maxMinutes * 60 * 1000) && s.time <= endTime;
+    }
+    return s.time >= startTime && s.time <= endTime;
+  });
+
+  // Add PNG layer
+  if (document.getElementById('png-layer-toggle').checked && pngImage && pngBounds) {
+    map3D.addSource('png-source', {
+      type: 'image',
+      url: pngImage,
+      coordinates: [
+        [pngBounds[0][1], pngBounds[1][0]],
+        [pngBounds[1][1], pngBounds[1][0]],
+        [pngBounds[1][1], pngBounds[0][0]],
+        [pngBounds[0][1], pngBounds[0][0]]
+      ]
+    });
+    map3D.addLayer({
+      id: 'png-layer',
+      type: 'raster',
+      source: 'png-source',
+      paint: {
+        'raster-opacity': parseFloat(document.getElementById('png-opacity-slider').value)
+      }
+    });
+  }
+
+  // Add KML layer
+  if (document.getElementById('kml-layer-toggle').checked && kmlGeoJSON) {
+    map3D.addSource('kml-source', { type: 'geojson', data: kmlGeoJSON });
+    map3D.addLayer({
+      id: 'kml-layer',
+      type: 'fill',
+      source: 'kml-source',
+      paint: {
+        'fill-color': [
+          'match',
+          ['get', 'name'],
+          'Low risk', risk_colors['Low risk'],
+          'Slight risk', risk_colors['Slight risk'],
+          'Enhanced risk', risk_colors['Enhanced risk'],
+          'Moderate risk', risk_colors['Moderate risk'],
+          'High risk', risk_colors['High risk'],
+          'transparent'
+        ],
+        'fill-opacity': [
+          'match',
+          ['get', 'name'],
+          'Low risk', 0.3,
+          'Slight risk', 0.3,
+          'Enhanced risk', 0.3,
+          'Moderate risk', 0.3,
+          'High risk', 0.3,
+          0
+        ]
+      }
+    });
+    map3D.addLayer({
+      id: 'kml-layer-outline',
+      type: 'line',
+      source: 'kml-source',
+      paint: {
+        'line-color': [
+          'match',
+          ['get', 'name'],
+          'Low risk', risk_colors['Low risk'],
+          'Slight risk', risk_colors['Slight risk'],
+          'Enhanced risk', risk_colors['Enhanced risk'],
+          'Moderate risk', risk_colors['Moderate risk'],
+          'High risk', risk_colors['High risk'],
+          risk_colors['Severe risk']
+        ],
+        'line-width': 2,
+        'line-opacity': 1
+      }
+    });
+  }
+
+  // Add nowcast layers
+  minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
   if (document.getElementById('nowcast-toggle').checked) {
     currentNowcasts = calculateLightningNowcast(currentFiltered);
     currentNowcasts.forEach((cluster, index) => {
@@ -891,6 +1107,8 @@ function addLightningFlash3D(lng, lat) {
         const radiusKm = cluster.confidenceScore * 5 + 5;
         const coneRadiusKm = cluster.confidenceScore * 30 + 30;
         const radiusDeg = radiusKm / 111;
+
+        // Add nowcast circle
         map3D.addSource(`nowcast-circle-${index}`, {
           type: 'geojson',
           data: {
@@ -922,6 +1140,8 @@ function addLightningFlash3D(lng, lat) {
           }
         });
         nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
+
+        // Add nowcast cone
         const cone = turf.sector(
           [cluster.baseLon, cluster.baseLat],
           coneRadiusKm,
@@ -947,55 +1167,7 @@ function addLightningFlash3D(lng, lat) {
     });
   }
 
-  // Render KML and PNG layers (if enabled) before lightning
-  toggleKMLLayer();
-  togglePNGLayer();
-
-  // Get user-defined lifespan and slider position
-  const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value) || 3;
-  const slider = document.getElementById('history-slider');
-  let sliderValue = parseInt(slider.value);
-  const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
-
-  // Determine time range based on filter mode
-  let startTime, endTime;
-  if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
-    const filterStart = new Date(customFilterStart);
-    const filterEnd = new Date(customFilterEnd);
-    if (isNaN(filterStart) || isNaN(filterEnd)) {
-      console.error('Invalid custom filter dates');
-      return;
-    }
-    const totalMinutes = (filterEnd - filterStart) / (60 * 1000);
-    const sliderMax = Math.max(totalMinutes, lifespanHours * 60);
-    sliderValue = Math.min(sliderValue, sliderMax); // Ensure slider value is within range
-    slider.max = sliderMax;
-    slider.min = 0;
-    slider.value = sliderValue;
-    endTime = new Date(filterStart.getTime() + sliderValue * 60 * 1000);
-    startTime = new Date(endTime.getTime() - lifespanHours * 3600 * 1000);
-  } else {
-    const now = new Date();
-    sliderValue = sliderValue || maxMinutes;
-    slider.max = maxMinutes;
-    slider.min = 0;
-    endTime = new Date(now.getTime() - (maxMinutes - sliderValue) * 60 * 1000);
-    startTime = new Date(endTime.getTime() - lifespanHours * 3600 * 1000);
-  }
-
-  // Update animation times
-  animationStart = startTime;
-  animationEnd = endTime;
-
-  // Filter strikes within the lifespan
-  currentFiltered = strikeData.filter(s => {
-    if (showAllStrikes) {
-      return s.time >= new Date(endTime.getTime() - maxMinutes * 60 * 1000) && s.time <= endTime;
-    }
-    return s.time >= startTime && s.time <= endTime;
-  });
-
-  // Render lightning layer
+  // Add lightning layer
   if (document.getElementById('lightning-layer-toggle').checked) {
     currentFiltered.forEach(s => {
       const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
@@ -1003,7 +1175,7 @@ function addLightningFlash3D(lng, lat) {
       const isNewStrike = !lastRenderedStrikes.has(strikeKey);
       const inBounds = currentBounds.contains([s.coordinates[0], s.coordinates[1]]);
       const ageFraction = (endTime - s.time) / (lifespanHours * 3600 * 1000);
-      
+
       const el = document.createElement('div');
       el.className = 'marker';
       el.style.backgroundColor = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
@@ -1113,7 +1285,6 @@ function addLightningFlash3D(lng, lat) {
   updateOverlay(currentFiltered);
   updateLegend();
 }
-
     function generateHeatmapGrid(data, frequency) {
       const UK_BBOX = [-15, 49, 8, 61];
       const [minLng, minLat, maxLng, maxLat] = UK_BBOX;
@@ -1853,9 +2024,9 @@ function togglePNGLayer() {
   const kmlZ = expertMode ? parseInt(document.getElementById('kml-zindex').value) || 60 : 60;
   const pngZ = expertMode ? parseInt(document.getElementById('png-zindex').value) || 40 : 40;
   const numbersZ = expertMode ? parseInt(document.getElementById('numbers-zindex').value) || 1200 : 1200;
-  const nowcastZ = lightningZ - 10; // Ensure nowcast is below lightning
+  const nowcastZ = Math.max(kmlZ, pngZ) + 10; // Ensure nowcast is above KML and PNG, but below lightning
 
-  // Remove and re-add layers in correct order to enforce rendering
+  // Remove all layers to re-add them in the correct order
   if (nowcastLayer && map.hasLayer(nowcastLayer)) map.removeLayer(nowcastLayer);
   if (strikeLayer && map.hasLayer(strikeLayer)) map.removeLayer(strikeLayer);
   if (kmlLayer && map.hasLayer(kmlLayer)) map.removeLayer(kmlLayer);
@@ -1863,25 +2034,25 @@ function togglePNGLayer() {
   if (heatmapLayer && map.hasLayer(heatmapLayer)) map.removeLayer(heatmapLayer);
   if (numberOverlay && map.hasLayer(numberOverlay)) map.removeLayer(numberOverlay);
 
-  // Add layers back in desired order: nowcast, kml, png, heatmap, lightning, numbers
+  // Add layers back in desired order: heatmap, png, kml, nowcast, lightning, numbers
+  if (heatmapLayer && document.getElementById('heatmap-toggle').checked) {
+    heatmapLayer._canvas.style.zIndex = heatmapZ;
+    map.addLayer(heatmapLayer);
+  }
+  if (pngLayer && document.getElementById('png-layer-toggle').checked) {
+    pngLayer.setZIndex(pngZ);
+    map.addLayer(pngLayer);
+  }
+  if (kmlLayer && document.getElementById('kml-layer-toggle').checked) {
+    kmlLayer.setZIndex(kmlZ);
+    map.addLayer(kmlLayer);
+  }
   if (nowcastLayer && document.getElementById('nowcast-toggle').checked) {
     nowcastLayer.eachLayer(layer => {
       if (layer.setZIndex) layer.setZIndex(nowcastZ);
     });
     nowcastLayer.setZIndex(nowcastZ);
     map.addLayer(nowcastLayer);
-  }
-  if (kmlLayer && document.getElementById('kml-layer-toggle').checked) {
-    kmlLayer.setZIndex(kmlZ);
-    map.addLayer(kmlLayer);
-  }
-  if (pngLayer && document.getElementById('png-layer-toggle').checked) {
-    pngLayer.setZIndex(pngZ);
-    map.addLayer(pngLayer);
-  }
-  if (heatmapLayer && document.getElementById('heatmap-toggle').checked) {
-    heatmapLayer._canvas.style.zIndex = heatmapZ;
-    map.addLayer(heatmapLayer);
   }
   if (strikeLayer && document.getElementById('lightning-layer-toggle').checked) {
     strikeLayer.setZIndex(lightningZ);
@@ -1890,6 +2061,181 @@ function togglePNGLayer() {
   if (numberOverlay && document.getElementById('number-overlay-toggle').checked) {
     numberOverlay.setZIndex(numbersZ);
     map.addLayer(numberOverlay);
+  }
+
+  // In 3D mode, ensure correct layer order by re-adding layers
+  if (is3DMode) {
+    // Remove existing 3D layers
+    if (map3D.getLayer('png-layer')) map3D.removeLayer('png-layer');
+    if (map3D.getSource('png-source')) map3D.removeSource('png-source');
+    if (map3D.getLayer('kml-layer')) map3D.removeLayer('kml-layer');
+    if (map3D.getLayer('kml-layer-outline')) map3D.removeLayer('kml-layer-outline');
+    if (map3D.getSource('kml-source')) map3D.removeSource('kml-source');
+    nowcastLayer3D.forEach(layer => {
+      if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
+      if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
+    });
+    strikeLayer3D.forEach(marker => marker.remove());
+    strikeLayer3D = [];
+
+    // Re-add PNG layer
+    if (document.getElementById('png-layer-toggle').checked && pngImage && pngBounds) {
+      map3D.addSource('png-source', {
+        type: 'image',
+        url: pngImage,
+        coordinates: [
+          [pngBounds[0][1], pngBounds[1][0]],
+          [pngBounds[1][1], pngBounds[1][0]],
+          [pngBounds[1][1], pngBounds[0][0]],
+          [pngBounds[0][1], pngBounds[0][0]]
+        ]
+      });
+      map3D.addLayer({
+        id: 'png-layer',
+        type: 'raster',
+        source: 'png-source',
+        paint: {
+          'raster-opacity': parseFloat(document.getElementById('png-opacity-slider').value)
+        }
+      });
+    }
+
+    // Re-add KML layer
+    if (document.getElementById('kml-layer-toggle').checked && kmlGeoJSON) {
+      map3D.addSource('kml-source', { type: 'geojson', data: kmlGeoJSON });
+      map3D.addLayer({
+        id: 'kml-layer',
+        type: 'fill',
+        source: 'kml-source',
+        paint: {
+          'fill-color': [
+            'match',
+            ['get', 'name'],
+            'Low risk', risk_colors['Low risk'],
+            'Slight risk', risk_colors['Slight risk'],
+            'Enhanced risk', risk_colors['Enhanced risk'],
+            'Moderate risk', risk_colors['Moderate risk'],
+            'High risk', risk_colors['High risk'],
+            'transparent'
+          ],
+          'fill-opacity': [
+            'match',
+            ['get', 'name'],
+            'Low risk', 0.3,
+            'Slight risk', 0.3,
+            'Enhanced risk', 0.3,
+            'Moderate risk', 0.3,
+            'High risk', 0.3,
+            0
+          ]
+        }
+      });
+      map3D.addLayer({
+        id: 'kml-layer-outline',
+        type: 'line',
+        source: 'kml-source',
+        paint: {
+          'line-color': [
+            'match',
+            ['get', 'name'],
+            'Low risk', risk_colors['Low risk'],
+            'Slight risk', risk_colors['Slight risk'],
+            'Enhanced risk', risk_colors['Enhanced risk'],
+            'Moderate risk', risk_colors['Moderate risk'],
+            'High risk', risk_colors['High risk'],
+            risk_colors['Severe risk']
+          ],
+          'line-width': 2,
+          'line-opacity': 1
+        }
+      });
+    }
+
+    // Re-add nowcast layers
+    if (document.getElementById('nowcast-toggle').checked) {
+      currentNowcasts.forEach((cluster, index) => {
+        if (cluster.confidenceScore >= minNowcastConfidence) {
+          const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
+                                  cluster.confidenceScore > 0.8 ? 'red' :
+                                  cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
+          const radiusKm = cluster.confidenceScore * 5 + 5;
+          const coneRadiusKm = cluster.confidenceScore * 30 + 30;
+          const radiusDeg = radiusKm / 111;
+
+          map3D.addSource(`nowcast-circle-${index}`, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [cluster.baseLon, cluster.baseLat]
+              },
+              properties: { radius: radiusDeg }
+            }
+          });
+          map3D.addLayer({
+            id: `nowcast-circle-${index}`,
+            type: 'circle',
+            source: `nowcast-circle-${index}`,
+            paint: {
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                5, (radiusKm * 1000) / 1000,
+                10, (radiusKm * 1000) / 250
+              ],
+              'circle-color': confidenceColor,
+              'circle-opacity': 0.5,
+              'circle-stroke-color': confidenceColor,
+              'circle-stroke-width': 2,
+              'circle-stroke-opacity': 0.8
+            }
+          });
+          nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
+
+          const at = turf.sector(
+            [cluster.baseLon, cluster.baseLat],
+            coneRadiusKm,
+            cluster.directionDeg - 15,
+            cluster.directionDeg + 15,
+            { units: 'kilometers' }
+          );
+          map3D.addSource(`nowcast-cone-${index}`, {
+            type: 'geojson',
+            data: cone
+          });
+          map3D.addLayer({
+            id: `nowcast-cone-${index}`,
+            type: 'fill',
+            source: `nowcast-cone-${index}`,
+            paint: {
+              'fill-color': confidenceColor,
+              'fill-opacity': 0.5
+            }
+          });
+          nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
+        }
+      });
+    }
+
+    // Re-add lightning layer
+    if (document.getElementById('lightning-layer-toggle').checked) {
+      currentFiltered.forEach(s => {
+        const ageFraction = (animationEnd - s.time) / (parseFloat(document.getElementById('lightning-lifespan').value) * 3600 * 1000);
+        const el = document.createElement('div');
+        el.className = 'marker';
+        el.style.backgroundColor = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
+        el.style.width = '10px';
+        el.style.height = '10px';
+        el.style.borderRadius = '50%';
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([s.coordinates[0], s.coordinates[1]])
+          .setPopup(new mapboxgl.Popup().setText(s.time.toISOString()))
+          .addTo(map3D);
+        strikeLayer3D.push(marker);
+      });
+    }
   }
 }
 
