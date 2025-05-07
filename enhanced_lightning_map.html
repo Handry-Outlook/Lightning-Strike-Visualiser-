@@ -129,7 +129,7 @@
       }
       #settings-button {
         position: fixed;
-        bottom: 135px;
+        bottom: 145px;
         right: 50px;
         background: #3b82f6;
         color: white;
@@ -1634,7 +1634,7 @@ function addLightningFlash3D(lng, lat) {
       updateHeatmap(currentFiltered);
       updateOverlay(currentFiltered);
       updateNowcast(currentFiltered);
-      document.getElementById('time-range').innerText = `=${start.toISOString()} - ${end.toISOString()}`;
+      document.getElementById('time-range').innerText = `Filter applied: ${start.toLocaleString()} - ${end.toLocaleString()}`;
       document.getElementById('history-label').innerText = formatTimeAgo(0);
       document.getElementById('history-time').innerText = `${start.toLocaleString()} - ${end.toLocaleString()}`;
       document.getElementById('remove-filter').style.display = 'block';
