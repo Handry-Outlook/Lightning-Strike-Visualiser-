@@ -14,93 +14,214 @@
       font-family: 'Inter', sans-serif;
       margin: 0;
       background: #f4f7fa;
+      overflow-x: hidden;
     }
-    h2 {
-      margin: 10px 20px;
-      color: #1a2a44;
+    #top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #283673;
+      padding: 10px 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      z-index: 1002;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    #top-bar h2 {
+      margin: 0;
+      color: #ffffff;
       font-weight: 600;
+      font-size: 1.2em;
+      flex-shrink: 0;
+    }
+    #top-bar div {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      max-width: 50%;
+    }
+    #top-bar button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      flex-shrink: 0;
+      margin-right: 5px;
+    }
+    #top-bar button:hover {
+      background: #2563eb;
     }
     #map, #map-3d {
       position: absolute;
-      top: 180px;
-      bottom: 0px;
-      left: 20px;
-      right: 20px;
-      width: calc(100vw - 40px);
-      height: calc(100vh - 200px);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
       border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     #map-3d {
       display: none;
     }
-    .controls {
-      padding: 10px;
+    #control-panel {
       background: #ffffff;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin: 10px 10px;
-      position: relative;
       z-index: 1003;
+      padding: 10px;
     }
-    .controls label {
+    @media (min-width: 769px) {
+      #control-panel {
+        position: fixed;
+        top: 60px;
+        left: 20px;
+        width: 300px;
+        height: calc(100% - 80px);
+        overflow-y: auto;
+      }
+      #map, #map-3d {
+        left: 340px;
+        width: calc(100% - 340px);
+      }
+    }
+    @media (max-width: 768px) {
+      #control-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        overflow-y: auto;
+      }
+      #control-panel.open {
+        display: block;
+      }
+      #settings-button {
+        position: fixed;
+        bottom: 70px;
+        right: 10px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        font-size: 1.2em;
+        cursor: pointer;
+        z-index: 1004;
+      }
+      #settings-button:hover {
+        background: #2563eb;
+      }
+      #fullscreen-button, .fullscreen-toggle {
+        display: none;
+      }
+    }
+    .section {
+      margin-bottom: 15px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 10px;
+    }
+    .section h4 {
+      margin: 0 0 10px;
+      color: #1a2a44;
+      font-weight: 600;
+      font-size: 0.9em;
+    }
+    .control-panel label {
       display: flex;
       flex-direction: column;
       font-size: 0.8em;
       color: #1a2a44;
       font-weight: 500;
+      margin-bottom: 8px;
+      position: relative;
     }
-    .controls input, .controls select, .controls button {
+    .control-panel label span.tooltip {
+      display: none;
+      position: absolute;
+      top: -30px;
+      left: 0;
+      background: #333;
+      color: white;
+      padding: 5px;
+      border-radius: 4px;
+      font-size: 0.7em;
+      white-space: nowrap;
+    }
+    .control-panel label:hover span.tooltip {
+      display: block;
+    }
+    .control-panel input, .control-panel select, .control-panel button {
       margin-top: 3px;
       padding: 6px;
       border: 1px solid #d1d5db;
       border-radius: 4px;
       font-size: 0.8em;
-      transition: all 0.2s;
     }
-    .controls input[type="checkbox"] {
+    @media (max-width: 768px) {
+      .control-panel input, .control-panel select, .control-panel button {
+        font-size: 1.2em;
+        padding: 10px;
+      }
+      .control-panel input[type="range"] {
+        width: 100%;
+      }
+    }
+    .control-panel input[type="checkbox"] {
       margin-top: 3px;
     }
-    .controls input[type="number"] {
-      width: 60px;
-    }
-    .controls input[type="range"] {
-      width: 80px;
-    }
-    .controls button, #remove-filter {
+    .control-panel button, #remove-filter {
       background: #3b82f6;
       color: white;
       border: none;
       cursor: pointer;
-      padding: 6px 12px;
-      font-size: 0.8em;
-      border-radius: 4px;
     }
-    .controls button:hover, #remove-filter:hover {
+    .control-panel button:hover, #remove-filter:hover {
       background: #2563eb;
     }
-    #heatmap-3d-toggle-label,
-    #heatmap-frequency-slider-label,
-    #heatmap-height-slider-label {
+    #expert-controls {
       display: none;
+      padding: 10px;
+      background: #f9fafb;
+      border-radius: 6px;
     }
     .time-slider-container {
-      position: absolute;
+      position: fixed;
       bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 80vw;
       background: #ffffff;
-      padding: 10px;
+      padding: 8px;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       z-index: 1001;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
+      box-sizing: border-box;
+    }
+    @media (min-width: 769px) {
+  .time-slider-container {
+    /* Map's left edge is at 340px, width is (100% - 340px) */
+    left: 340px;
+    width: calc((100% - 340px) * 0.8); /* 80% of the map's width */
+    /* Center within the map area: left + (map width - container width) / 2 */
+    left: calc(340px + ((100% - 340px) - ((100% - 340px) * 0.8)) / 2);
+  }
+}
+    @media (max-width: 768px) {
+      .time-slider-container {
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+      }
     }
     .time-slider-container .animator {
       display: flex;
@@ -115,8 +236,12 @@
       border-radius: 4px;
       padding: 6px;
       cursor: pointer;
-      font-size: 0.8em;
-      transition: all 0.2s;
+    }
+    .time-slider-container .logo {
+      width: 80px;
+      display: block;
+      margin: 0 auto 4px;
+      pointer-events: none;
     }
     .time-slider-container button:hover {
       background: #2563eb;
@@ -124,13 +249,16 @@
     .slider {
       width: 100%;
     }
-    .speed-slider {
-      width: 80px;
-    }
     .time-slider-container .status-info {
       font-size: 0.75em;
       color: #1a2a44;
       margin: 0;
+    }
+    .status-info-container {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 4px;
     }
     .legend {
       background: rgba(255,255,255,0.95);
@@ -139,169 +267,146 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       font-size: 0.75em;
       color: #1a2a44;
-      max-width: 200px;
+      max-width: 125px;
+      min-width: 110px;
       position: absolute;
-      top: 100px;
+      top: 60px;
       right: 10px;
       z-index: 1002;
+      display: block;
     }
-    .legend h4 {
-      margin: 0 0 6px;
-      font-weight: 600;
-      font-size: 0.85em;
-    }
-    .legend div {
+    .legend-item {
       display: flex;
       align-items: center;
       margin-bottom: 4px;
     }
     .color-box {
-      width: 16px;
-      height: 16px;
+      display: inline-block;
+      width: 12px;
+      height: 12px;
       margin-right: 8px;
-      border-radius: 3px;
+      vertical-align: middle;
     }
     .gradient-bar {
+      height: 10px;
       width: 100%;
-      height: 16px;
-      border-radius: 3px;
-      margin-top: 4px;
     }
     .modal {
-      display: none;
       position: fixed;
-      top: 60%;
+      top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       background: white;
       padding: 15px;
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      z-index: 1002;
-      max-width: 570px;
+      z-index: 1005;
+      max-width: 90%;
     }
-    .modal h3 {
-      margin-top: 0;
-      font-size: 1em;
+    #tutorial-modal {
+      max-height: 80vh; /* Limit height to 80% of viewport height */
+      overflow-y: auto; /* Enable vertical scrolling */
+      width: 70%; /* Ensure it fits well on mobile */
+      max-width: 70vh; /* Cap width for larger screens */
+      padding: 20px; /* Slightly more padding for readability */
     }
-    .modal button {
-      margin: 8px 4px 0 0;
-      padding: 6px 12px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      background: #3b82f6;
-      color: white;
-      font-size: 0.8em;
-    }
-    .modal button:hover {
-      background: #2563eb;
+    @media (max-width: 768px) {
+      #tutorial-modal {
+        width: 70%; /* Slightly wider on mobile for better fit */
+        max-height: 85vh; /* Slightly more height on mobile */
+        padding: 15px; /* Adjust padding for smaller screens */
+      }
     }
     .overlay {
-      display: none;
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
       background: rgba(0,0,0,0.5);
-      z-index: 1001;
+      z-index: 1004;
     }
-    #map.dropzone, #map-3d.dropzone {
-      border: 2px dashed #3b82f6;
-      background: rgba(59, 134, 246, 0.1);
+    .hidden {
+      display: none;
+    }
+    #fullscreen-button {
+      position: fixed;
+      bottom: 20px;
+      right: 10px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      font-size: 1.2em;
+      cursor: pointer;
+      z-index: 1004;
+    }
+    .user-location-marker {
+      background-color: #3b82f6;
+      border-radius: 50%;
+      width: 12px;
+      height: 12px;
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+      70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
     }
     .fullscreen #map, .fullscreen #map-3d {
       width: 100vw;
       height: 100vh;
-      top: 0;
       left: 0;
-      right: 0;
-      bottom: 0;
-      margin: 0;
-      border-radius: 0;
-      box-shadow: none;
     }
-    .fullscreen .controls,
-    .fullscreen h2 {
+    .fullscreen #control-panel {
       display: none;
     }
     .fullscreen .time-slider-container {
-      bottom: 10px;
       left: 50%;
       transform: translateX(-50%);
-      width: 80vw;
-    }
-    #expert-controls {
-      display: none;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      padding: 10px;
-      background: #f9fafb;
-      border-radius: 6px;
-      margin-top: 10px;
-    }
-    #expert-controls label {
-      font-size: 0.75em;
-    }
-    #expert-controls input[type="number"],
-    #expert-controls input[type="range"] {
-      width: 50px;
-      padding: 4px;
-    }
-    #expert-controls input[type="file"] {
-      font-size: 0.7em;
-    }
-    .playback-speed-input {
-      width: 60px;
-      padding: 4px;
-      font-size: 0.8em;
-    }
-    .lightning-flash-2d,
-.lightning-flash-3d {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 50%);
-  pointer-events: none;
-  animation: flash 2.5s ease-out;
-  z-index: 999;
-}
-@keyframes flash {
-  0% { transform: scale(0.1); opacity: 1; }
-  100% { transform: scale(2); opacity: 0; }
-}
-    .nowcast-cluster {
-      border: 2px solid;
-      border-radius: 50%;
-      opacity: 0.5;
-    }
-    .nowcast-cone {
-      opacity: 0.5;
+      width: 90%;
     }
   </style>
 </head>
 <!-- Google tag (gtag.js) -->
- <script async src="https://www.googletagmanager.com/gtag/js?id=G-M5QDT7XR39"></script>
- <script>
-   window.dataLayer = window.dataLayer || [];
-   function gtag(){dataLayer.push(arguments);}
-   gtag('js', new Date());
- 
-   gtag('config', 'G-M5QDT7XR39');
- </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-M5QDT7XR39"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-M5QDT7XR39');
+</script>
 <body>
-  <div class="controls">
-    <label>Start Time: <input type="datetime-local" id="start-time"></label>
-    <label>End Time: <input type="datetime-local" id="end-time"></label>
-    <button onclick="applyFilter()">Apply Filter</button>
-    <button id="remove-filter" onclick="removeTimeFilter()" style="display: none;">Remove Time Filter</button>
-    <label>Color by age: <input type="checkbox" id="color-mode" checked onchange="updateStrikeColors()"></label>
-    <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"></label>
-    <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"></label>
-    <label id="heatmap-3d-toggle-label">3D Heatmap: <input type="checkbox" id="heatmap-3d-toggle" onchange="updateHeatmap(currentFiltered)"></label>
-    <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"></label>
-    <label>Map Style:
-      <select id="map-style" onchange="switchBaseMap(this.value)">
+  <div id="top-bar">
+    <h2>Lightning Map⚡</h2>
+    <div>
+      <button onclick="showTutorial()">Help</button>
+      <button onclick="showUserLocation()">📍</button>
+      <button class="fullscreen-toggle" onclick="toggleFullScreen()">⛶</button>
+    </div>
+  </div>
+  <div id="control-panel" class="control-panel">
+    <div class="section">
+      <h4>Time Filter</h4>
+      <label>Start Time: <input type="datetime-local" id="start-time"><span class="tooltip">Filter strikes from this time</span></label>
+      <label>End Time: <input type="datetime-local" id="end-time"><span class="tooltip">Filter strikes up to this time</span></label>
+      <button onclick="applyFilter()">Apply Filter</button>
+      <button id="remove-filter" onclick="removeTimeFilter()" style="display: none;">Remove Filter</button>
+      <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked><span class="tooltip">Auto-adjust time based on uploaded files</span></label>
+      <label>Lightning Lifespan: <input type="number" id="lightning-lifespan" value="3" min="0.1" step="0.1"> hours<span class="tooltip">Show strikes within this period</span></label>
+      <label>Max History: <input type="number" id="max-history-hours" value="48" min="1" step="1" onchange="updateHistorySliderMax()"> hours<span class="tooltip">Max hours back for slider</span></label>
+    </div>
+    <div class="section">
+      <h4>Layers</h4>
+      <label>Color by Age: <input type="checkbox" id="color-mode" checked onchange="updateStrikeColors()"><span class="tooltip">Color strikes by age</span></label>
+      <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"><span class="tooltip">Show lightning strikes</span></label>
+      <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"><span class="tooltip">Show 2D heatmap</span></label>
+      <label id="heatmap-3d-toggle-label">3D Heatmap: <input type="checkbox" id="heatmap-3d-toggle" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Show 3D heatmap in 3D mode</span></label>
+      <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
+      <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
         <option value="mapbox" selected>Mapbox (Handry Outlook)</option>
         <option value="custom">Mapbox Classic</option>
         <option value="osm">OpenStreetMap</option>
@@ -311,51 +416,54 @@
         <option value="maptiler-outdoor">MapTiler Outdoor</option>
         <option value="maptiler-dark">MapTiler Dark</option>
         <option value="maptiler-light">MapTiler Light</option>
-      </select>
-    </label>
-    <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"></label>
-    <label>Number Overlay Resolution: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"></label>
-    <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"></label>
-    <label id="heatmap-frequency-slider-label">3D Heatmap Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"></label>
-    <label id="heatmap-height-slider-label">3D Heatmap Tower Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="updateHeatmap(currentFiltered)"></label>
-   
-                <label id="heatmap-frequency-slider-label">3D Heatmap Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"></label>
-    <label id="heatmap-height-slider-label">3D Heatmap Tower Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="updateHeatmap(currentFiltered)"></label>
-    <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked></label>
-    <label>Auto-refresh every:
-      <select id="refresh-interval" onchange="setRefreshInterval()">
+      </select><span class="tooltip">Choose map background</span></label>
+      <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"><span class="tooltip">Switch to 3D view</span></label>
+      <label id="terrain-exaggeration-slider-label" class="hidden">Terrain Exaggeration: <input type="range" id="terrain-exaggeration-slider" min="0" max="20" value="12" onchange="updateTerrainExaggeration()"><span class="tooltip">Adjust terrain height in 3D mode</span></label>
+
+      <label>Number Resolution: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Adjust overlay grid size</span></label>
+      <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Adjust heatmap spread</span></label>
+      <label id="heatmap-frequency-slider-label">3D Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">3D heatmap detail</span></label>
+      <label id="heatmap-height-slider-label">3D Tower Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">3D heatmap height</span></label>
+    </div>
+    <div class="section">
+      <h4>Automation</h4>
+      <label>Auto-refresh: <select id="refresh-interval" onchange="setRefreshInterval()">
         <option value="0">Off</option>
         <option value="0.5">30 seconds</option>
         <option value="1" selected>1 minute</option>
         <option value="5">5 minutes</option>
         <option value="10">10 minutes</option>
-        <option value="15">15 minutes</option>
-        <option value="30">30 minutes</option>
-        <option value="60">60 minutes</option>
-      </select>
-    </label>
-    <label>Auto-set to latest: <input type="checkbox" id="auto-latest" checked onchange="toggleAutoLatest()"></label>
-    <label>Lightning Lifespan: <input type="number" id="lightning-lifespan" value="3" min="0.1" step="0.1"> hours <span title="Strikes will be shown only within this period from the selected time.">ℹ️</span></label>
-    <label>Max History: <input type="number" id="max-history-hours" value="48" min="1" step="1" onchange="updateHistorySliderMax()"> hours <span title="Maximum hours back for history slider.">ℹ️</span></label>
-    <label><button id="view-mode" onclick="toggleViewMode()">Enable all strikes</button></label>
-    <label>Sound: <input type="checkbox" id="sound-toggle" onchange="toggleSound()"></label>
-    <label>Nowcast: <input type="checkbox" id="nowcast-toggle" checked onchange="toggleNowcast()"></label>
-    <a href="https://handry-outlook.github.io/Convective-Outlook/lightning_strikes_chart.html" target="_blank"><button>View Customisable Strikes Chart</button></a>
-    <a href="https://handry-outlook.github.io/Convective-Outlook/interactive_map.html" target="_blank"><button>View Latest Radar and Forecast</button></a>
-    <button onclick="showTutorial()">Help</button>
-    <label>Expert Mode: <input type="checkbox" id="expert-mode" onchange="toggleExpertMode()"></label>
-    <div id="expert-controls">
-  <label>KML Layer: <input type="checkbox" id="kml-layer-toggle" checked onchange="toggleKMLLayer()"></label>
-  <label>KML File: <input type="file" id="kml-file" accept=".kml" onchange="importKML(this)"></label>
-  <label>PNG Layer: <input type="checkbox" id="png-layer-toggle" checked onchange="togglePNGLayer()"></label>
-  <label>PNG File: <input type="file" id="png-file" accept=".png" onchange="importPNG(this)"></label>
-  <label>PNG Opacity: <input type="range" id="png-opacity-slider" min="0" max="1" step="0.1" value="0.8" onchange="updatePNGOpacity()"></label>
-  <label>KML Z-Index: <input type="number" id="kml-zindex" value="1500" min="0" onchange="updateZIndex()"></label>
-  <label>PNG Z-Index: <input type="number" id="png-zindex" value="1400" min="0" onchange="updateZIndex()"></label>
-  <label>Lightning Z-Index: <input type="number" id="lightning-zindex" value="1000" min="0" onchange="updateZIndex()"></label>
-  <label>Heatmap Z-Index: <input type="number" id="heatmap-zindex" value="70" min="0" onchange="updateZIndex()"></label>
-  <label>Numbers Z-Index: <input type="number" id="numbers-zindex" value="1200" min="0" onchange="updateZIndex()"></label>
-</div>
+      </select><span class="tooltip">Set data refresh interval</span></label>
+      <label>Auto-set Latest: <input type="checkbox" id="auto-latest" checked onchange="toggleAutoLatest()"><span class="tooltip">Keep time at latest</span></label>
+      <label><button id="view-mode" onclick="toggleViewMode()">Enable All Strikes</button><span class="tooltip">Show all strikes in range</span></label>
+    </div>
+    <div class="section">
+      <h4>Extras</h4>
+      <label>Sound: <input type="checkbox" id="sound-toggle" onchange="toggleSound()"><span class="tooltip">Play thunder sound</span></label>
+      <label>Nowcast: <input type="checkbox" id="nowcast-toggle" checked onchange="toggleNowcast()"><span class="tooltip">Show lightning predictions</span></label>
+      <label>Nowcast Confidence: <input type="range" id="min-nowcast-confidence" min="0" max="1" step="0.1" value="0.5" onchange="is3DMode ? update3DView() : toggleNowcast()"><span class="tooltip">Minimum confidence for nowcast cones to be displayed</span></label>
+    </div>
+    <div class="section">
+      <h4>Links</h4>
+      <a href="https://handry-outlook.github.io/Convective-Outlook/lightning_strikes_chart.html" target="_blank"><button>Strikes Chart</button></a>
+      <a href="https://handry-outlook.github.io/Convective-Outlook/interactive_map.html" target="_blank"><button>Radar & Forecast</button></a>
+    </div>
+    <div class="section">
+      <h4>Expert Mode</h4>
+      <label>Enable: <input type="checkbox" id="expert-mode" onchange="toggleExpertMode()"><span class="tooltip">Show advanced options</span></label>
+      <div id="expert-controls">
+        <label>KML Layer: <input type="checkbox" id="kml-layer-toggle" checked onchange="toggleKMLLayer()"></label>
+        <label>KML File: <input type="file" id="kml-file" accept=".kml" onchange="importKML(this)"></label>
+        <label>PNG Layer: <input type="checkbox" id="png-layer-toggle" checked onchange="togglePNGLayer()"></label>
+        <label>PNG File: <input type="file" id="png-file" accept=".png" onchange="importPNG(this)"></label>
+        <label>PNG Opacity: <input type="range" id="png-opacity-slider" min="0" max="1" step="0.1" value="0.8" onchange="updatePNGOpacity()"></label>
+        <label>KML Z-Index: <input type="number" id="kml-zindex" value="1500" min="0" onchange="updateZIndex()"></label>
+        <label>PNG Z-Index: <input type="number" id="png-zindex" value="1400" min="0" onchange="updateZIndex()"></label>
+        <label>Lightning Z-Index: <input type="number" id="lightning-zindex" value="1000" min="0" onchange="updateZIndex()"></label>
+        <label>Heatmap Z-Index: <input type="number" id="heatmap-zindex" value="70" min="0" onchange="updateZIndex()"></label>
+        <label>Numbers Z-Index: <input type="number" id="numbers-zindex" value="1200" min="0" onchange="updateZIndex()"></label>
+      </div>
+    </div>
   </div>
   <div id="map"></div>
   <div id="map-3d"></div>
@@ -363,16 +471,18 @@
     <label><input type="range" id="history-slider" class="slider" min="0" max="2880" value="2880" oninput="updateHistory()"> <span id="history-label">Now</span></label>
     <p id="history-time"></p>
     <div class="animator">
-  <button onclick="playAnimation()">▶️ Play</button>
-  <button onclick="stopAnimation()">⏹️ Stop</button>
-  <button onclick="toggleFullScreen()">⛶ Fullscreen</button>
-  <label>Speed: <input type="range" id="speed-slider" class="speed-slider" min="1" max="100" step="1" value="50" oninput="updateSpeedTextbox()"></label>
-  <label>Minutes per second: <input type="number" id="playback-minutes" class="playback-speed-input" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
-</div>
+      <button onclick="playAnimation()">▶️ Play</button>
+      <button onclick="stopAnimation()">⏹️ Stop</button>
+      <label>Speed: <input type="range" id="speed-slider" min="1" max="100" step="1" value="50" oninput="updateSpeedTextbox()"></label>
+      <label>Min/Sec: <input type="number" id="playback-minutes" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
+    </div>
     <p id="time-range" class="status-info"></p>
-    <p id="last-update" class="status-info"></p>
-    <p id="current-time" class="status-info"></p>
+    <div class="status-info-container">
+      <p id="last-update" class="status-info"></p>
+      <p id="current-time" class="status-info"></p>
+    </div>
   </div>
+  <button id="settings-button" onclick="toggleControls()">⚙️</button>
   <div id="tutorial-modal" class="modal" style="display: none;">
     <h3>Tutorial</h3>
     <div id="normal-tutorial">
@@ -388,15 +498,14 @@
       <p>For KML files, ensure polygon names match risk levels: 'Low risk', 'Slight risk', 'Enhanced risk', 'Moderate risk', 'High risk' for correct colors.</p>
       <p>For PNG files, the filename should include the region name (e.g., 'England', 'Wales') to set image bounds.</p>
     </div>
-
     <button onclick="closeTutorial()">Close</button>
   </div>
-  <div id="modal" class="modal">
-    <p>Do you want to automatically adjust the time filter based on the file's timestamp?</p>
-    <button class="yes" onclick="confirmAutoTimeFilter(true)">Yes</button>
-    <button class="no" onclick="confirmAutoTimeFilter(false)">No</button>
+  <div id="modal" class="modal" style="display: none;">
+    <p>Do you want to adjust the time filter based on the file's timestamp?</p>
+    <button onclick="confirmAutoTimeFilter(true)">Yes</button>
+    <button onclick="confirmAutoTimeFilter(false)">No</button>
   </div>
-  <div id="overlay" class="overlay"></div>
+  <div id="overlay" class="overlay" style="display: none;"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
@@ -410,12 +519,13 @@
     const maptilerApiKey = 'd6FiSbcpDtzJ4g4e0oD4';
 
     const risk_colors = {
-      'Low risk': '#5aac91',
-      'Slight risk': '#ffff00',
-      'Enhanced risk': '#ffa500',
-      'Moderate risk': '#ff0000',
-      'High risk': '#800080'
-    };
+  'Low risk': '#5aac91',
+  'Slight risk': '#ffff00',
+  'Enhanced risk': '#ffa500',
+  'Moderate risk': '#ff0000',
+  'High risk': '#800080',
+  'Severe risk': '#000000' // Added Severe risk with black color
+};
 
     const region_bounds = {
       "England": [[47.7, -21.1], [57.075, 9.95]],
@@ -497,16 +607,21 @@ map3D.on('load', () => {
 });
 map.invalidateSize(); // Ensure 2D map is sized correctly
 
-    const mapContainer = document.getElementById('map');
-    const logo = document.createElement('img');
-    logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png';
-    logo.style.position = 'absolute';
-    logo.style.top = '10px';
-    logo.style.left = '10px';
-    logo.style.zIndex = '100';
-    logo.style.width = '100px';
-    logo.style.pointerEvents = 'none';
-    mapContainer.appendChild(logo);
+     const timeSliderContainer = document.querySelector('.time-slider-container');
+  const logo = document.createElement('img');
+  logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png';
+  logo.className = 'logo';
+  logo.style.width = '80px'; // Smaller size to fit over text
+  logo.style.position = 'absolute';
+  logo.style.bottom = '20px'; // Align with bottom of container (matches padding)
+  logo.style.right = '8px'; // Align with right edge (matches padding)
+  logo.style.zIndex = '1002'; // Same as time-slider-container
+  logo.style.pointerEvents = 'none';
+  timeSliderContainer.appendChild(logo);
+
+// Insert the logo before the status-info-container
+const statusInfoContainer = timeSliderContainer.querySelector('.status-info-container');
+timeSliderContainer.insertBefore(logo, statusInfoContainer);
 
     const legendControl = L.control({ position: 'topright' });
     legendControl.onAdd = function (map) {
@@ -553,7 +668,63 @@ map.invalidateSize(); // Ensure 2D map is sized correctly
     let nowcastLayer = L.layerGroup();
     let nowcastLayer3D = [];
     let currentNowcasts = [];
-
+    let minNowcastConfidence = 0.5;
+    let userLocationMarker = null;
+    
+function toggleControls() {
+    const controlPanel = document.getElementById('control-panel');
+    controlPanel.classList.toggle('open');
+  }
+    function updateTerrainExaggeration() {
+    if (is3DMode) {
+      const exaggeration = parseFloat(document.getElementById('terrain-exaggeration-slider').value);
+      map3D.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': exaggeration });
+      map3D.resize();
+    }
+  }
+   function showUserLocation() {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        // Remove existing marker if present
+        if (userLocationMarker) {
+          if (is3DMode) {
+            userLocationMarker.remove();
+          } else {
+            map.removeLayer(userLocationMarker);
+          }
+          userLocationMarker = null;
+        }
+        // Add new marker
+        if (is3DMode) {
+          const el = document.createElement('div');
+          el.className = 'user-location-marker';
+          userLocationMarker = new mapboxgl.Marker(el)
+            .setLngLat([longitude, latitude])
+            .addTo(map3D);
+          map3D.jumpTo({ center: [longitude, latitude], zoom: 10 });
+          map3D.resize();
+        } else {
+          userLocationMarker = L.circleMarker([latitude, longitude], {
+            radius: 6,
+            color: '#3b82f6',
+            fillColor: '#3b82f6',
+            fillOpacity: 1,
+            className: 'user-location-marker'
+          }).addTo(map);
+          map.setView([latitude, longitude], 10);
+          map.invalidateSize();
+        }
+      },
+      (error) => {
+        alert('Unable to retrieve location: ' + error.message);
+      }
+    );
+  }
     function toggleSound() {
       soundEnabled = document.getElementById('sound-toggle').checked;
     }
@@ -626,30 +797,42 @@ function addLightningFlash3D(lng, lat) {
 }
 
     function toggle3DMode() {
-  is3DMode = document.getElementById('3d-mode-toggle').checked;
-  const mapDiv = document.getElementById('map');
-  const map3DDiv = document.getElementById('map-3d');
-  mapDiv.style.display = is3DMode ? 'none' : 'block';
-  map3DDiv.style.display = is3DMode ? 'block' : 'none';
-  document.getElementById('heatmap-3d-toggle').parentElement.style.display = is3DMode ? 'flex' : 'none';
-  document.getElementById('heatmap-frequency-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
-  document.getElementById('heatmap-height-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
-  
-  if (is3DMode) {
-    map3D.jumpTo({ center: [-4.5, 57.5], zoom: 5 });
-    map3D.resize();
-    update3DView();
-    toggleKMLLayer();
-    togglePNGLayer();
-    updateOverlay(currentFiltered);
-    toggleNowcast();
-    updateLegend();
-  } else {
-    map.invalidateSize();
-    updateHistory();
-    updateLegend();
+    is3DMode = document.getElementById('3d-mode-toggle').checked;
+    const mapDiv = document.getElementById('map');
+    const map3DDiv = document.getElementById('map-3d');
+    mapDiv.style.display = is3DMode ? 'none' : 'block';
+    map3DDiv.style.display = is3DMode ? 'block' : 'none';
+    document.getElementById('heatmap-3d-toggle').parentElement.style.display = is3DMode ? 'flex' : 'none';
+    document.getElementById('heatmap-frequency-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
+    document.getElementById('heatmap-height-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
+    document.getElementById('terrain-exaggeration-slider').parentElement.style.display = is3DMode ? 'flex' : 'none';
+    
+    // Remove user location marker when switching modes
+    if (userLocationMarker) {
+      if (is3DMode) {
+        if (map.hasLayer(userLocationMarker)) map.removeLayer(userLocationMarker);
+      } else {
+        if (userLocationMarker.remove) userLocationMarker.remove();
+      }
+      userLocationMarker = null;
+    }
+    
+    if (is3DMode) {
+      map3D.jumpTo({ center: [-4.5, 57.5], zoom: 5 });
+      map3D.resize();
+      update3DView();
+      toggleKMLLayer();
+      togglePNGLayer();
+      updateOverlay(currentFiltered);
+      toggleNowcast();
+      updateLegend();
+      updateTerrainExaggeration();
+    } else {
+      map.invalidateSize();
+      updateHistory();
+      updateLegend();
+    }
   }
-}
 
     function update3DView() {
   // Clear existing layers
@@ -668,72 +851,72 @@ function addLightningFlash3D(lng, lat) {
   const currentBounds = map3D.getBounds();
   const newStrikes = new Set();
 
-  // Render nowcast layers first
+  minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
+
+  // Render nowcast if enabled
   if (document.getElementById('nowcast-toggle').checked) {
     currentNowcasts = calculateLightningNowcast(currentFiltered);
     currentNowcasts.forEach((cluster, index) => {
-      const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
-                              cluster.confidenceScore > 0.8 ? 'red' :
-                              cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
-      const radiusKm = cluster.confidenceScore * 5 + 5;
-      const coneRadiusKm = cluster.confidenceScore * 30 + 30;
-      const radiusDeg = radiusKm / 111;
-
-      // Render cluster circle
-      map3D.addSource(`nowcast-circle-${index}`, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [cluster.baseLon, cluster.baseLat]
-          },
-          properties: { radius: radiusDeg }
-        }
-      });
-      map3D.addLayer({
-        id: `nowcast-circle-${index}`,
-        type: 'circle',
-        source: `nowcast-circle-${index}`,
-        paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            5, (radiusKm * 1000) / 1000, // Adjusted for better size match
-            10, (radiusKm * 1000) / 250  // Adjusted for better size match
-          ],
-          'circle-color': confidenceColor,
-          'circle-opacity': 0.5,
-          'circle-stroke-color': confidenceColor,
-          'circle-stroke-width': 2,
-          'circle-stroke-opacity': 0.8
-        }
-      });
-      nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
-
-      // Render cone
-      const cone = turf.sector(
-        [cluster.baseLon, cluster.baseLat],
-        coneRadiusKm,
-        cluster.directionDeg - 15,
-        cluster.directionDeg + 15,
-        { units: 'kilometers' }
-      );
-      map3D.addSource(`nowcast-cone-${index}`, {
-        type: 'geojson',
-        data: cone
-      });
-      map3D.addLayer({
-        id: `nowcast-cone-${index}`,
-        type: 'fill',
-        source: `nowcast-cone-${index}`,
-        paint: {
-          'fill-color': confidenceColor,
-          'fill-opacity': 0.5
-        }
-      });
-      nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
+      if (cluster.confidenceScore >= minNowcastConfidence) {
+        const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
+                                cluster.confidenceScore > 0.8 ? 'red' :
+                                cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
+        const radiusKm = cluster.confidenceScore * 5 + 5;
+        const coneRadiusKm = cluster.confidenceScore * 30 + 30;
+        const radiusDeg = radiusKm / 111;
+        map3D.addSource(`nowcast-circle-${index}`, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [cluster.baseLon, cluster.baseLat]
+            },
+            properties: { radius: radiusDeg }
+          }
+        });
+        map3D.addLayer({
+          id: `nowcast-circle-${index}`,
+          type: 'circle',
+          source: `nowcast-circle-${index}`,
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              5, (radiusKm * 1000) / 1000,
+              10, (radiusKm * 1000) / 250
+            ],
+            'circle-color': confidenceColor,
+            'circle-opacity': 0.5,
+            'circle-stroke-color': confidenceColor,
+            'circle-stroke-width': 2,
+            'circle-stroke-opacity': 0.8
+          }
+        });
+        nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
+        const cone = turf.sector(
+          [cluster.baseLon, cluster.baseLat],
+          coneRadiusKm,
+          cluster.directionDeg - 15,
+          cluster.directionDeg + 15,
+          { units: 'kilometers' }
+        );
+        map3D.addSource(`nowcast-cone-${index}`, {
+          type: 'geojson',
+          data: cone
+        });
+        map3D.addLayer({
+          id: `nowcast-cone-${index}`,
+          type: 'fill',
+          source: `nowcast-cone-${index}`,
+          paint: {
+            'fill-color': confidenceColor,
+            'fill-opacity': 0.5
+          }
+        });
+        nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
+      }
     });
   }
 
@@ -741,18 +924,62 @@ function addLightningFlash3D(lng, lat) {
   toggleKMLLayer();
   togglePNGLayer();
 
-  // Render lightning layer after nowcast
+  // Get user-defined lifespan and slider position
+  const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value) || 3;
+  const slider = document.getElementById('history-slider');
+  let sliderValue = parseInt(slider.value);
+  const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+
+  // Determine time range based on filter mode
+  let startTime, endTime;
+  if (lastFilterMode === 'inputs' && customFilterStart && customFilterEnd) {
+    const filterStart = new Date(customFilterStart);
+    const filterEnd = new Date(customFilterEnd);
+    if (isNaN(filterStart) || isNaN(filterEnd)) {
+      console.error('Invalid custom filter dates');
+      return;
+    }
+    const totalMinutes = (filterEnd - filterStart) / (60 * 1000);
+    const sliderMax = Math.max(totalMinutes, lifespanHours * 60);
+    sliderValue = Math.min(sliderValue, sliderMax); // Ensure slider value is within range
+    slider.max = sliderMax;
+    slider.min = 0;
+    slider.value = sliderValue;
+    endTime = new Date(filterStart.getTime() + sliderValue * 60 * 1000);
+    startTime = new Date(endTime.getTime() - lifespanHours * 3600 * 1000);
+  } else {
+    const now = new Date();
+    sliderValue = sliderValue || maxMinutes;
+    slider.max = maxMinutes;
+    slider.min = 0;
+    endTime = new Date(now.getTime() - (maxMinutes - sliderValue) * 60 * 1000);
+    startTime = new Date(endTime.getTime() - lifespanHours * 3600 * 1000);
+  }
+
+  // Update animation times
+  animationStart = startTime;
+  animationEnd = endTime;
+
+  // Filter strikes within the lifespan
+  currentFiltered = strikeData.filter(s => {
+    if (showAllStrikes) {
+      return s.time >= new Date(endTime.getTime() - maxMinutes * 60 * 1000) && s.time <= endTime;
+    }
+    return s.time >= startTime && s.time <= endTime;
+  });
+
+  // Render lightning layer
   if (document.getElementById('lightning-layer-toggle').checked) {
     currentFiltered.forEach(s => {
       const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
       newStrikes.add(strikeKey);
       const isNewStrike = !lastRenderedStrikes.has(strikeKey);
-      const inBounds = is3DMode ? 
-    currentBounds.contains([s.coordinates[0], s.coordinates[1]]) :
-    currentBounds.contains([s.coordinates[1], s.coordinates[0]]);
+      const inBounds = currentBounds.contains([s.coordinates[0], s.coordinates[1]]);
+      const ageFraction = (endTime - s.time) / (lifespanHours * 3600 * 1000);
+      
       const el = document.createElement('div');
       el.className = 'marker';
-      el.style.backgroundColor = document.getElementById('color-mode').checked ? getColorFromAge((new Date(document.getElementById('end-time').value) - s.time) / (parseFloat(document.getElementById('lightning-lifespan').value) * 3600 * 1000)) : 'black';
+      el.style.backgroundColor = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
       el.style.width = '10px';
       el.style.height = '10px';
       el.style.borderRadius = '50%';
@@ -762,19 +989,15 @@ function addLightningFlash3D(lng, lat) {
         .addTo(map3D);
       strikeLayer3D.push(marker);
       if (isNewStrike && inBounds) {
-  playThunderSound();
-  addLightningFlash3D(s.coordinates[0], s.coordinates[1]);
-}
-      if (isNewStrike && inBounds && document.getElementById('lightning-layer-toggle').checked) {
-    playThunderSound();
-    if (!is3DMode) addLightningFlash2D(s.coordinates[1], s.coordinates[0]);
-  }
-});
+        playThunderSound();
+        addLightningFlash3D(s.coordinates[0], s.coordinates[1]);
+      }
+    });
   }
 
   lastRenderedStrikes = newStrikes;
 
-  // Render heatmap layers
+  // Render 2D and 3D heatmaps
   const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
   const heatmap3DEnabled = document.getElementById('heatmap-3d-toggle').checked;
   const blur = parseInt(document.getElementById('blur-slider').value);
@@ -860,9 +1083,7 @@ function addLightningFlash3D(lng, lat) {
     });
   }
 
-  // Render number overlay
   updateOverlay(currentFiltered);
-
   updateLegend();
 }
 
@@ -993,7 +1214,7 @@ function addLightningFlash3D(lng, lat) {
           map.invalidateSize();
         }
         document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
-        document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+        document.getElementById('history-time').innerText = `${start.toLocaleString()} - ${end.toLocaleString()}`;
       } else {
         const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
         sliderMax = maxMinutes;
@@ -1011,7 +1232,7 @@ function addLightningFlash3D(lng, lat) {
         document.getElementById('start-time').value = start.toISOString().slice(0, 16);
         document.getElementById('end-time').value = end.toISOString().slice(0, 16);
         document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
-        document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+        document.getElementById('history-time').innerText = `${start.toLocaleString()} - ${end.toLocaleString()}`;
         document.getElementById('remove-filter').style.display = 'none';
       }
 
@@ -1188,7 +1409,7 @@ function addLightningFlash3D(lng, lat) {
           return false;
         });
 
-        console.log(`Loaded ${strikeData.length} unique strikes.`);
+        
         lastUpdateTime = new Date();
         document.getElementById('last-update').innerText = `Last update: ${lastUpdateTime.toLocaleString()}`;
         
@@ -1209,12 +1430,13 @@ function addLightningFlash3D(lng, lat) {
     }
 
     function getColorFromAge(ageFraction) {
-      if (ageFraction < 0.2) return '#ffd700';
-      if (ageFraction < 0.4) return '#ff69b4';
-      if (ageFraction < 0.6) return '#ff00ff';
-      if (ageFraction < 0.8) return '#800080';
-      return '#4b0082';
-    }
+  
+  if (ageFraction < 0.2) return '#ffd700'; // Newest
+  if (ageFraction < 0.4) return '#ff69b4';
+  if (ageFraction < 0.6) return '#ff00ff';
+  if (ageFraction < 0.8) return '#800080';
+  return '#4b0082'; // Oldest
+}
 
     function updateLegend() {
       const legendDiv = document.querySelector('.legend');
@@ -1265,13 +1487,14 @@ function addLightningFlash3D(lng, lat) {
       }
 
       if (kmlEnabled && kmlLayer) {
-        legendDiv.innerHTML += '<h4>Risk Levels</h4>';
-        Object.entries(risk_colors).forEach(([name, color]) => {
-          legendDiv.innerHTML += `
-            <div><div class="color-box" style="background: ${color}"></div>${name}</div>
-          `;
-        });
-      }
+  legendDiv.innerHTML += '<h4>Risk Levels</h4>';
+  Object.entries(risk_colors).forEach(([name, color]) => {
+    const isSevere = name === 'Severe risk';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: ${isSevere ? 'none' : color}; border: 2px solid ${color};"></div>${name}</div>
+    `;
+  });
+}
 
       if (nowcastEnabled) {
         legendDiv.innerHTML += '<h4>Nowcast</h4>';
@@ -1379,9 +1602,9 @@ function addLightningFlash3D(lng, lat) {
       updateHeatmap(currentFiltered);
       updateOverlay(currentFiltered);
       updateNowcast(currentFiltered);
-      document.getElementById('time-range').innerText = `Showing strikes from ${start.toISOString()} to ${end.toISOString()}`;
+      document.getElementById('time-range').innerText = `=${start.toISOString()} - ${end.toISOString()}`;
       document.getElementById('history-label').innerText = formatTimeAgo(0);
-      document.getElementById('history-time').innerText = `Showing strikes from ${start.toLocaleString()} to ${end.toLocaleString()}`;
+      document.getElementById('history-time').innerText = `${start.toLocaleString()} - ${end.toLocaleString()}`;
       document.getElementById('remove-filter').style.display = 'block';
       updateZIndex();
       updateLegend();
@@ -1480,12 +1703,16 @@ function addLightningFlash3D(lng, lat) {
       updateLegend();
     }
        
-    function toggleKMLLayer() {
+  function toggleKMLLayer() {
   const toggle = document.getElementById('kml-layer-toggle').checked;
   if (is3DMode) {
+    // Remove existing layers and source if they exist
     if (map3D.getLayer('kml-layer')) map3D.removeLayer('kml-layer');
+    if (map3D.getLayer('kml-layer-outline')) map3D.removeLayer('kml-layer-outline');
     if (map3D.getSource('kml-source')) map3D.removeSource('kml-source');
+    
     if (toggle && kmlGeoJSON) {
+      // Add new source and layers only if toggle is enabled and kmlGeoJSON exists
       map3D.addSource('kml-source', { type: 'geojson', data: kmlGeoJSON });
       map3D.addLayer({
         id: 'kml-layer',
@@ -1500,11 +1727,40 @@ function addLightningFlash3D(lng, lat) {
             'Enhanced risk', risk_colors['Enhanced risk'],
             'Moderate risk', risk_colors['Moderate risk'],
             'High risk', risk_colors['High risk'],
-            'black'
+            'transparent' // Transparent for Severe risk or unknown
           ],
-          'fill-opacity': 0.3
+          'fill-opacity': [
+            'match',
+            ['get', 'name'],
+            'Low risk', 0.3,
+            'Slight risk', 0.3,
+            'Enhanced risk', 0.3,
+            'Moderate risk', 0.3,
+            'High risk', 0.3,
+            0 // No fill for Severe risk or unknown
+          ]
         }
       });
+      map3D.addLayer({
+        id: 'kml-layer-outline',
+        type: 'line',
+        source: 'kml-source',
+        paint: {
+          'line-color': [
+            'match',
+            ['get', 'name'],
+            'Low risk', risk_colors['Low risk'],
+            'Slight risk', risk_colors['Slight risk'],
+            'Enhanced risk', risk_colors['Enhanced risk'],
+            'Moderate risk', risk_colors['Moderate risk'],
+            'High risk', risk_colors['High risk'],
+            risk_colors['Severe risk'] // Black outline for Severe risk or unknown
+          ],
+          'line-width': 2,
+          'line-opacity': 1
+        }
+      });
+      map3D.resize();
     }
   } else {
     if (toggle && kmlLayer && !map.hasLayer(kmlLayer)) {
@@ -1802,17 +2058,18 @@ function updateSpeedTextbox() {
       kmlLayer = L.geoJSON(kmlGeoJSON, {
         style: function(feature) {
           const name = feature.properties.name || '';
+          const isSevere = name === 'Severe risk';
           return risk_colors[name] ? {
             color: risk_colors[name],
-            fillColor: risk_colors[name],
-            fillOpacity: 0.3
+            fillColor: isSevere ? 'transparent' : risk_colors[name],
+            fillOpacity: isSevere ? 0 : 0.3,
+            weight: 2
           } : { color: 'black', fillOpacity: 0 };
         },
         onEachFeature: (f, l) => {
           if (f.properties.name) l.bindPopup(f.properties.name);
         }
       });
-      // Only add layer if Expert Mode is enabled
       if (document.getElementById('expert-mode').checked) {
         if (document.getElementById('kml-layer-toggle').checked && !is3DMode) {
           kmlLayer.addTo(map);
@@ -1871,19 +2128,56 @@ function updateSpeedTextbox() {
   reader.readAsDataURL(file);
 }
     function toggleNowcast() {
-  const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
-  if (nowcastEnabled) {
-    updateNowcast(currentFiltered);
-  } else {
-    if (!is3DMode) nowcastLayer.clearLayers();
-    else {
-      nowcastLayer3D.forEach(layer => {
-        if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
-        if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
-      });
-      nowcastLayer3D = [];
-    }
+  minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
+
+  // Remove existing nowcast layers in 2D mode
+  nowcastLayer.clearLayers();
+
+  if (document.getElementById('nowcast-toggle').checked && !is3DMode) {
+    currentNowcasts = calculateLightningNowcast(currentFiltered);
+    currentNowcasts.forEach((cluster, index) => {
+      if (cluster.confidenceScore >= minNowcastConfidence) {
+        const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
+                                cluster.confidenceScore > 0.8 ? 'red' :
+                                cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
+        const radiusKm = cluster.confidenceScore * 5 + 5;
+        const coneRadiusKm = cluster.confidenceScore * 30 + 30;
+
+        // Add circle for cluster center
+        L.circle([cluster.baseLat, cluster.baseLon], {
+          color: confidenceColor,
+          fillColor: confidenceColor,
+          fillOpacity: 0.5,
+          radius: radiusKm * 1000 // Convert to meters
+        }).addTo(nowcastLayer);
+
+        // Add cone using turf.js
+        const cone = turf.sector(
+          [cluster.baseLon, cluster.baseLat],
+          coneRadiusKm,
+          cluster.directionDeg - 15,
+          cluster.directionDeg + 15,
+          { units: 'kilometers' }
+        );
+        L.geoJSON(cone, {
+          style: {
+            fillColor: confidenceColor,
+            fillOpacity: 0.5,
+            color: confidenceColor,
+            weight: 1
+          }
+        }).addTo(nowcastLayer);
+      }
+    });
   }
+
+  // Ensure the layer is added to the map if enabled
+  if (document.getElementById('nowcast-toggle').checked && map.hasLayer(nowcastLayer)) {
+    map.addLayer(nowcastLayer);
+  } else if (!document.getElementById('nowcast-toggle').checked && map.hasLayer(nowcastLayer)) {
+    map.removeLayer(nowcastLayer);
+  }
+
   updateLegend();
 }
 
@@ -1897,111 +2191,112 @@ function updateSpeedTextbox() {
 
   if (!document.getElementById('nowcast-toggle').checked) return;
 
+  minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
   currentNowcasts = calculateLightningNowcast(filtered);
 
-  console.log(`Rendering ${currentNowcasts.length} nowcast cones`);
+  
 
   currentNowcasts.forEach((cluster, index) => {
-    const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
-                            cluster.confidenceScore > 0.8 ? 'red' :
-                            cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
-    const radiusKm = cluster.confidenceScore * 5 + 5;
-    const coneRadiusKm = cluster.confidenceScore * 30 + 30;
-    const radiusDeg = radiusKm / 111;
+    if (cluster.confidenceScore >= minNowcastConfidence) { // Apply confidence filter
+      const confidenceColor = cluster.confidenceScore > 0.9 ? 'purple' :
+                              cluster.confidenceScore > 0.8 ? 'red' :
+                              cluster.confidenceScore > 0.7 ? 'orange' : 'yellow';
+      const radiusKm = cluster.confidenceScore * 5 + 5;
+      const coneRadiusKm = cluster.confidenceScore * 30 + 30;
+      const radiusDeg = radiusKm / 111;
 
-    console.log(`Cone ${index}: lat=${cluster.baseLat.toFixed(2)}, lon=${cluster.baseLon.toFixed(2)}, coneRadius=${coneRadiusKm.toFixed(1)}km, circleRadius=${radiusKm.toFixed(1)}km, direction=${cluster.directionDeg.toFixed(1)}°, confidence=${(cluster.confidenceScore * 100).toFixed(1)}%`);
+          if (is3DMode) {
+        // Render cluster circle
+        map3D.addSource(`nowcast-circle-${index}`, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [cluster.baseLon, cluster.baseLat]
+            },
+            properties: { radius: radiusDeg }
+          }
+        });
+        map3D.addLayer({
+          id: `nowcast-circle-${index}`,
+          type: 'circle',
+          source: `nowcast-circle-${index}`,
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              5, (radiusKm * 1000) / 1000,
+              10, (radiusKm * 1000) / 250
+            ],
+            'circle-color': confidenceColor,
+            'circle-opacity': 0.5,
+            'circle-stroke-color': confidenceColor,
+            'circle-stroke-width': 2,
+            'circle-stroke-opacity': 0.8
+          }
+        });
+        nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
 
-    if (is3DMode) {
-      // Render cluster circle
-      map3D.addSource(`nowcast-circle-${index}`, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [cluster.baseLon, cluster.baseLat]
-          },
-          properties: { radius: radiusDeg }
-        }
-      });
-      map3D.addLayer({
-        id: `nowcast-circle-${index}`,
-        type: 'circle',
-        source: `nowcast-circle-${index}`,
-        paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            5, (radiusKm * 1000) / 1000,
-            10, (radiusKm * 1000) / 250
-          ],
-          'circle-color': confidenceColor,
-          'circle-opacity': 0.5,
-          'circle-stroke-color': confidenceColor,
-          'circle-stroke-width': 2,
-          'circle-stroke-opacity': 0.8
-        }
-      });
-      nowcastLayer3D.push({ id: `nowcast-circle-${index}`, source: `nowcast-circle-${index}` });
-
-      // Render cone
-      const cone = turf.sector(
-        [cluster.baseLon, cluster.baseLat],
-        coneRadiusKm,
-        cluster.directionDeg - 15,
-        cluster.directionDeg + 15,
-        { units: 'kilometers' }
-      );
-      map3D.addSource(`nowcast-cone-${index}`, {
-        type: 'geojson',
-        data: cone
-      });
-      map3D.addLayer({
-        id: `nowcast-cone-${index}`,
-        type: 'fill',
-        source: `nowcast-cone-${index}`,
-        paint: {
-          'fill-color': confidenceColor,
-          'fill-opacity': 0.5
-        }
-      });
-      nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
-    } else {
-      // Render cluster circle
-      const circle = L.circle([cluster.baseLat, cluster.baseLon], {
-        radius: radiusDeg * 111 * 1000,
-        color: confidenceColor,
-        fillColor: confidenceColor,
-        fillOpacity: 0.5,
-        weight: 2,
-        className: 'nowcast-cluster'
-      }).bindPopup(`
-        <b>Nowcast Cluster</b><br>
-        Confidence: ${(cluster.confidenceScore * 100).toFixed(1)}%<br>
-        Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
-        Direction: ${cluster.directionDeg.toFixed(1)}°
-      `);
-      nowcastLayer.addLayer(circle);
-
-      // Render cone
-      const cone = turf.sector(
-        [cluster.baseLon, cluster.baseLat],
-        coneRadiusKm,
-        cluster.directionDeg - 15,
-        cluster.directionDeg + 15,
-        { units: 'kilometers' }
-      );
-      const coneLayer = L.geoJSON(cone, {
-        style: {
+        // Render cone
+        const cone = turf.sector(
+          [cluster.baseLon, cluster.baseLat],
+          coneRadiusKm,
+          cluster.directionDeg - 15,
+          cluster.directionDeg + 15,
+          { units: 'kilometers' }
+        );
+        map3D.addSource(`nowcast-cone-${index}`, {
+          type: 'geojson',
+          data: cone
+        });
+        map3D.addLayer({
+          id: `nowcast-cone-${index}`,
+          type: 'fill',
+          source: `nowcast-cone-${index}`,
+          paint: {
+            'fill-color': confidenceColor,
+            'fill-opacity': 0.5
+          }
+        });
+        nowcastLayer3D.push({ id: `nowcast-cone-${index}`, source: `nowcast-cone-${index}` });
+      } else {
+        // Render cluster circle
+        const circle = L.circle([cluster.baseLat, cluster.baseLon], {
+          radius: radiusDeg * 111 * 1000,
           color: confidenceColor,
           fillColor: confidenceColor,
           fillOpacity: 0.5,
-          weight: 1,
-          className: 'nowcast-cone'
-        }
-      });
-      nowcastLayer.addLayer(coneLayer);
+          weight: 2,
+          className: 'nowcast-cluster'
+        }).bindPopup(`
+          <b>Nowcast Cluster</b><br>
+          Confidence: ${(cluster.confidenceScore * 100).toFixed(1)}%<br>
+          Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
+          Direction: ${cluster.directionDeg.toFixed(1)}°
+        `);
+        nowcastLayer.addLayer(circle);
+
+        // Render cone
+        const cone = turf.sector(
+          [cluster.baseLon, cluster.baseLat],
+          coneRadiusKm,
+          cluster.directionDeg - 15,
+          cluster.directionDeg + 15,
+          { units: 'kilometers' }
+        );
+        const coneLayer = L.geoJSON(cone, {
+          style: {
+            color: confidenceColor,
+            fillColor: confidenceColor,
+            fillOpacity: 0.5,
+            weight: 1,
+            className: 'nowcast-cone'
+          }
+        });
+        nowcastLayer.addLayer(coneLayer);
+      }
     }
   });
 
@@ -2027,8 +2322,7 @@ function updateSpeedTextbox() {
   // Use animationEnd if defined (during animation), otherwise current time
   const referenceTime = animationEnd ? new Date(animationEnd) : new Date();
 
-  console.log(`Processing ${lightningData.length} strikes`);
-
+  
   // Form clusters based on spatial and temporal proximity
   const clusters = [];
   const used = new Set();
@@ -2050,7 +2344,7 @@ function updateSpeedTextbox() {
     if (cluster.length >= minClusterSize) clusters.push(cluster);
   }
 
-  console.log(`Formed ${clusters.length} clusters`);
+  
 
   const clusterInfos = [];
   clusters.forEach((cluster, c) => {
@@ -2058,14 +2352,7 @@ function updateSpeedTextbox() {
     const maxTime = Math.max(...cluster.map(s => s.time.getTime()));
     const lastStrikeTime = new Date(maxTime); // Most recent strike in the cluster
 
-    // Skip clusters where the last strike is older than 15 minutes
-    if (referenceTime - lastStrikeTime > inactivityThreshold) {
-      console.log(`Cluster ${c} skipped: last strike at ${lastStrikeTime.toISOString()} is too old`);
-      return;
-    }
-
-    console.log(`Cluster ${c}: ${cluster.length} strikes, time span ${(maxTime - minTime) / 1000}s`);
-
+   
     // Create time bins for centroid calculation
     const bins = [];
     for (let t = minTime; t < maxTime; t += binSize) {
@@ -2088,7 +2375,7 @@ function updateSpeedTextbox() {
     }
 
     if (bins.length === 0) return;
-    console.log(`Cluster ${c}: ${bins.length} bins`);
+    
 
     let speedLatDegPerSec = 0, speedLonDegPerSec = 0, regressionScore = 0, speedKmH = 0, directionDeg = 0;
     if (bins.length >= 2) {
@@ -2108,7 +2395,7 @@ function updateSpeedTextbox() {
       directionDeg = 0; // Default to north
     }
 
-    console.log(`Cluster ${c}: speed=${speedKmH.toFixed(1)} km/h, direction=${directionDeg.toFixed(1)}°, regressionScore=${regressionScore.toFixed(2)}`);
+    
 
     const clusterSizeScore = Math.min(cluster.length / 50, 1);
     const velocityScore = Math.min(speedKmH / 100, 1);
@@ -2162,7 +2449,7 @@ function updateSpeedTextbox() {
     });
   });
 
-  console.log(`Generated ${clusterInfos.length} nowcast clusters`);
+  
   return clusterInfos;
 }
 
