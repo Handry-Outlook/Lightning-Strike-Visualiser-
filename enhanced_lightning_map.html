@@ -136,7 +136,7 @@
     .logo {
       width: 80px;
       pointer-events: none;
-      z-index: 1012;
+      z-index: 1001;
     }
     @media (min-width: 769px) {
       .logo {
@@ -168,9 +168,10 @@
       background: #ffffff;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      z-index: 1003;
+      z-index: 106;
       padding: 10px;
       transition: background 0.3s ease, color 0.3s ease;
+      z-index: 1003;
     }
     body.dark-mode #control-panel {
       background: #2a2a2a;
@@ -975,7 +976,7 @@ logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/
 logo.className = 'logo';
 logo.style.width = '80px';
 logo.style.pointerEvents = 'none';
-logo.style.zIndex = '1012'; // Ensure logo is above other elements
+logo.style.zIndex = '1001'; // Ensure logo is above other elements
 document.body.appendChild(logo); // Append to body instead of map container
 // Append logo to the map container for mobile positioning
 
