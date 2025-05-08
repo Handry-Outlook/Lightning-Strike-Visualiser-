@@ -136,7 +136,7 @@
     .logo {
       width: 80px;
       pointer-events: none;
-      z-index: 1002;
+      z-index: 1012;
     }
     @media (min-width: 769px) {
       .logo {
@@ -441,12 +441,17 @@
       max-width: 125px;
       min-width: 110px;
       position: absolute;
-      top: 60px;
+      top: 10px;
       right: 10px;
-      z-index: 1002;
+      z-index: 1010;
       display: none;
       transition: background 0.3s ease, color 0.3s ease;
     }
+    @media (min-width: 769px) {
+  .legend {
+    right: calc(10px + 340px); /* Adjust for map offset */
+  }
+}
     body.dark-mode .legend {
       background: rgba(40,40,40,0.95);
       color: #e0e0e0;
@@ -580,7 +585,112 @@
     z-index: 1100 !important; /* Ensure mapbox-gl-draw controls are above top bar */
     margin-top: 70px !important; /* Move controls below top bar */
   }
-  
+  #expert-controls button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  margin-top: 5px;
+  width: 100%;
+  transition: background 0.3s ease;
+}
+
+#expert-controls button:hover {
+  background: #2563eb;
+}
+
+body.dark-mode #expert-controls button {
+  background: #4b9bff;
+  color: #e0e0e0;
+}
+
+body.dark-mode #expert-controls button:hover {
+  background: #3578d6;
+}
+
+.modal h3 {
+  margin-top: 0;
+  font-size: 1.1em;
+  color: #1a2a44;
+}
+
+body.dark-mode .modal h3 {
+  color: #e0e0e0;
+}
+
+.modal p {
+  font-size: 0.9em;
+  color: #1a2a44;
+  margin: 10px 0;
+}
+
+body.dark-mode .modal p {
+  color: #e0e0e0;
+}
+
+.modal label {
+  display: block;
+  font-size: 0.8em;
+  color: #1a2a44;
+  margin: 8px 0;
+}
+
+body.dark-mode .modal label {
+  color: #e0e0e0;
+}
+
+.modal input[type="text"],
+.modal input[type="datetime-local"],
+.modal input[type="checkbox"] {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.8em;
+  background: #fff;
+  color: #1a2a44;
+  box-sizing: border-box;
+  margin-top: 3px;
+}
+
+body.dark-mode .modal input[type="text"],
+body.dark-mode .modal input[type="datetime-local"],
+body.dark-mode .modal input[type="checkbox"] {
+  background: #333;
+  color: #e0e0e0;
+  border: 1px solid #555;
+}
+
+.modal input[type="checkbox"] {
+  width: auto;
+  accent-color: #3b82f6;
+}
+
+.modal button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  margin: 5px 5px 0 0;
+}
+
+.modal button:hover {
+  background: #2563eb;
+}
+
+body.dark-mode .modal button {
+  background: #4b9bff;
+}
+
+body.dark-mode .modal button:hover {
+  background: #3578d6;
+}
   </style>
 </head>
 <!-- Google tag (gtag.js) -->
@@ -695,6 +805,7 @@
       <h4>Expert Mode</h4>
       <label>Enable: <input type="checkbox" id="expert-mode" onchange="toggleExpertMode()"><span class="tooltip">Show advanced options</span></label>
       <div id="expert-controls">
+        <button onclick="showRectangleExportModal()">Export Strikes As PNG</button>
         <label>KML Layer: <input type="checkbox" id="kml-layer-toggle" checked onchange="toggleKMLLayer()"></label>
         <label>KML File: <input type="file" id="kml-file" accept=".kml" onchange="importKML(this)"></label>
         <label>PNG Layer: <input type="checkbox" id="png-layer-toggle" checked onchange="togglePNGLayer()"></label>
@@ -745,6 +856,7 @@
       <p>Enable "Expert Mode" to access KML and PNG uploads. Upload a KML file to overlay risk zones, or a PNG file for custom imagery. Toggle these layers on/off and adjust settings like "PNG Opacity" or layer z-indices to customize their display order in both 2D and 3D modes.</p>
       <p>For KML files, ensure polygon names match risk levels: 'Low risk', 'Slight risk', 'Enhanced risk', 'Moderate risk', 'High risk' for correct colors.</p>
       <p>For PNG files, the filename should include the region name (e.g., 'England', 'Wales') to set image bounds.</p>
+      <p>You can also export lightning map as a png file by entering a set of coorindates or drag an area on the map by clicking 'Export Strikes As PNG'.</p>
     </div>
     <button onclick="closeTutorial()">Close</button>
   </div>
@@ -858,15 +970,14 @@ map3D.on('load', () => {
 map.invalidateSize(); // Ensure 2D map is sized correctly
 
      const timeSliderContainer = document.querySelector('.time-slider-container');
- const logo = document.createElement('img');
+const logo = document.createElement('img');
 logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png';
 logo.className = 'logo';
 logo.style.width = '80px';
 logo.style.pointerEvents = 'none';
-
+logo.style.zIndex = '1012'; // Ensure logo is above other elements
+document.body.appendChild(logo); // Append to body instead of map container
 // Append logo to the map container for mobile positioning
-const mapDiv = document.getElementById('map');
-mapDiv.appendChild(logo);
 
 
     const legendControl = L.control({ position: 'topright' });
@@ -918,40 +1029,393 @@ legendControl.addTo(map);
     let minNowcastConfidence = 0.8;
     let userLocationMarker = null;
     let isLegendVisible = false; // Legend is initially disabled
-   
+    let lastDrawnRectangle = null; //
   let drawnItems = L.featureGroup().addTo(map);
   let drawControl;
   let drawControl3D;
   let drawnItems3D = [];
   let isDrawingEnabled = false;
   let editingLayerId = null;
-  
+  function initializeRectangleExport() {
+  // Add Export Rectangle Strikes button
+  const exportButton = document.createElement('button');
+  exportButton.textContent = 'Export Rectangle Strikes';
+  exportButton.onclick = showRectangleExportModal;
+  const expertControls = document.getElementById('expert-controls');
+  if (expertControls && !expertControls.querySelector('button[onclick="showRectangleExportModal()"]')) {
+    expertControls.appendChild(exportButton);
+  }
 
+  // Rectangle drawing for 2D mode
+  map.on(L.Draw.Event.CREATED, function (e) {
+    if (e.layerType === 'rectangle') {
+      const layer = e.layer;
+      const bounds = layer.getBounds();
+      const coords = [
+        [bounds.getSouthWest().lat, bounds.getSouthWest().lng],
+        [bounds.getSouthEast().lat, bounds.getSouthEast().lng],
+        [bounds.getNorthEast().lat, bounds.getNorthEast().lng],
+        [bounds.getNorthWest().lat, bounds.getNorthWest().lng]
+      ];
+      lastDrawnRectangle = layer; // Store the rectangle layer
+      drawnItems.addLayer(layer);
+      console.log('Rectangle Coords:', coords);
+      console.log('lastDrawnRectangle set:', lastDrawnRectangle);
+      showTimeFilterModalForExport(coords);
+    }
+  });
+
+  // Handle rectangle deletion
+  map.on(L.Draw.Event.DELETED, function (e) {
+    if (lastDrawnRectangle && !drawnItems.hasLayer(lastDrawnRectangle)) {
+      console.log('lastDrawnRectangle cleared due to deletion');
+      lastDrawnRectangle = null;
+    }
+  });
+
+  // Initialize drawControl
+  drawControl = new L.Control.Draw({
+    draw: {
+      polygon: {
+        allowIntersection: false,
+        showArea: true,
+        drawError: { color: '#b00b00', timeout: 1000 },
+        shapeOptions: { color: risk_colors['Low risk'], weight: 2, opacity: 0.8, fillOpacity: 0.3 }
+      },
+      rectangle: {
+        shapeOptions: { color: '#3b82f6', weight: 2, opacity: 0.8, fillOpacity: 0.3 }
+      },
+      polyline: false,
+      circle: false,
+      marker: false,
+      circlemarker: false
+    },
+    edit: {
+      featureGroup: drawnItems,
+      remove: true
+    }
+  });
+  map.addControl(drawControl);
+}
+
+function showRectangleExportModal() {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <h3>Export Lightning Strikes</h3>
+    <p>Choose how to define the rectangle area:</p>
+    <button onclick="drawRectangleOnMap()">Draw on Map</button>
+    <p>Or enter bounding coordinates:</p>
+    <label>North (lat): <input type="text" id="north-coord" placeholder="e.g., 53.0"></label>
+    <label>South (lat): <input type="text" id="south-coord" placeholder="e.g., 51.0"></label>
+    <label>East (lng): <input type="text" id="east-coord" placeholder="e.g., 1.0"></label>
+    <label>West (lng): <input type="text" id="west-coord" placeholder="e.g., -1.0"></label>
+    <button onclick="validateCoordinates()">Next</button>
+    <button onclick="closeModal()">Cancel</button>
+  `;
+  document.body.appendChild(modal);
+  document.getElementById('overlay').style.display = 'block';
+}
+
+function drawRectangleOnMap() {
+  closeModal();
+  // Clear any existing rectangles
+  if (lastDrawnRectangle) {
+    drawnItems.removeLayer(lastDrawnRectangle);
+    lastDrawnRectangle = null;
+    console.log('Cleared existing rectangle');
+  }
+  if (drawControl && drawControl._toolbars.draw._modes.rectangle) {
+    drawControl._toolbars.draw._modes.rectangle.handler.enable();
+  } else {
+    alert('Drawing is not available. Please ensure Expert Mode is enabled.');
+  }
+}
+
+function validateCoordinates() {
+  const north = parseFloat(document.getElementById('north-coord').value);
+  const south = parseFloat(document.getElementById('south-coord').value);
+  const east = parseFloat(document.getElementById('east-coord').value);
+  const west = parseFloat(document.getElementById('west-coord').value);
+
+  if (isNaN(north) || isNaN(south) || isNaN(east) || isNaN(west)) {
+    alert('Please enter valid numeric coordinates.');
+    return;
+  }
+
+  if (north <= south || east <= west) {
+    alert('North must be greater than South, and East must be greater than West.');
+    return;
+  }
+
+  const coords = [
+    [south, west], // SW
+    [south, east], // SE
+    [north, east], // NE
+    [north, west]  // NW
+  ];
+  console.log('Coordinate Input Coords:', coords);
+  closeModal();
+  showTimeFilterModalForExport(coords);
+}
+
+function showTimeFilterModalForExport(coords) {
+  document.querySelectorAll('.modal').forEach(modal => modal.remove());
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <h3>Time Filter & Color Options</h3>
+    <label>Start Time: <input type="datetime-local" id="export-start-time"></label>
+    <label>End Time: <input type="datetime-local" id="export-end-time"></label>
+    <label>Color by Age: <input type="checkbox" id="export-color-mode" checked="checked"></label>
+    <button id="export-png-button">Export PNG</button>
+    <button onclick="closeModal()">Cancel</button>
+  `;
+  document.body.appendChild(modal);
+  document.getElementById('overlay').style.display = 'block';
+
+  const exportButton = document.getElementById('export-png-button');
+  if (exportButton) {
+    console.log('Export PNG button found, attaching listener');
+    exportButton.addEventListener('click', () => {
+      console.log('Export PNG button clicked, coords:', coords);
+      const startInput = document.getElementById('export-start-time');
+      const endInput = document.getElementById('export-end-time');
+      console.log('Start Input Element:', startInput);
+      console.log('End Input Element:', endInput);
+      console.log('Start Time Value:', startInput?.value);
+      console.log('End Time Value:', endInput?.value);
+      exportStrikesToPNG(coords);
+    });
+  } else {
+    console.error('Export PNG button not found');
+    alert('Error: Export button not found. Please try again.');
+  }
+
+  const startInput = document.getElementById('export-start-time');
+  const endInput = document.getElementById('export-end-time');
+  if (startInput) {
+    startInput.addEventListener('change', (e) => {
+      console.log('Start Time Changed:', e.target.value);
+    });
+  }
+  if (endInput) {
+    endInput.addEventListener('change', (e) => {
+      console.log('End Time Changed:', e.target.value);
+    });
+  }
+}
+
+function exportStrikesToPNG(coords) {
+  console.log('exportStrikesToPNG called with coords:', coords);
+
+  const startInput = document.getElementById('export-start-time');
+  const endInput = document.getElementById('export-end-time');
+  const startTimeInput = startInput?.value;
+  const endTimeInput = endInput?.value;
+  const colorMode = document.getElementById('export-color-mode')?.checked;
+
+  console.log('Start Time Input:', startTimeInput);
+  console.log('End Time Input:', endTimeInput);
+  console.log('Color Mode:', colorMode);
+  console.log('Start Input Element:', startInput);
+  console.log('End Input Element:', endInput);
+
+  if (!startInput || !endInput) {
+    console.error('Input elements not found');
+    alert('Error: Time input fields not found. Please try again.');
+    closeModal();
+    return;
+  }
+
+  if (!startTimeInput || !endTimeInput) {
+    console.error('Time inputs are empty:', startTimeInput, endTimeInput);
+    alert('Please select both start and end times.');
+    closeModal();
+    return;
+  }
+
+  const startTime = new Date(startTimeInput);
+  const endTime = new Date(endTimeInput);
+
+  if (isNaN(startTime.getTime())) {
+    console.error('Invalid start time:', startTimeInput);
+    alert('Please select a valid start time.');
+    closeModal();
+    return;
+  }
+  if (isNaN(endTime.getTime())) {
+    console.error('Invalid end time:', endTimeInput);
+    alert('Please select a valid end time.');
+    closeModal();
+    return;
+  }
+  if (endTime <= startTime) {
+    console.error('End time is not after start time:', startTime, endTime);
+    alert('End time must be after start time.');
+    closeModal();
+    return;
+  }
+
+  console.log('Parsed Start Time:', startTime);
+  console.log('Parsed End Time:', endTime);
+
+  if (!coords || !Array.isArray(coords) || coords.length !== 4 || coords.some(coord => !Array.isArray(coord) || coord.length !== 2)) {
+    console.error('Invalid coords format:', coords);
+    alert('Error: Invalid rectangle coordinates. Please try again.');
+    closeModal();
+    return;
+  }
+
+  let bounds;
+  try {
+    bounds = L.latLngBounds(coords);
+  } catch (error) {
+    console.error('Failed to create bounds:', error, coords);
+    alert('Error: Invalid rectangle bounds. Please try again.');
+    closeModal();
+    return;
+  }
+
+  console.log('Filtering strikes with bounds:', bounds.toBBoxString());
+  const filteredStrikes = strikeData.filter(s => {
+    if (!(s.time instanceof Date) || isNaN(s.time.getTime())) {
+      console.warn('Invalid strike time:', s.time);
+      return false;
+    }
+    if (!s.coordinates || s.coordinates.length !== 2) {
+      console.warn('Invalid strike coordinates:', s.coordinates);
+      return false;
+    }
+    return s.time >= startTime && s.time <= endTime && bounds.contains([s.coordinates[1], s.coordinates[0]]);
+  });
+
+  console.log('Filtered Strikes:', filteredStrikes.length, filteredStrikes);
+
+  if (filteredStrikes.length === 0) {
+    console.warn('No strikes found in the selected area and time range.');
+    alert('No lightning strikes found in the selected area and time range.');
+    closeModal();
+    return;
+  }
+
+  let canvas, ctx, latRange, lngRange, width, height;
+  try {
+    latRange = bounds.getNorth() - bounds.getSouth();
+    lngRange = bounds.getEast() - bounds.getWest();
+    if (latRange <= 0 || lngRange <= 0) {
+      console.error('Invalid bounds range:', latRange, lngRange);
+      throw new Error('Invalid bounds range');
+    }
+    width = 800;
+    height = width * (latRange / lngRange);
+    canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('Failed to get canvas context');
+      throw new Error('Failed to get canvas context');
+    }
+    ctx.clearRect(0, 0, width, height);
+  } catch (error) {
+    console.error('Canvas creation failed:', error);
+    alert('Error: Failed to create image. Please try again.');
+    closeModal();
+    return;
+  }
+
+  try {
+    const lifespanMs = endTime - startTime;
+    filteredStrikes.forEach(s => {
+      const x = ((s.coordinates[0] - bounds.getWest()) / lngRange) * width;
+      const y = ((bounds.getNorth() - s.coordinates[1]) / latRange) * height;
+      const ageFraction = colorMode ? (endTime - s.time) / lifespanMs : 0;
+      const color = colorMode ? getColorFromAge(ageFraction) : 'black';
+      
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  } catch (error) {
+    console.error('Drawing strikes failed:', error);
+    alert('Error: Failed to draw strikes. Please try again.');
+    closeModal();
+    return;
+  }
+
+  try {
+    const link = document.createElement('a');
+    link.download = `lightning_strikes_${startTime.toISOString()}_${endTime.toISOString()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    console.log('PNG download initiated');
+    console.log('lastDrawnRectangle before removal:', lastDrawnRectangle);
+    if (lastDrawnRectangle) {
+      drawnItems.removeLayer(lastDrawnRectangle);
+      console.log('Removed drawn rectangle');
+      lastDrawnRectangle = null;
+    }
+  } catch (error) {
+    console.error('PNG download failed:', error);
+    alert('Error: Failed to download image. Please try again.');
+    closeModal();
+    return;
+  }
+
+  closeModal();
+}
+
+function closeModal() {
+  document.querySelectorAll('.modal').forEach(modal => modal.remove());
+  document.getElementById('overlay').style.display = 'none';
+  if (drawControl && drawControl._toolbars.draw._modes.rectangle.handler) {
+    drawControl._toolbars.draw._modes.rectangle.handler.disable();
+  }
+}
+
+// Initialize rectangle export functionality
+initializeRectangleExport();
   // Initialize Leaflet.draw for 2D mode
   function initializeDrawControl() {
-    drawControl = new L.Control.Draw({
-      draw: {
-        polygon: {
-          allowIntersection: false,
-          showArea: true,
-          drawError: { color: '#b00b00', timeout: 1000 },
-          shapeOptions: { color: risk_colors['Low risk'], weight: 2, opacity: 0.8, fillOpacity: 0.3 }
-        },
-        polyline: false,
-        circle: false,
-        rectangle: false,
-        marker: false,
-        circlemarker: false
-      },
-      edit: {
-        featureGroup: drawnItems,
-        remove: true
-      }
-    });
-    map.addControl(drawControl);
+  // Initialize drawnItems if not already defined
+  if (!drawnItems) {
+    drawnItems = L.featureGroup().addTo(map);
+  }
 
-    map.on(L.Draw.Event.CREATED, function (e) {
-      const layer = e.layer;
+  // Remove existing drawControl if it exists to prevent conflicts
+  if (drawControl) {
+    map.removeControl(drawControl);
+  }
+
+  drawControl = new L.Control.Draw({
+    draw: {
+      polygon: {
+        allowIntersection: false,
+        showArea: true,
+        drawError: { color: '#b00b00', timeout: 1000 },
+        shapeOptions: { color: risk_colors['Low risk'], weight: 2, opacity: 0.8, fillOpacity: 0.3 }
+      },
+      rectangle: {
+        shapeOptions: { color: '#3b82f6', weight: 2, opacity: 0.8, fillOpacity: 0.3 }
+      },
+      polyline: false,
+      circle: false,
+      marker: false,
+      circlemarker: false
+    },
+    edit: {
+      featureGroup: drawnItems,
+      remove: true
+    }
+  });
+  map.addControl(drawControl);
+
+  map.on(L.Draw.Event.CREATED, function (e) {
+    const layer = e.layer;
+    if (e.layerType === 'polygon') {
       const riskLevel = document.getElementById('risk-level-select')?.value || 'Low risk';
       layer.feature = { type: 'Feature', properties: { name: riskLevel, source: 'leaflet' } };
       layer.setStyle({
@@ -966,26 +1430,47 @@ legendControl.addTo(map);
       if (is3DMode) syncPolygonsTo3D();
       updateLegend();
       console.log('Created 2D polygon:', layer._leaflet_id, layer.toGeoJSON());
-    });
+    } else if (e.layerType === 'rectangle') {
+      const bounds = layer.getBounds();
+      const coords = [
+        [bounds.getSouthWest().lat, bounds.getSouthWest().lng],
+        [bounds.getSouthEast().lat, bounds.getSouthEast().lng],
+        [bounds.getNorthEast().lat, bounds.getNorthEast().lng],
+        [bounds.getNorthWest().lat, bounds.getNorthWest().lng]
+      ];
+      drawnItems.addLayer(layer);
+      showTimeFilterModalForExport(coords);
+    }
+  });
 
-    map.on(L.Draw.Event.EDITED, function (e) {
-      e.layers.eachLayer(layer => {
-        if (layer && is3DMode) syncPolygonsTo3D();
-        updatePolygonPopup(layer);
-      });
-      updateLegend();
-      if (drawControl?._toolbars?.edit?._modes?.edit?.handler) {
-        drawControl._toolbars.edit._modes.edit.handler.disable();
-      }
-      editingLayerId = null;
+  map.on(L.Draw.Event.EDITED, function (e) {
+    e.layers.eachLayer(layer => {
+      if (layer && is3DMode) syncPolygonsTo3D();
+      updatePolygonPopup(layer);
     });
+    updateLegend();
+    if (drawControl?._toolbars?.edit?._modes?.edit?.handler) {
+      drawControl._toolbars.edit._modes.edit.handler.disable();
+    }
+    editingLayerId = null;
+  });
 
-    map.on(L.Draw.Event.DELETED, function (e) {
-      if (is3DMode) syncPolygonsTo3D();
-      updateLegend();
-      editingLayerId = null;
-    });
+  map.on(L.Draw.Event.DELETED, function (e) {
+    if (is3DMode) syncPolygonsTo3D();
+    updateLegend();
+    editingLayerId = null;
+  });
+
+  // Add Export Rectangle Strikes button to expert-controls
+  const exportButton = document.createElement('button');
+  exportButton.textContent = 'Export Rectangle Strikes';
+  exportButton.onclick = showRectangleExportModal;
+  const expertControls = document.getElementById('expert-controls');
+  if (expertControls && !expertControls.querySelector('button[onclick="showRectangleExportModal()"]')) {
+    expertControls.appendChild(exportButton);
   }
+}
+
   function initializeDrawControl3D() {
   // No drawing in 3D mode
 }
@@ -2529,59 +3014,101 @@ function addLightningFlash3D(lng, lat) {
 }
 
     function updateLegend() {
-    const legend = document.querySelector('.legend');
-    let legendHTML = '<h4>Legend</h4>';
+  const legendDiv = document.querySelector('.legend');
+  legendDiv.innerHTML = '';
+  const colorMode = document.getElementById('color-mode').checked;
+  const heatmap2DEnabled = document.getElementById('heatmap-toggle').checked;
+  const heatmap3DEnabled = is3DMode && document.getElementById('heatmap-3d-toggle').checked;
+  const lightningEnabled = document.getElementById('lightning-layer-toggle').checked;
+  const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
+  const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
+  const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
 
-    if (document.getElementById('color-mode').checked && document.getElementById('lightning-layer-toggle').checked) {
-      legendHTML += `
-        <div class="legend-item"><span class="color-box" style="background: linear-gradient(to right, #EE9B00, #9B2226);"></span> Lightning Age (New to Old)</div>`;
-    } else if (document.getElementById('lightning-layer-toggle').checked) {
-      legendHTML += `
-        <div class="legend-item"><span class="color-box" style="background: black;"></span> Lightning Strikes</div>`;
+  if (lightningEnabled) {
+    legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
+    if (colorMode) {
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: #ffd700"></div>Newest</div>
+        <div><div class="color-box" style="background: #ff69b4"></div></div>
+        <div><div class="color-box" style="background: #ff00ff"></div></div>
+        <div><div class="color-box" style="background: #800080"></div></div>
+        <div><div class="color-box" style="background: #4b0082"></div>Oldest</div>
+      `;
+    } else {
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: black"></div>Strikes</div>
+      `;
     }
-
-    if (document.getElementById('heatmap-toggle').checked && !is3DMode) {
-      legendHTML += `
-        <div class="legend-item"><span class="gradient-bar" style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226);"></span> Heatmap Intensity</div>`;
-    }
-
-    if (document.getElementById('heatmap-3d-toggle').checked && is3DMode) {
-      legendHTML += `
-        <div class="legend-item"><span class="gradient-bar" style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226);"></span> 3D Heatmap Height</div>`;
-    }
-
-    if (document.getElementById('nowcast-toggle').checked) {
-      legendHTML += `
-        <div class="legend-item"><span class="color-box" style="background: purple;"></span> Nowcast (>90%)</div>
-        <div class="legend-item"><span class="color-box" style="background: red;"></span> Nowcast (>80%)</div>
-        <div class="legend-item"><span class="color-box" style="background: orange;"></span> Nowcast (>70%)</div>
-        <div class="legend-item"><span class="color-box" style="background: yellow;"></span> Nowcast (>50%)</div>`;
-    }
-
-    if (document.getElementById('kml-layer-toggle').checked && kmlGeoJSON) {
-      Object.keys(risk_colors).forEach(risk => {
-        const isSevere = risk === 'Severe risk';
-        legendHTML += `
-          <div class="legend-item"><span class="color-box" style="background: ${isSevere ? 'transparent' : risk_colors[risk]}; border: 2px solid ${risk_colors[risk]};"></span> ${risk} (KML)</div>`;
-      });
-    }
-
-    if (document.getElementById('drawn-polygons-toggle').checked && drawnItems.getLayers().length > 0) {
-      drawnItems.eachLayer(layer => {
-        const risk = layer.feature.properties.name;
-        const isSevere = risk === 'Severe risk';
-        legendHTML += `
-          <div class="legend-item"><span class="color-box" style="background: ${isSevere ? 'transparent' : layer.options.color}; border: 2px solid ${layer.options.color};"></span> ${risk} (Drawn)</div>`;
-      });
-    }
-
-    legend.innerHTML = legendHTML;
-    legend.style.display = isLegendVisible ? 'block' : 'none';
   }
+
+  if (heatmap2DEnabled) {
+    legendDiv.innerHTML += `
+      <h4>2D Heatmap</h4>
+      <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
+      <div style="display: flex; justify-content: space-between; margin-top: 4px">
+        <span>Low</span><span>High</span>
+      </div>
+    `;
+  }
+
+  if (heatmap3DEnabled) {
+    legendDiv.innerHTML += `
+      <h4>3D Heatmap</h4>
+      <div style="background: linear-gradient(to right, #001219, #0A9396, #94D2BD, #E9D8A6, #c89578, #EE9B00, #CA6702, #BB3E03, #AE2012, #9B2226); margin-top: 4px" class="gradient-bar"></div>
+      <div style="display: flex; justify-content: space-between; margin-top: 4px">
+        <span>Low</span><span>High</span>
+      </div>
+    `;
+  }
+
+  if (kmlEnabled && kmlLayer) {
+    legendDiv.innerHTML += '<h4>Risk Levels</h4>';
+    Object.entries(risk_colors).forEach(([name, color]) => {
+      const isSevere = name === 'Severe risk';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: ${isSevere ? 'none' : color}; border: 2px solid ${color};"></div>${name}</div>
+      `;
+    });
+  }
+
+  if (nowcastEnabled) {
+    legendDiv.innerHTML += '<h4>Nowcast</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: purple"></div>Very High Confidence</div>
+      <div><div class="color-box" style="background: red"></div>High Confidence</div>
+      <div><div class="color-box" style="background: orange"></div>Moderate Confidence</div>
+      <div><div class="color-box" style="background: yellow"></div>Low Confidence</div>
+    `;
+  }
+
+  // Show or hide based on isLegendVisible and content
+  legendDiv.style.display = (isLegendVisible && legendDiv.innerHTML) ? 'block' : 'none';
+
+  if (is3DMode) {
+    let map3DLegend = document.getElementById('map3d-legend');
+    if (!map3DLegend) {
+      map3DLegend = document.createElement('div');
+      map3DLegend.id = 'map3d-legend';
+      map3DLegend.className = 'legend';
+      map3DLegend.style.position = 'absolute';
+      map3DLegend.style.top = '100px';
+      map3DLegend.style.right = '10px';
+      map3DLegend.style.zIndex = '1002';
+      document.getElementById('map-3d').appendChild(map3DLegend);
+    }
+    map3DLegend.innerHTML = legendDiv.innerHTML;
+    map3DLegend.style.display = (isLegendVisible && legendDiv.innerHTML) ? 'block' : 'none';
+  } else {
+    const map3DLegend = document.getElementById('map3d-legend');
+    if (map3DLegend) map3DLegend.remove();
+  }
+}
+  
     function toggleLegend() {
   isLegendVisible = !isLegendVisible;
   updateLegend(); // Update visibility based on new state
 }
+
     function applyFilter() {
       lastFilterMode = 'inputs';
       let startInput = document.getElementById('start-time').value;
