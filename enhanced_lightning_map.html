@@ -1220,15 +1220,6 @@ function exportStrikesToPNG(coords) {
   console.log('Start Time Input:', startTimeInput);
   console.log('End Time Input:', endTimeInput);
   console.log('Color Mode:', colorMode);
-  console.log('Start Input Element:', startInput);
-  console.log('End Input Element:', endInput);
-
-  if (!startInput || !endInput) {
-    console.error('Input elements not found');
-    alert('Error: Time input fields not found. Please try again.');
-    closeModal();
-    return;
-  }
 
   if (!startTimeInput || !endTimeInput) {
     console.error('Time inputs are empty:', startTimeInput, endTimeInput);
@@ -1240,27 +1231,19 @@ function exportStrikesToPNG(coords) {
   const startTime = new Date(startTimeInput);
   const endTime = new Date(endTimeInput);
 
-  if (isNaN(startTime.getTime())) {
-    console.error('Invalid start time:', startTimeInput);
-    alert('Please select a valid start time.');
+  if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+    console.error('Invalid time inputs:', startTimeInput, endTimeInput);
+    alert('Please select valid start and end times.');
     closeModal();
     return;
   }
-  if (isNaN(endTime.getTime())) {
-    console.error('Invalid end time:', endTimeInput);
-    alert('Please select a valid end time.');
-    closeModal();
-    return;
-  }
+
   if (endTime <= startTime) {
     console.error('End time is not after start time:', startTime, endTime);
     alert('End time must be after start time.');
     closeModal();
     return;
   }
-
-  console.log('Parsed Start Time:', startTime);
-  console.log('Parsed End Time:', endTime);
 
   if (!coords || !Array.isArray(coords) || coords.length !== 4 || coords.some(coord => !Array.isArray(coord) || coord.length !== 2)) {
     console.error('Invalid coords format:', coords);
@@ -1279,96 +1262,104 @@ function exportStrikesToPNG(coords) {
     return;
   }
 
-  console.log('Filtering strikes with bounds:', bounds.toBBoxString());
+  // Calculate pixel dimensions of the selected area
+  let width, height;
+  if (lastDrawnRectangle) {
+    // For drawn rectangle, use pixel coordinates directly
+    const rectangleBounds = lastDrawnRectangle.getBounds();
+    const topLeft = map.latLngToContainerPoint(rectangleBounds.getNorthWest());
+    const bottomRight = map.latLngToContainerPoint(rectangleBounds.getSouthEast());
+    width = Math.abs(bottomRight.x - topLeft.x);
+    height = Math.abs(bottomRight.y - topLeft.y);
+  } else {
+    // For manually entered coordinates, project bounds to pixel coordinates
+    const topLeft = map.latLngToContainerPoint(bounds.getNorthWest());
+    const bottomRight = map.latLngToContainerPoint(bounds.getSouthEast());
+    width = Math.abs(bottomRight.x - topLeft.x);
+    height = Math.abs(bottomRight.y - topLeft.y);
+  }
+
+  // Ensure dimensions are positive and reasonable
+  if (width <= 0 || height <= 0 || width > 10000 || height > 10000) {
+    console.error('Invalid canvas dimensions:', width, height);
+    alert('Error: Invalid area dimensions. Please select a valid area.');
+    closeModal();
+    return;
+  }
+
+  // Round dimensions to integers for canvas
+  width = Math.round(width);
+  height = Math.round(height);
+  console.log('Calculated pixel dimensions:', { width, height });
+
+  // Create a canvas with the exact pixel dimensions
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  // Set background (transparent)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0)';
+  ctx.fillRect(0, 0, width, height);
+
+  // Filter strikes within the time range and bounds
   const filteredStrikes = strikeData.filter(s => {
-    if (!(s.time instanceof Date) || isNaN(s.time.getTime())) {
-      console.warn('Invalid strike time:', s.time);
-      return false;
-    }
-    if (!s.coordinates || s.coordinates.length !== 2) {
-      console.warn('Invalid strike coordinates:', s.coordinates);
-      return false;
-    }
-    return s.time >= startTime && s.time <= endTime && bounds.contains([s.coordinates[1], s.coordinates[0]]);
+    const strikeTime = new Date(s.time);
+    const withinTime = strikeTime >= startTime && strikeTime <= endTime;
+    const withinBounds = bounds.contains([s.coordinates[1], s.coordinates[0]]);
+    return withinTime && withinBounds;
   });
 
-  console.log('Filtered Strikes:', filteredStrikes.length, filteredStrikes);
+  console.log('Filtered strikes:', filteredStrikes.length);
 
-  if (filteredStrikes.length === 0) {
-    console.warn('No strikes found in the selected area and time range.');
-    alert('No lightning strikes found in the selected area and time range.');
-    closeModal();
-    return;
-  }
+  // Map geographic coordinates to canvas coordinates
+  filteredStrikes.forEach(s => {
+    const lat = s.coordinates[1];
+    const lng = s.coordinates[0];
 
-  let canvas, ctx, latRange, lngRange, width, height;
-  try {
-    latRange = bounds.getNorth() - bounds.getSouth();
-    lngRange = bounds.getEast() - bounds.getWest();
-    if (latRange <= 0 || lngRange <= 0) {
-      console.error('Invalid bounds range:', latRange, lngRange);
-      throw new Error('Invalid bounds range');
+    // Convert lat/lng to pixel coordinates relative to the bounds
+    const point = map.latLngToContainerPoint([lat, lng]);
+    const topLeft = map.latLngToContainerPoint(bounds.getNorthWest());
+
+    // Translate to canvas coordinates (origin at top-left of canvas)
+    const x = point.x - topLeft.x;
+    const y = point.y - topLeft.y;
+
+    // Calculate color based on age if enabled
+    let color = 'black';
+    if (colorMode) {
+      const ageFraction = (endTime - new Date(s.time)) / ((endTime - startTime) || 1);
+      color = getColorFromAge(ageFraction);
     }
-    width = 800;
-    height = width * (latRange / lngRange);
-    canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.error('Failed to get canvas context');
-      throw new Error('Failed to get canvas context');
-    }
-    ctx.clearRect(0, 0, width, height);
-  } catch (error) {
-    console.error('Canvas creation failed:', error);
-    alert('Error: Failed to create image. Please try again.');
-    closeModal();
-    return;
-  }
 
-  try {
-    const lifespanMs = endTime - startTime;
-    filteredStrikes.forEach(s => {
-      const x = ((s.coordinates[0] - bounds.getWest()) / lngRange) * width;
-      const y = ((bounds.getNorth() - s.coordinates[1]) / latRange) * height;
-      const ageFraction = colorMode ? (endTime - s.time) / lifespanMs : 0;
-      const color = colorMode ? getColorFromAge(ageFraction) : 'black';
-      
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
-    });
-  } catch (error) {
-    console.error('Drawing strikes failed:', error);
-    alert('Error: Failed to draw strikes. Please try again.');
-    closeModal();
-    return;
-  }
+    // Draw strike as a circle
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, 2 * Math.PI); // 5-pixel radius
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
 
-  try {
-    const link = document.createElement('a');
-    link.download = `lightning_strikes_${startTime.toISOString()}_${endTime.toISOString()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    console.log('PNG download initiated');
-    console.log('lastDrawnRectangle before removal:', lastDrawnRectangle);
-    if (lastDrawnRectangle) {
-      drawnItems.removeLayer(lastDrawnRectangle);
-      console.log('Removed drawn rectangle');
-      lastDrawnRectangle = null;
-    }
-  } catch (error) {
-    console.error('PNG download failed:', error);
-    alert('Error: Failed to download image. Please try again.');
-    closeModal();
-    return;
+  // Convert canvas to PNG and trigger download
+  const dataUrl = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = `lightning_strikes_${startTime.toISOString()}_${endTime.toISOString()}.png`;
+  link.click();
+
+  console.log('PNG exported with dimensions:', width, 'x', height);
+
+  // Remove the drawn rectangle if it exists
+  if (lastDrawnRectangle) {
+    drawnItems.removeLayer(lastDrawnRectangle);
+    console.log('Removed lastDrawnRectangle from map');
+    lastDrawnRectangle = null;
   }
 
   closeModal();
 }
-
 function closeModal() {
   document.querySelectorAll('.modal').forEach(modal => modal.remove());
   document.getElementById('overlay').style.display = 'none';
