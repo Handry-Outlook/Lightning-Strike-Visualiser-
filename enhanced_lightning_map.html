@@ -153,353 +153,167 @@
       }
     }
     #map, #map-3d {
-  position: absolute;
-  top: 60px; /* Account for top bar */
-  left: 0;
-  width: 100%;
-  height: calc(100vh - 60px - 100px); /* Subtract top bar and time slider height */
-  z-index: 1;
-  border-radius: 8px;
-  overflow: hidden; /* Prevent any scrolling */
-}
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: calc(100vh - 60px);
+      z-index: 1;
+      border-radius: 8px;
+      overflow: hidden;
+    }
     #map-3d {
       display: none;
     }
     #control-panel {
-  position: fixed;
-  top: 60px;
-  left: 20px;
-  width: 300px;
-  height: calc(100vh - 60px);
-  background: rgba(255, 255, 255, 0.95);
-  padding: 20px;
-  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  overflow-y: auto; /* Allow vertical scrolling if needed */
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 106;
+      padding: 10px;
+      transition: background 0.3s ease, color 0.3s ease;
+      z-index: 1003;
+      overflow-x: hidden;
+      direction: rtl
+    }
+    #control-panel::-webkit-scrollbar {
+    width: 8px; /* Thin scrollbar for WebKit browsers */
+  }
+  /* Ensure control panel handles overflow correctly */
+#control-panel {
+  padding: 8px; /* Consistent with previous compact design */
+  width: 280px; /* Slightly narrower */
+  max-height: calc(100vh - 80px); /* Limit height to viewport minus top bar */
+  overflow-y: auto; /* Vertical scrollbar for overflow */
   overflow-x: hidden; /* Prevent horizontal overflow */
+  box-sizing: border-box; /* Ensure padding is included in width */
+}
+
+/* Compact section styling */
+.section {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+}
+
+/* Compact labels to constrain sliders */
+.control-panel label {
+  font-size: 0.75em;
+  margin-bottom: 6px;
+  width: 100%; /* Ensure label takes full width of container */
   box-sizing: border-box; /* Include padding in width */
-  transition: background 0.3s ease, color 0.3s ease;
 }
 
-body.dark-mode #control-panel {
-  background: rgba(40, 40, 40, 0.95);
-  color: #e0e0e0;
-}
-
-/* Control Group */
-.control-group {
-  margin-bottom: 15px;
-  display: flex;
-  flex-direction: column; /* Stack items vertically */
-  gap: 10px;
-}
-
-/* Control Item (e.g., checkbox, slider, button) */
-.control-group {
-  margin-bottom: 15px;
-  display: flex;
-  flex-direction: column; /* Stack items vertically */
-  gap: 10px;
-}
-
-/* Control Item (e.g., checkbox, slider, button) */
-.control-item {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap; /* Allow wrapping to prevent overflow */
-  gap: 8px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Labels */
-.control-item label {
-  flex: 1 1 auto;
-  font-size: 0.9em;
-  white-space: normal; /* Allow text wrapping */
-  word-break: break-word; /* Break long words */
-  max-width: 100%; /* Prevent label overflow */
-}
-
-/* Inputs (checkboxes, sliders) */
-.control-item input[type="checkbox"],
-.control-item input[type="range"],
-.control-item input[type="number"],
-.control-item input[type="file"] {
-  flex: 0 0 auto;
-  max-width: 100%; /* Ensure inputs don't exceed container */
-}
-
-/* Sliders */
+/* Constrain sliders to prevent overflow */
 .control-panel input[type="range"] {
-  -webkit-appearance: none;
-  width: 200px; /* Reduced from 260px to fit within 260px content area */
-  max-width: 100%; /* Ensure it doesn't exceed container */
-  height: 8px;
+  width: 100%; /* Full width of parent label */
+  max-width: 240px; /* Limit slider width to fit within control panel */
+  height: 6px; /* Compact height */
   background: #d1d5db;
-  border-radius: 4px;
-  outline: none;
-  transition: background 0.3s ease;
-  margin: 3px 0;
+  border-radius: 3px;
+  margin: 2px 0; /* Reduced margin to minimize vertical space */
+  padding: 0; /* Remove any padding */
+  box-sizing: border-box; /* Ensure width includes all components */
 }
 
+/* Smaller slider thumbs */
+.control-panel input[type="range"]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  background: #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -3px; /* Adjust thumb position to align with track */
+}
+
+.control-panel input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Dark mode slider styling */
 body.dark-mode .control-panel input[type="range"] {
   background: #555;
 }
 
-.control-panel input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #3b82f6;
-  border-radius: 50%;
-  cursor: pointer;
+body.dark-mode .control-panel input[type="range"]::-webkit-slider-thumb {
+  background: #4b9bff; /* Match dark mode button color */
 }
 
-.control-panel input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: #3b82f6;
-  border-radius: 50%;
-  cursor: pointer;
-}
-.control-panel button#apply-filter,
-.control-panel button:where(:not(#expert-controls button))[innerText="Apply Filter" i] {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85em;
-  max-width: 200px;
-  width: 100%;
-  transition: background 0.3s ease;
-}
-
-body.dark-mode .control-panel button#apply-filter,
-body.dark-mode .control-panel button:where(:not(#expert-controls button))[innerText="Apply Filter" i] {
+body.dark-mode .control-panel input[type="range"]::-moz-range-thumb {
   background: #4b9bff;
-  color: #e0e0e0;
-  border: none;
 }
 
-.control-panel button#apply-filter:hover,
-.control-panel button:where(:not(#expert-controls button))[innerText="Apply Filter" i]:hover {
-  background: #2563eb;
-}
-
-body.dark-mode .control-panel button#apply-filter:hover,
-body.dark-mode .control-panel button:where(:not(#expert-controls button))[innerText="Apply Filter" i]:hover {
-  background: #3578d6;
-}
-
-/* Number Inputs */
-.control-panel input[type="number"] {
-  width: 100px; /* Constrain width */
-  max-width: 100%;
-  padding: 6px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 0.8em;
-}
-
-body.dark-mode .control-panel input[type="number"] {
-  background: #333;
-  color: #e0e0e0;
-  border: 1px solid #555;
-}
-
-/* File Inputs */
-.control-panel input[type="file"] {
-  width: 100%;
-  max-width: 200px; /* Constrain file input width */
-  padding: 6px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 0.8em;
-}
-
-body.dark-mode .control-panel input[type="file"] {
-  background: #333;
-  color: #e0e0e0;
-  border: 1px solid #555;
-}
-
-/* Buttons */
+/* Ensure other inputs and buttons remain compact */
+.control-panel input,
+.control-panel select,
 .control-panel button {
-  padding: 6px 12px;
-  font-size: 0.85em;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #f5f5f5;
-  cursor: pointer;
-  flex: 0 0 auto;
-  max-width: 100%; /* Prevent button overflow */
-  white-space: nowrap; /* Keep button text on one line */
-  overflow: hidden;
-  text-overflow: ellipsis; /* Truncate long button text */
+  padding: 4px;
+  font-size: 0.75em;
+  border-radius: 3px;
+  width: 100%; /* Ensure full width within container */
+  max-width: 240px; /* Consistent with slider width */
+  box-sizing: border-box;
 }
 
-body.dark-mode .control-panel button {
+/* Compact checkboxes */
+.control-panel input[type="checkbox"] {
+  transform: scale(0.8);
+  margin-top: 2px;
+  width: auto; /* Override max-width for checkboxes */
+}
+
+/* Ensure draw-toolbar elements are compact */
+.draw-toolbar button,
+.draw-toolbar select {
+  padding: 4px 8px;
+  font-size: 0.75em;
+  border-radius: 3px;
+  max-width: 240px; /* Constrain to fit within control panel */
+}
+
+/* Thin scrollbar */
+#control-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+#control-panel::-webkit-scrollbar-thumb {
   background: #555;
-  border-color: #777;
-  color: #e0e0e0;
+  border-radius: 3px;
 }
 
-.control-panel button:hover {
-  background: #e0e0e0;
+#control-panel::-webkit-scrollbar-thumb:hover {
+  background: #777;
 }
-
-body.dark-mode .control-panel button:hover {
-  background: #666;
-}
-
-/* Expert Controls */
-#expert-controls {
-  display: none;
-  padding: 10px;
-  background: #f9fafb;
-  border-radius: 6px;
-  transition: background 0.3s ease;
-  flex-direction: column; /* Stack children vertically */
-  gap: 10px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-body.dark-mode #expert-controls {
-  background: #333;
-}
-
-body.expert-mode #expert-controls {
-  display: flex; /* Use flexbox for layout */
-}
-
-/* Expert Controls Buttons */
-#expert-controls button {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8em;
-  margin-top: 5px;
-  max-width: 200px; /* Constrain button width */
-  width: 100%; /* Ensure buttons take full available width */
-  transition: background 0.3s ease;
-}
-
-body.dark-mode #expert-controls button {
-  background: #4b9bff;
-  color: #e0e0e0;
-}
-
-#expert-controls button:hover {
-  background: #2563eb;
-}
-
-body.dark-mode #expert-controls button:hover {
-  background: #3578d6;
-}
-
-/* Expert Controls Sliders */
-#expert-controls input[type="range"] {
-  width: 200px; /* Match other sliders */
-  max-width: 100%;
-}
-
-/* Expert Controls Labels */
-#expert-controls label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.8em;
-  color: #1a2a44;
-  font-weight: 500;
-  margin-bottom: 8px;
-  max-width: 100%;
-}
-
-body.dark-mode #expert-controls label {
-  color: #e0e0e0;
-}
-
-/* Prevent horizontal overflow in control panel content */
-#control-panel * {
-  max-width: 100%; /* Ensure all children respect panel width */
-  box-sizing: border-box;
-}
-
-/* Desktop scrollbar styling */
-@media (min-width: 769px) {
-  #control-panel {
-    position: fixed;
-    top: 60px;
-    left: 20px;
-    width: 300px;
-    height: calc(100% - 80px);
-    overflow-y: auto;
-    direction: rtl; /* Scrollbar on the left */
-    background: #fff;
-    color: #000;
-  }
-  #control-panel * {
-    direction: ltr; /* Ensure content is left-to-right */
-  }
-  #control-panel::-webkit-scrollbar {
-    width: 10px;
-  }
-  #control-panel::-webkit-scrollbar-track {
-    background: #f1f1f1;
-  }
   #control-panel::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 5px;
+    background: #555; /* Dark mode thumb */
+    border-radius: 4px;
   }
-  #control-panel {
-    scrollbar-color: #888 #f1f1f1;
-    scrollbar-width: thin;
+  #control-panel::-webkit-scrollbar-thumb:hover {
+    background: #777; /* Lighter on hover */
   }
-  .dark-mode #control-panel {
-    background: #1a1a1a;
-    color: #e0e0e0;
+  #control-panel > * {
+    direction: ltr; /* Reset content direction to normal */
   }
-  .dark-mode #control-panel::-webkit-scrollbar-track {
-    background: #2c2c2c;
-  }
-  .dark-mode #control-panel::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 5px;
-  }
-  .dark-mode #control-panel {
-    scrollbar-color: #555 #2c2c2c;
-    scrollbar-width: thin;
-  }
-}@media (min-width: 769px) and (prefers-color-scheme: dark) {
-  #control-panel {
-    background: #222; /* Dark mode background */
-  }
-  #control-panel::-webkit-scrollbar {
-    width: 10px;
-  }
-  #control-panel::-webkit-scrollbar-track {
-    background: #333; /* Dark track */
-  }
-  #control-panel::-webkit-scrollbar-thumb {
-    background: #666; /* Dark thumb */
-    border-radius: 5px;
-  }
-  #control-panel {
-    scrollbar-color: #666 #333; /* Firefox: thumb track */
-    scrollbar-width: thin;
-  }
-}
+    body.dark-mode #control-panel {
+      background: #2a2a2a;
+      color: #e0e0e0;
+    }
+    @media (min-width: 769px) {
+      #control-panel {
+        position: fixed;
+        top: 60px;
+        left: 20px;
+        width: 300px;
+        height: calc(100% - 80px);
+        overflow-y: auto;
+      }
       #map, #map-3d {
-    left: 340px; /* Account for control panel width */
-    width: calc(100% - 340px);
-    height: calc(100vh - 60px); /* Ensure consistent height */
-  }
+        left: 340px;
+        width: calc(100% - 340px);
+      }
     }
     @media (max-width: 768px) {
       #control-panel {
@@ -514,9 +328,6 @@ body.dark-mode #expert-controls label {
       #control-panel.open {
         display: block;
       }
-      #map, #map-3d {
-    height: calc(100vh - 60px ); /* Adjust for mobile time slider and settings button */
-  }
       #settings-button {
         position: fixed;
         bottom: 145px;
@@ -603,16 +414,14 @@ body.dark-mode #expert-controls label {
       border: 1px solid #555;
     }
     .control-panel input[type="range"] {
-  -webkit-appearance: none;
-  width: 260px; /* Shortened to fit within 300px minus 20px padding (10px each side) */
-  max-width: 100%; /* Ensure it doesn't exceed container */
-  height: 8px;
-  background: #d1d5db;
-  border-radius: 4px;
-  outline: none;
-  transition: background 0.3s ease;
-  margin: 3px 0; /* Keep existing margin */
-}
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      background: #d1d5db;
+      border-radius: 4px;
+      outline: none;
+      transition: background 0.3s ease;
+    }
     body.dark-mode .control-panel input[type="range"] {
       background: #555;
     }
@@ -757,30 +566,23 @@ body.dark-mode #expert-controls label {
   max-width: 125px;
   min-width: 110px;
   position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1010;
-  display: none;
+  top: 10px; /* Consistent 10px margin from top */
+  right: 10px; /* Consistent 10px margin from right */
+  z-index: 1010; /* High z-index to stay above map elements */
   transition: background 0.3s ease, color 0.3s ease;
-}
-
-body.dark-mode .legend {
-  background: rgba(40, 40, 40, 0.95);
-  color: #e0e0e0;
-}
-
-/* Adjust legend position in 2D mode for larger screens to account for control panel */
-@media (min-width: 769px) {
-  body:not(.three-d-mode):not(.fullscreen) .legend {
-    right: calc(10px + 340px); /* Account for 340px control panel offset */
-  }
-}
-
-/* Ensure legend stays top-right in 3D and fullscreen modes */
-body.three-d-mode .legend,
-body.fullscreen .legend {
+}  
+   .fullscreen .legend {
+  right: 10px; /* Ensure 10px margin */
   top: 10px;
-  right: 10px;
+}
+body.three-d-mode .legend {
+  right: 10px; /* Ensure 10px margin */
+  top: 10px;
+}
+    @media (min-width: 769px) {
+  .legend {
+    right: calc(10px + 340px); /* Adjust for map offset */
+  }
 }
     body.dark-mode .legend {
       background: rgba(40,40,40,0.95);
@@ -874,8 +676,9 @@ body.fullscreen .legend {
     }
     .fullscreen #map, .fullscreen #map-3d {
       width: 100vw;
-      height: calc(100vh - 60px);
+      height: 1calc(100vh - 60px);
       left: 0;
+      overflow: hidden
     }
     .fullscreen #control-panel {
       display: none;
@@ -911,7 +714,6 @@ body.fullscreen .legend {
   body.three-d-mode #map3D {
     opacity: 1; /* Show 3D map */
   }
-
   .mapboxgl-ctrl-group {
     z-index: 1100 !important; /* Ensure mapbox-gl-draw controls are above top bar */
     margin-top: 70px !important; /* Move controls below top bar */
@@ -932,19 +734,7 @@ body.fullscreen .legend {
 #expert-controls button:hover {
   background: #2563eb;
 }
-body.dark-mode #control-panel button#apply-filter {
-  background: #4b9bff; /* Lighter blue for dark mode */
-  color: #e0e0e0;
-  border: none;
-}
 
-#control-panel button#apply-filter:hover {
-  background: #2563eb; /* Darker blue on hover */
-}
-
-body.dark-mode #control-panel button#apply-filter:hover {
-  background: #3578d6; /* Slightly darker blue for dark mode hover */
-}
 body.dark-mode #expert-controls button {
   background: #4b9bff;
   color: #e0e0e0;
@@ -1034,6 +824,41 @@ body.dark-mode .modal button {
 body.dark-mode .modal button:hover {
   background: #3578d6;
 }
+/* Adjust 3D map position in normal mode */
+#map-3d {
+  position: absolute;
+  top: 60px; /* Match 2D map offset to avoid top bar overlap */
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 60px); /* Adjust height to fit viewport minus top bar */
+  z-index: 2;
+  display: none; /* Preserve existing behavior */
+  overflow: hidden;
+}
+
+/* Desktop mode with control panel */
+@media (min-width: 769px) {
+  #map-3d {
+    left: 340px; /* Match 2D map offset for control panel */
+    width: calc(100% - 340px);
+    height: calc(100vh - 60px); /* Maintain height */
+  }
+}
+
+/* Fullscreen mode */
+.fullscreen #map-3d {
+  top: 0; /* No offset needed in fullscreen */
+  left: 0;
+  width: 100vw;
+  height: 100vh; /* Full viewport height */
+  overflow: hidden;
+}
+
+/* Ensure 3D mode visibility */
+body.three-d-mode #map-3d {
+  display: block; /* Show 3D map */
+  opacity: 1;
+}
   </style>
 </head>
 <!-- Google tag (gtag.js) -->
@@ -1044,7 +869,7 @@ body.dark-mode .modal button:hover {
   gtag('js', new Date());
   gtag('config', 'G-M5QDT7XR39');
 </script>
-<body class="dark-mode">
+<body>
   <div id="top-bar">
     <div class="draw-toolbar">
   <button onclick="toggleDrawing()">Enable Drawing</button>
@@ -1060,7 +885,7 @@ body.dark-mode .modal button:hover {
 </div>
 
     <div>
-      <button onclick="toggleDarkMode()">☀️ Light Mode</button>
+      <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
       <button onclick="toggleLegend()">Legend</button>
       <button onclick="showTutorial()">Help</button>
       <button onclick="showUserLocation()">📍</button>
@@ -1106,7 +931,6 @@ body.dark-mode .modal button:hover {
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
         <option value="mapbox" selected>Mapbox (Handry Outlook)</option>
         <option value="custom">Mapbox Classic</option>
-        <option value="custom">Mapbox Black</option>
         <option value="osm">OpenStreetMap</option>
         <option value="opentopo">OpenTopoMap</option>
         <option value="esri">Esri World Imagery</option>
@@ -1138,7 +962,7 @@ body.dark-mode .modal button:hover {
       <h4>Extras</h4>
       <label>Sound: <input type="checkbox" id="sound-toggle" onchange="toggleSound()"><span class="tooltip">Play thunder sound</span></label>
       <label>Nowcast: <input type="checkbox" id="nowcast-toggle" checked onchange="toggleNowcast()"><span class="tooltip">Show lightning predictions</span></label>
-      <label>Nowcast Confidence: <input type="range" id="min-nowcast-confidence" min="0" max="1" step="0.01" value="0.8" onchange="is3DMode ? update3DView() : toggleNowcast()"><span class="tooltip">Min. conf. for nowcast to be displayed</span></label>
+      <label>Nowcast Confidence: <input type="range" id="min-nowcast-confidence" min="0" max="1" step="0.01" value="0.8" onchange="is3DMode ? update3DView() : toggleNowcast()"><span class="tooltip">Minimum confidence for nowcast cones to be displayed</span></label>
     </div>
     <div class="section">
       <h4>Links</h4>
@@ -1256,12 +1080,6 @@ body.dark-mode .modal button:hover {
         attribution: '© Mapbox © OpenStreetMap',
         maxZoom: 18
       }),
-      custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-        tileSize: 512,
-        zoomOffset: -1,
-        attribution: '© Mapbox © OpenStreetMap',
-        maxZoom: 18
-      }),
       osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
@@ -1296,7 +1114,7 @@ body.dark-mode .modal button:hover {
       })
     };
 
-    map = L.map('map', { layers: [baseLayers.mapbox], zoomControl: false }).setView([53.5, -0.5], 6);
+    map = L.map('map', { layers: [baseLayers.mapbox], zoomControl: false }).setView([53.5, -4.5], 6);
 
    map3D = new mapboxgl.Map({
   container: 'map-3d',
@@ -1386,6 +1204,65 @@ legendControl.addTo(map);
   let drawnItems3D = [];
   let isDrawingEnabled = false;
   let editingLayerId = null;
+  // Function to move legend between 2D and 3D map containers
+function updateLegendContainer() {
+  const legendElement = document.querySelector('.legend');
+  if (!legendElement) return;
+
+  if (is3DMode) {
+    // Move legend to 3D map container
+    const map3DContainer = document.getElementById('map-3d');
+    map3DContainer.appendChild(legendElement);
+    legendElement.style.position = 'absolute';
+    legendElement.style.top = '10px';
+    legendElement.style.right = '10px';
+    legendElement.style.zIndex = '1010';
+  } else {
+    // Move legend back to 2D map container
+    const mapContainer = document.getElementById('map');
+    mapContainer.appendChild(legendElement);
+    legendElement.style.position = 'absolute';
+    legendElement.style.top = '10px';
+    legendElement.style.right = '10px';
+    legendElement.style.zIndex = '1010';
+  }
+
+  // Ensure legend visibility matches toggle state
+  legendElement.style.display = isLegendVisible ? 'block' : 'none';
+}
+
+// Update toggleLegend to sync visibility
+function toggleLegend() {
+  isLegendVisible = !isLegendVisible;
+  const legendElement = document.querySelector('.legend');
+  if (legendElement) {
+    legendElement.style.display = isLegendVisible ? 'block' : 'none';
+  }
+  updateLegendContainer(); // Ensure correct container
+}
+
+// Modify toggle3DMode to update legend container
+function toggle3DMode() {
+  is3DMode = !is3DMode;
+  document.body.classList.toggle('three-d-mode', is3DMode);
+  if (is3DMode) {
+    document.getElementById('map').style.opacity = '0';
+    document.getElementById('map').style.pointerEvents = 'none';
+    document.getElementById('map-3d').style.display = 'block';
+    document.getElementById('map-3d').style.opacity = '1';
+    map3D.resize();
+    update3DView();
+  } else {
+    document.getElementById('map').style.opacity = '1';
+    document.getElementById('map').style.pointerEvents = 'auto';
+    document.getElementById('map-3d').style.display = 'none';
+    document.getElementById('map-3d').style.opacity = '0';
+    map.invalidateSize();
+  }
+  updateLegendContainer(); // Move legend to correct container
+  updateZIndex();
+  updateLegend();
+}
   function initializeRectangleExport() {
   // Add Export Rectangle Strikes button
   const exportButton = document.createElement('button');
@@ -1999,23 +1876,32 @@ initializeRectangleExport();
   // Toggle 3D mode
   function toggle3DMode() {
   is3DMode = !is3DMode;
-  document.body.classList.toggle('three-d-mode');
+  const button = document.querySelector('#top-bar button[onclick="toggle3DMode()"]') || document.querySelector('#control-panel button[onclick="toggle3DMode()"]');
+  if (button) {
+    button.textContent = is3DMode ? 'Switch to 2D' : 'Switch to 3D';
+  }
+  document.body.classList.toggle('three-d-mode', is3DMode);
   if (is3DMode) {
-    document.getElementById('map').style.display = 'none';
-    document.getElementById('map-3d').style.display = 'block';
     map3D.resize();
-    update3DView();
+    syncPolygonsTo3D();
+    if (isDrawingEnabled) {
+      isDrawingEnabled = false;
+      const drawButton = document.querySelector('#top-bar button[onclick="toggleDrawing()"]') || document.querySelector('#control-panel button[onclick="toggleDrawing()"]');
+      if (drawButton) {
+        drawButton.textContent = 'Enable Drawing';
+      }
+      console.log('Drawing disabled when switching to 3D mode');
+    }
   } else {
-    document.getElementById('map').style.display = 'block';
-    document.getElementById('map-3d').style.display = 'none';
-    map.invalidateSize();
+    map.getContainer().style.display = 'block';
+    map.getContainer().style.opacity = '1';
+    map.getContainer().style.height = 'auto';
+    map.getContainer().style.overflow = 'visible';
+    clear3DPolygons();
+    map3D.getContainer().style.opacity = '0';
   }
-  // Ensure legend position is correct
-  const legendDiv = document.querySelector('.legend');
-  if (isLegendVisible) {
-    legendDiv.style.display = 'block';
-    updateLegend();
-  }
+  updateLegend();
+  console.log('Toggled to', is3DMode ? '3D' : '2D', 'mode, synced polygons');
 }
 
   // Toggle drawing mode
@@ -2493,7 +2379,10 @@ function close3DDrawModal() {
       document.body.classList.toggle('dark-mode');
       const button = document.querySelector('#top-bar button[onclick="toggleDarkMode()"]');
       button.textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
-      
+      const mapStyleSelect = document.getElementById('map-style');
+      const newMapStyle = document.body.classList.contains('dark-mode') ? 'maptiler-dark' : 'mapbox';
+      mapStyleSelect.value = newMapStyle;
+      switchBaseMap(newMapStyle);
     }
 
 function toggleControls() {
@@ -3433,11 +3322,9 @@ function addLightningFlash3D(lng, lat) {
   }
 }
   
-   function toggleLegend() {
+    function toggleLegend() {
   isLegendVisible = !isLegendVisible;
-  const legendDiv = document.querySelector('.legend');
-  legendDiv.style.display = isLegendVisible ? 'block' : 'none';
-  updateLegend(); // Ensure legend content is updated when toggled
+  updateLegend(); // Update visibility based on new state
 }
 
     function applyFilter() {
