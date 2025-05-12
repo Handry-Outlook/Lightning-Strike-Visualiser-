@@ -3173,79 +3173,87 @@ function addLightningFlash3D(lng, lat) {
     }
 
     async function fetchData() {
-      const githubUrl = 'https://raw.githubusercontent.com/Handry-Outlook/lightning_data/main/lightning_data.json';
-      const metOfficeUrl = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning';
-      const metOfficeUrl2 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=135';
-      const metOfficeUrl3 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=136';
-      const metOfficeUrl4 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=137';
-      const metOfficeUrl5 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=138';
-      const metOfficeUrl6 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=139';
-      const metOfficeUrl7 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=137';
-      const metOfficeUrl8 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=137';
-      const metOfficeUrl9 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=137';
-      const metOfficeUrl10 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=137';
-      const metOfficeUrl11 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=137';
-      const metOfficeUrl12 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=137';
-      try {
-        const [githubResponse, metOfficeResponse, metOfficeResponse2,metOfficeResponse3,metOfficeResponse4] = await Promise.all([
-  fetch(githubUrl).then(res => res.json()).catch(() => null),
-  fetch(metOfficeUrl).then(res => res.json()).catch(() => null),
-  fetch(metOfficeUrl2).then(res => res.json()).catch(() => null),
-  fetch(metOfficeUrl4).then(res => res.json()).catch(() => null),
-  fetch(metOfficeUrl3).then(res => res.json()).catch(() => null)
-]);
+  const githubUrl = 'https://raw.githubusercontent.com/Handry6/lightning_data/refs/heads/main/lightning_data.json';
+  const metOfficeBaseUrl = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning';
 
-let githubStrikes = githubResponse?.lightning_strikes?.map(s => ({
-  ...s,
-  time: new Date(s.strike_time)
-})) || [];
-let metOfficeStrikes = metOfficeResponse?.lightning_strikes?.map(s => ({
-  ...s,
-  time: new Date(s.strike_time)
-})) || [];
-let metOfficeStrikes3 = metOfficeResponse3?.lightning_strikes?.map(s => ({
-  ...s,
-  time: new Date(s.strike_time)
-})) || [];
-let metOfficeStrikes2 = metOfficeResponse3?.lightning_strikes?.map(s => ({
-  ...s,
-  time: new Date(s.strike_time)
-})) || [];
-let metOfficeStrikes4 = metOfficeResponse3?.lightning_strikes?.map(s => ({
-  ...s,
-  time: new Date(s.strike_time)
-})) || [];
-
-        const allStrikes = [...githubStrikes, ...metOfficeStrikes,  ...metOfficeStrikes3,...metOfficeStrikes2, ...metOfficeStrikes4];
-        const seen = new Map();
-        strikeData = allStrikes.filter(s => {
-          const key = `${s.strike_time}_${s.coordinates[0]}_${s.coordinates[1]}`;
-          if (!seen.has(key)) {
-            seen.set(key, true);
-            return true;
-          }
-          return false;
-        });
-
-        
-        lastUpdateTime = new Date();
-        document.getElementById('last-update').innerText = `Last update: ${lastUpdateTime.toLocaleString()}`;
-        
-        if (lastFilterMode === 'slider') {
-    updateHistory(); // Calls updateNowcast()
-  } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
-    applyFilter(); // Calls updateNowcast()
-        }
-      } catch (error) {
-        console.error('Error fetching lightning data:', error);
-        strikeData = [];
-        if (lastFilterMode === 'slider') {
-          updateHistory();
-        } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
-          applyFilter();
-        }
-      }
+  try {
+    // Fetch the main Met Office URL to get chunks and strikes
+    const mainResponse = await fetch(metOfficeBaseUrl).then(res => res.json()).catch(() => null);
+    if (!mainResponse) {
+      console.error('Failed to fetch main Met Office URL');
+      throw new Error('No data from main Met Office URL');
     }
+
+    // Extract strikes from the base URL
+    const baseStrikes = mainResponse?.lightning_strikes?.map(s => ({
+      ...s,
+      time: new Date(s.strike_time)
+    })) || [];
+
+    // Extract chunks and generate chunk URLs
+    const chunkUrls = mainResponse?.chunks?.map(chunk =>
+      `${metOfficeBaseUrl}?last-minutes=1&chunk=${chunk.chunk}`
+    ) || [];
+    if (!mainResponse.chunks) {
+      console.warn('No chunks data found in main Met Office URL response');
+    }
+
+    // Fetch GitHub and all chunk URLs in parallel
+    const fetchPromises = [
+      fetch(githubUrl).then(res => res.json()).catch(() => null),
+      ...chunkUrls.map(url => fetch(url).then(res => res.json()).catch(() => null))
+    ];
+
+    const responses = await Promise.all(fetchPromises);
+
+    // Process GitHub strikes
+    const githubStrikes = responses[0]?.lightning_strikes?.map(s => ({
+      ...s,
+      time: new Date(s.strike_time)
+    })) || [];
+
+    // Combine strikes from all Met Office chunk responses (skip the first response, which is GitHub)
+    const chunkStrikes = responses.slice(1).flatMap(response =>
+      response?.lightning_strikes?.map(s => ({
+        ...s,
+        time: new Date(s.strike_time)
+      })) || []
+    );
+
+    // Combine all strikes (GitHub, base URL, and chunk URLs)
+    const allStrikes = [...githubStrikes, ...baseStrikes, ...chunkStrikes];
+
+    // Deduplicate strikes
+    const seen = new Map();
+    strikeData = allStrikes.filter(s => {
+      const key = `${s.strike_time}_${s.coordinates[0]}_${s.coordinates[1]}`;
+      if (!seen.has(key)) {
+        seen.set(key, true);
+        return true;
+      }
+      return false;
+    });
+
+    // Update last update time in the UI
+    lastUpdateTime = new Date();
+    document.getElementById('last-update').innerText = `Last update: ${lastUpdateTime.toLocaleString()}`;
+
+    // Apply filters based on the last filter mode
+    if (lastFilterMode === 'slider') {
+      updateHistory(); // Calls updateNowcast()
+    } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
+      applyFilter(); // Calls updateNowcast()
+    }
+  } catch (error) {
+    console.error('Error fetching lightning data:', error);
+    strikeData = [];
+    if (lastFilterMode === 'slider') {
+      updateHistory();
+    } else if (!(lastFilterMode === 'inputs' && customFilterStart && customFilterEnd)) {
+      applyFilter();
+    }
+  }
+}
 
     function getColorFromAge(ageFraction) {
   
