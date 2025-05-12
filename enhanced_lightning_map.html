@@ -3175,23 +3175,29 @@ function addLightningFlash3D(lng, lat) {
     async function fetchData() {
       const githubUrl = 'https://raw.githubusercontent.com/HandryOutlook/lightning_data/main/lightning_data.json';
       const metOfficeUrl = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning';
-
+      
+      const metOfficeUrl3 = 'https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning?last-minutes=1&chunk=135';
       try {
-        const [githubResponse, metOfficeResponse] = await Promise.all([
-          fetch(githubUrl).then(res => res.json()).catch(() => null),
-          fetch(metOfficeUrl).then(res => res.json()).catch(() => null)
-        ]);
+        const [githubResponse, metOfficeResponse, metOfficeResponse3] = await Promise.all([
+  fetch(githubUrl).then(res => res.json()).catch(() => null),
+  fetch(metOfficeUrl).then(res => res.json()).catch(() => null),
+  fetch(metOfficeUrl3).then(res => res.json()).catch(() => null)
+]);
 
-        let githubStrikes = githubResponse?.lightning_strikes?.map(s => ({
-          ...s,
-          time: new Date(s.strike_time)
-        })) || [];
-        let metOfficeStrikes = metOfficeResponse?.lightning_strikes?.map(s => ({
-          ...s,
-          time: new Date(s.strike_time)
-        })) || [];
+let githubStrikes = githubResponse?.lightning_strikes?.map(s => ({
+  ...s,
+  time: new Date(s.strike_time)
+})) || [];
+let metOfficeStrikes = metOfficeResponse?.lightning_strikes?.map(s => ({
+  ...s,
+  time: new Date(s.strike_time)
+})) || [];
+let metOfficeStrikes3 = metOfficeResponse3?.lightning_strikes?.map(s => ({
+  ...s,
+  time: new Date(s.strike_time)
+})) || [];
 
-        const allStrikes = [...githubStrikes, ...metOfficeStrikes];
+        const allStrikes = [...githubStrikes, ...metOfficeStrikes,  ...metOfficeStrikes3];
         const seen = new Map();
         strikeData = allStrikes.filter(s => {
           const key = `${s.strike_time}_${s.coordinates[0]}_${s.coordinates[1]}`;
