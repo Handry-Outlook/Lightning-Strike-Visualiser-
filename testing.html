@@ -1222,32 +1222,28 @@ async function getRadarImageUrl(timestamp) {
   }
 
   const date = new Date(timestamp);
-  // Stop fetching if timestamp is more than 6 days ago
-  const currentTime = new Date(); // Current time: 2025-05-31 23:52 BST
-  const sixDaysInMs = 6 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
-  if (currentTime - date > sixDaysInMs) {
-    console.log(`Radar fetch stopped: Timestamp ${date.toISOString()} is more than 6 days ago`);
-    return null;
-  }
-
   // Round to previous 5-minute interval
   date.setMinutes(Math.floor(date.getMinutes() / 5) * 5);
   date.setSeconds(0);
   date.setMilliseconds(0);
 
+  // Ensure the timestamp is within the last 6 days
+  const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+  const formatISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+
   // Try the rounded time and up to 12 previous 5-minute intervals (1 hour)
   let currentTime = new Date(date);
   let attempts = 0;
-  const maxAttempts = 12;
-  const formatISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
-  while (currentTime >= new Date(Date.now() - sixDaysInMs) && attempts < maxAttempts) {
+  const maxAttempts = 12; // Limit to 1 hour of retries
+  while (currentTime >= sixDaysAgo && attempts < maxAttempts) {
     const radarUrl = `https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${formatISO(currentTime)}.png`;
-    console.log(`Attempting to fetch radar image: ${radarUrl}`);
+    const proxiedUrl = `${CORS_PROXY}${radarUrl}`;
+    console.log(`Attempting to fetch radar image: ${radarUrl}`); // Debug API URL
     try {
       const response = await fetch(radarUrl, { method: 'HEAD', cache: 'no-store' });
       if (response.ok) {
         console.log(`Successfully found radar image: ${radarUrl}`);
-        return radarUrl;
+        return radarUrl; // Return original URL for image overlay
       } else {
         console.warn(`Error ${response.status} for radar image at ${formatISO(currentTime)}`);
         currentTime.setMinutes(currentTime.getMinutes() - 5);
