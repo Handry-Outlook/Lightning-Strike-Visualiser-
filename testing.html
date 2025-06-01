@@ -1211,10 +1211,22 @@ legendControl.addTo(map);
   let editingLayerId = null;
    let radarLayer = null;
 let isFilterApplied = false;
-  const CORS_PROXY = 'https://api.cors.lol/?url='; // Replace with actual CORS proxy URL (e.g., https://cors-anywhere.herokuapp.com/)
-const currentTime = new Date(); // Current time: 2025-05-31 23:38 BST
-const sixDaysInMs = 6 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
   
+const currentTime = new Date(); // Current time: 2025-05-31 23:38 BST  
+// List of CORS proxy URLs to try
+
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://cors-anywhere.herokuapp.com/',
+   'https://proxy.cors.sh/',
+   'https://api.cors.lol/?url=',
+   'https://api.allorigins.win/raw?url=',
+
+  // Add more proxies here if available
+];
+
+const sixDaysInMs = 6 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
+
 async function getRadarImageUrl(timestamp) {
   if (typeof timestamp !== 'number' || isNaN(timestamp)) {
     console.error(`Invalid timestamp passed to getRadarImageUrl: ${JSON.stringify(timestamp)}`);
@@ -1231,46 +1243,62 @@ async function getRadarImageUrl(timestamp) {
   const sixDaysAgo = new Date(Date.now() - sixDaysInMs);
   const formatISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-  // Try the rounded time and up to 12 previous 5-minute intervals (1 hour)
-  let currentTime = new Date(date);
-  let attempts = 0;
-  const maxAttempts = 12; // Limit to 1 hour of retries
-  while (currentTime >= sixDaysAgo && attempts < maxAttempts) {
-    const radarUrl = `https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${formatISO(currentTime)}.png`;
-    console.log(`Attempting to fetch radar image: ${radarUrl}`); // Debug API URL
-    try {
-      const response = await fetch(radarUrl, {
-        method: 'GET', // Switch to GET to test image retrieval
-        cache: 'no-store',
-        headers: {
-          'Referer': 'https://weather.metoffice.gov.uk/',
-          'Origin': 'https://weather.metoffice.gov.uk', // Add Origin to mimic their domain
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0',
-          'Accept': 'image/png,image/*;q=0.8,*/*;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br, zstd',
-          'Accept-Language': 'en-GB,en;q=0.9'
+  let totalAttempts = 0;
+  const maxTotalAttempts = 12; // Limit to 1 hour of retries
+  const attemptsPerProxy = 3; // 3 attempts per proxy
+
+  // Iterate through each proxy
+  for (let proxyIndex = 0; proxyIndex < CORS_PROXIES.length; proxyIndex++) {
+    const proxy = CORS_PROXIES[proxyIndex];
+    // Reset to the initial timestamp for each proxy
+    let currentTime = new Date(date);
+    let proxyAttempts = 0;
+
+    // Try up to 3 timestamps with the current proxy
+    while (
+      currentTime >= sixDaysAgo &&
+      proxyAttempts < attemptsPerProxy &&
+      totalAttempts < maxTotalAttempts
+    ) {
+      const radarUrl = `https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${formatISO(currentTime)}.png`;
+      console.log(`Attempt ${totalAttempts + 1}/${maxTotalAttempts}: Trying proxy ${proxy} for ${radarUrl}`);
+
+      // Handle URL encoding for proxies that require it
+      const proxiedUrl = proxy.includes('?') ? `${proxy}${encodeURIComponent(radarUrl)}` : `${proxy}${radarUrl}`;
+
+      let timeoutId = null; // Initialize timeoutId
+      try {
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 5000); // Assign timeoutId
+        const response = await fetch(proxiedUrl, { method: 'HEAD', cache: 'no-store', signal: controller.signal });
+        clearTimeout(timeoutId); // Clear timeout if fetch succeeds
+        timeoutId = null; // Reset to avoid double-clearing
+
+        if (response.ok) {
+          console.log(`Successfully found radar image via proxy ${proxy}: ${radarUrl}`);
+          return radarUrl; // Return original URL for image overlay
+        } else {
+          console.warn(`Error ${response.status} for radar image at ${formatISO(currentTime)} with proxy ${proxy}`);
         }
-      });
-      if (response.ok) {
-        console.log(`Successfully found radar image: ${radarUrl}`);
-        return radarUrl; // Return original URL for image overlay
-      } else {
-        console.warn(`Error ${response.status} for radar image at ${formatISO(currentTime)}: ${response.statusText}`);
-        currentTime.setMinutes(currentTime.getMinutes() - 5);
-        attempts++;
-        continue;
+      } catch (e) {
+        if (timeoutId !== null) {
+          clearTimeout(timeoutId); // Clear only if timeoutId was assigned
+        }
+        console.warn(`Fetch error for radar image at ${formatISO(currentTime)} with proxy ${proxy}: ${e.message}`);
       }
-    } catch (e) {
-      console.warn(`Fetch error for radar image at ${formatISO(currentTime)}: ${e.message}`);
+
+      // Move to previous 5-minute interval
       currentTime.setMinutes(currentTime.getMinutes() - 5);
-      attempts++;
-      continue;
+      proxyAttempts++;
+      totalAttempts++;
     }
+
+    console.warn(`Proxy ${proxy} failed after ${proxyAttempts} attempts. Moving to next proxy.`);
   }
-  console.error(` No valid radar image found within 6-day limit after ${attempts} attempts`);
+
+  console.error(`No valid radar image found within 6-day limit after ${totalAttempts} attempts across all proxies`);
   return null;
 }
-
 async function updateRadarLayer(timestamp) {
   if (!map || !document.getElementById('radarLayer')?.checked) {
     if (radarLayer) {
