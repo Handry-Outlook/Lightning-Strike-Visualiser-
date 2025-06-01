@@ -1228,7 +1228,7 @@ async function getRadarImageUrl(timestamp) {
   date.setMilliseconds(0);
 
   // Ensure the timestamp is within the last 6 days
-  const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+  const sixDaysAgo = new Date(Date.now() - sixDaysInMs);
   const formatISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 
   // Try the rounded time and up to 12 previous 5-minute intervals (1 hour)
@@ -1237,15 +1237,25 @@ async function getRadarImageUrl(timestamp) {
   const maxAttempts = 12; // Limit to 1 hour of retries
   while (currentTime >= sixDaysAgo && attempts < maxAttempts) {
     const radarUrl = `https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${formatISO(currentTime)}.png`;
-    const proxiedUrl = `${CORS_PROXY}${radarUrl}`;
     console.log(`Attempting to fetch radar image: ${radarUrl}`); // Debug API URL
     try {
-      const response = await fetch(proxiedUrl, { method: 'HEAD', cache: 'no-store' });
+      const response = await fetch(radarUrl, {
+        method: 'GET', // Switch to GET to test image retrieval
+        cache: 'no-store',
+        headers: {
+          'Referer': 'https://weather.metoffice.gov.uk/',
+          'Origin': 'https://weather.metoffice.gov.uk', // Add Origin to mimic their domain
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0',
+          'Accept': 'image/png,image/*;q=0.8,*/*;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          'Accept-Language': 'en-GB,en;q=0.9'
+        }
+      });
       if (response.ok) {
         console.log(`Successfully found radar image: ${radarUrl}`);
         return radarUrl; // Return original URL for image overlay
       } else {
-        console.warn(`Error ${response.status} for radar image at ${formatISO(currentTime)}`);
+        console.warn(`Error ${response.status} for radar image at ${formatISO(currentTime)}: ${response.statusText}`);
         currentTime.setMinutes(currentTime.getMinutes() - 5);
         attempts++;
         continue;
@@ -1257,7 +1267,7 @@ async function getRadarImageUrl(timestamp) {
       continue;
     }
   }
-  console.error(`No valid radar image found within 6-day limit after ${attempts} attempts`);
+  console.error(` No valid radar image found within 6-day limit after ${attempts} attempts`);
   return null;
 }
 
