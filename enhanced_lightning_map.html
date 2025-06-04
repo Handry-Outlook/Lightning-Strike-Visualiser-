@@ -141,14 +141,14 @@
     @media (min-width: 769px) {
       .logo {
         position: absolute;
-        bottom: 20px;
+        top: 70px;
         right: 8px;
       }
     }
     @media (max-width: 768px) {
       .logo {
         position: absolute;
-        top: 60px;
+        top: 70px;
         left: 10px;
       }
     }
@@ -330,8 +330,8 @@ body.dark-mode .control-panel input[type="range"]::-moz-range-thumb {
       }
       #settings-button {
         position: fixed;
-        bottom: 145px;
-        right: 50px;
+        top: 80px;
+        right: 30px;
         background: #3b82f6;
         color: white;
         border: none;
@@ -923,11 +923,6 @@ body.three-d-mode #map-3d {
     </div>
     <div class="section">
       <h4>Layers</h4>
-      <label>Color by Age: <input type="checkbox" id="color-mode" checked onchange="updateStrikeColors()"><span class="tooltip">Color strikes by age</span></label>
-      <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"><span class="tooltip">Show lightning strikes</span></label>
-      <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"><span class="tooltip">Show 2D heatmap</span></label>
-      <label id="heatmap-3d-toggle-label">3D Heatmap: <input type="checkbox" id="heatmap-3d-toggle" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Show 3D heatmap in 3D mode</span></label>
-      <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
         <option value="mapbox" selected>Mapbox (Handry Outlook)</option>
         <option value="custom">Mapbox Classic</option>
@@ -939,12 +934,22 @@ body.three-d-mode #map-3d {
         <option value="maptiler-dark">MapTiler Dark</option>
         <option value="maptiler-light">MapTiler Light</option>
       </select><span class="tooltip">Choose map background</span></label>
-      <label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"><span class="tooltip">Switch to 3D view</span></label>
-      <label id="terrain-exaggeration-slider-label" class="hidden">Terrain Exaggeration: <input type="range" id="terrain-exaggeration-slider" min="0" max="20" value="12" onchange="updateTerrainExaggeration()"><span class="tooltip">Adjust terrain height in 3D mode</span></label>
+      <label>Color by Age: <input type="checkbox" id="color-mode" checked onchange="updateStrikeColors()"><span class="tooltip">Color strikes by age</span></label>
+      <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"><span class="tooltip">Show lightning strikes</span></label>
+      <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"><span class="tooltip">Show 2D heatmap</span></label>
+      <!--<label id="heatmap-3d-toggle-label">3D Heatmap: <input type="checkbox" id="heatmap-3d-toggle" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Show 3D heatmap in 3D mode</span></label>-->
+      <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
+      <label>Radar Layer: <input type="checkbox" id="radarLayer" checked><span class="tooltip">Show rainfall radar</span></label>
+
+      <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="0.8"></label>      
+
+      
+      <!--<label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"><span class="tooltip">Switch to 3D view</span></label>-->
+      <!--<label id="terrain-exaggeration-slider-label" class="hidden">Terrain Exaggeration: <input type="range" id="terrain-exaggeration-slider" min="0" max="20" value="12" onchange="updateTerrainExaggeration()"><span class="tooltip">Adjust terrain height in 3D mode</span></label>-->
       <label>Number Resolution: <input type="range" id="density-slider" min="1" max="100" value="50" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Adjust overlay grid size</span></label>
       <label>Heatmap Blur: <input type="range" id="blur-slider" min="1" max="50" value="30" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Adjust heatmap spread</span></label>
-      <label id="heatmap-frequency-slider-label">3D Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">3D heatmap detail</span></label>
-      <label id="heatmap-height-slider-label">3D Tower Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">3D heatmap height</span></label>
+      <!--<label id="heatmap-frequency-slider-label">3D Resolution: <input type="range" id="heatmap-frequency-slider" min="10" max="1500" value="300" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">3D heatmap detail</span></label>-->
+      <!--<label id="heatmap-height-slider-label">3D Tower Height: <input type="range" id="heatmap-height-slider" min="1000" max="50000" value="10000" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">3D heatmap height</span></label>-->
     </div>
     <div class="section">
       <h4>Automation</h4>
@@ -995,7 +1000,7 @@ body.three-d-mode #map-3d {
     <div class="animator">
       <button onclick="playAnimation()">▶️ Play</button>
       <button onclick="stopAnimation()">⏹️ Stop</button>
-      <label>Speed: <input type="range" id="speed-slider" min="1" max="100" step="1" value="50" oninput="updateSpeedTextbox()"></label>
+      <label>Speed: <input type="range" id="speed-slider" min="1" max="100" step="1" value="5" oninput="updateSpeedTextbox()"></label>
       <label>Min/Sec: <input type="number" id="playback-minutes" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
     </div>
     <p id="time-range" class="status-info"></p>
@@ -1204,6 +1209,375 @@ legendControl.addTo(map);
   let drawnItems3D = [];
   let isDrawingEnabled = false;
   let editingLayerId = null;
+   let radarLayer = null;
+let isFilterApplied = false;
+  
+const currentTime = new Date(); // Current time: 2025-05-31 23:38 BST  
+// List of CORS proxy URLs to try
+
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://cors-anywhere.herokuapp.com/',
+   'https://proxy.cors.sh/',
+   'https://api.cors.lol/?url=',
+   'https://api.allorigins.win/raw?url=',
+
+  // Add more proxies here if available
+];
+
+
+const sixDaysInMs = 6 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
+
+async function getRadarImageUrl(timestamp) {
+  if (typeof timestamp !== 'number' || isNaN(timestamp)) {
+    console.error(`Invalid timestamp passed to getRadarImageUrl: ${JSON.stringify(timestamp)}`);
+    return null;
+  }
+
+  const date = new Date(timestamp);
+  // Round to previous 5-minute interval
+  date.setMinutes(Math.floor(date.getMinutes() / 5) * 5);
+  date.setSeconds(0);
+  date.setMilliseconds(0);
+
+  // Ensure the timestamp is within the last 6 days
+  const sixDaysAgo = new Date(Date.now() - sixDaysInMs);
+  const formatISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  let currentTime = new Date(date);
+  const maxAttempts = 4; // Limit to 1 hour of retries (12 * 5 minutes)
+
+  // Try up to 12 timestamps (1 hour) within the 6-day limit
+  for (let attempt = 0; attempt < maxAttempts && currentTime >= sixDaysAgo; attempt++) {
+    const radarUrl = `https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${formatISO(currentTime)}.png`;
+    console.log(`Attempt ${attempt + 1}/${maxAttempts}: Testing ${new Date(timestamp).toISOString()}`);
+
+    // Test if the image can be loaded using an <img> tag
+    const img = new Image();
+    img.src = radarUrl;
+
+    // Wait for the image to load or fail
+    const isValid = await new Promise((resolve) => {
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      // Set a timeout to prevent hanging if the server doesn't respond
+      setTimeout(() => resolve(false), 5000);
+    });
+
+    if (isValid) {
+      console.log(`Valid radar image found: ${new Date(timestamp).toISOString()}`);
+      return radarUrl; // Return the URL for use in the image overlay
+    } else {
+      console.warn(`Image failed to load: ${new Date(timestamp).toISOString()}`);
+    }
+
+    // Move to previous 5-minute interval
+    currentTime.setMinutes(currentTime.getMinutes() - 5);
+  }
+
+  console.error(`No valid radar image found within 6-day limit after ${maxAttempts} attempts`);
+  return null;
+}
+
+async function updateRadarLayer(timestamp) {
+  if (!map || !document.getElementById('radarLayer')?.checked) {
+    if (radarLayer) {
+      map.removeLayer(radarLayer);
+      radarLayer = null;
+    }
+    return;
+  }
+
+  if (typeof timestamp !== 'number' || isNaN(timestamp)) {
+    console.error(`Invalid timestamp in updateRadarLayer: ${JSON.stringify(timestamp)}`);
+    return;
+  }
+
+  // Check if timestamp is more than 6 days ago
+  if (Date.now() - timestamp > sixDaysInMs) {
+    console.log(`Radar layer not updated: Timestamp ${new Date(timestamp).toISOString()} is more than 6 days ago`);
+    if (radarLayer) {
+      map.removeLayer(radarLayer);
+      radarLayer = null;
+    }
+    return;
+  }
+
+  const radarUrl = await getRadarImageUrl(timestamp);
+  console.log(`Updating radar for timestamp: ${new Date(timestamp).toISOString()}`);
+  if (!radarUrl) {
+    console.warn('No valid radar image found for the selected time');
+    if (radarLayer) {
+      map.removeLayer(radarLayer);
+      radarLayer = null;
+    }
+    return;
+  }
+
+  // UK bounds for radar overlay
+  const bounds = [[44.02, -25], [64, 16]]; // [latMin, lonMin], [latMax, lonMax]
+
+  // Remove existing radar layer to ensure refresh
+  if (radarLayer) {
+    map.removeLayer(radarLayer);
+    radarLayer = null;
+  }
+
+  // Create new radar layer
+  radarLayer = L.imageOverlay(radarUrl, bounds, {
+    opacity: parseFloat(document.getElementById('radarOpacity')?.value || 0.8),
+    zIndex: 100 // Ensure radar is above base map but below lightning
+  }).addTo(map);
+}
+function handleTimeSliderChange(event) {
+  const historySlider = document.getElementById('history-slider');
+  if (!historySlider) {
+    console.error('history-slider element not found');
+    return;
+  }
+
+  console.log('Slider changed, processing handleTimeSliderChange at', new Date().toISOString());
+
+  const rawValue = historySlider.value;
+  console.log(`Before parsing - Raw slider value: ${rawValue}`);
+
+  // Get slider attributes
+  const sliderMin = parseInt(historySlider.getAttribute('min') || 0, 10);
+  const sliderMax = parseInt(historySlider.getAttribute('max') || 100, 10);
+  const sliderValue = parseFloat(rawValue);
+
+  if (isNaN(sliderValue) || sliderValue < sliderMin || sliderValue > sliderMax) {
+    console.error(`Invalid slider value: ${rawValue}, must be between ${sliderMin} and ${sliderMax}`);
+    return;
+  }
+
+  let timestamp;
+  if (isFilterApplied && customFilterStart && customFilterEnd && !isNaN(customFilterStart) && !isNaN(customFilterEnd)) {
+    // Map slider value to filter range (0 = start, max = end)
+    const timeRangeMs = customFilterEnd.getTime() - customFilterStart.getTime();
+    const normalizedValue = sliderValue / sliderMax; // 0 to 1
+    timestamp = customFilterStart.getTime() + normalizedValue * timeRangeMs;
+  } else {
+    // Default: Map slider to maxHistoryHours to now
+    const maxHistoryHours = parseFloat(document.getElementById('maxHistory')?.value || 48);
+    const maxHistoryMs = maxHistoryHours * 60 * 60 * 1000;
+    const normalizedValue = (sliderMax - sliderValue) / sliderMax; // Invert: 0 = now, max = oldest
+    timestamp = currentTime.getTime() - normalizedValue * maxHistoryMs;
+  }
+
+  console.log(`After parsing - Parsed timestamp: ${new Date(timestamp).toISOString()} (milliseconds: ${timestamp})`);
+
+  // Update UI with current time
+  document.getElementById('history-time').innerText = isFilterApplied
+    ? `${customFilterStart.toLocaleString()} - ${new Date(timestamp).toLocaleString()}`
+    : `${new Date(timestamp).toLocaleString()}`;
+
+  // Update layers
+  console.log('Updating map layers');
+  const radarLayerCheckbox = document.getElementById('radarLayer');
+  if (radarLayerCheckbox) {
+    console.log(`Radar layer checkbox found, checked: ${radarLayerCheckbox.checked}`);
+    if (radarLayerCheckbox.checked) {
+      console.log('Radar layer is enabled, calling updateRadarLayer');
+      try {
+        updateRadarLayer(timestamp);
+        console.log('Radar layer updated successfully');
+      } catch (error) {
+        console.error('Error in updateRadarLayer:', error);
+      }
+    } else {
+      console.log('Radar layer is not checked, skipping updateRadarLayer');
+      if (radarLayer) {
+        map.removeLayer(radarLayer);
+        radarLayer = null;
+      }
+    }
+  } else {
+    console.error('Radar layer checkbox (radarLayer) not found in DOM');
+  }
+}// Event listener for slider
+document.addEventListener('DOMContentLoaded', () => {
+  const timeSlider = document.getElementById('history-slider');
+  if (timeSlider) {
+    timeSlider.addEventListener('input', handleTimeSliderChange);
+  } else {
+    console.error('Failed to attach event listener: history-slider not found');
+  }
+
+  // Attach radar opacity slider listener for real-time updates
+  const radarOpacitySlider = document.getElementById('radarOpacity');
+  if (radarOpacitySlider) {
+    radarOpacitySlider.addEventListener('input', radarOpacityHandler);
+    console.log('Radar opacity slider listener attached');
+  } else {
+    console.error('Radar opacity slider (radarOpacity) not found in DOM');
+  }
+
+  // Initial radar update if enabled
+  if (document.getElementById('radarLayer')?.checked) {
+    let timestamp;
+    if (timeSlider) {
+      const rawValue = timeSlider.value;
+      console.log(`Initial - Raw slider value: ${rawValue}`);
+      if (rawValue.includes('T')) {
+        timestamp = new Date(rawValue).getTime();
+      } else if (/^\d+$/.test(rawValue)) {
+        timestamp = parseInt(rawValue, 10);
+      } else if (/^\d{2}:\d{2}$/.test(rawValue)) {
+        const [hours, minutes] = rawValue.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0, 0);
+        timestamp = date.getTime();
+      } else if (rawValue.includes('-')) {
+        timestamp = new Date(rawValue.replace(' ', 'T') + ':00.000Z').getTime();
+      } else {
+        timestamp = Date.now();
+        console.warn(`Initial - Invalid slider value, using current time: ${rawValue}`);
+      }
+      console.log(`Initial - Parsed timestamp: ${timestamp ? new Date(timestamp).toISOString() : 'invalid'}`);
+    } else {
+      timestamp = Date.now();
+      console.warn('Initial - No timeSlider, using current time');
+    }
+    if (!isNaN(timestamp)) {
+      updateRadarLayer(timestamp);
+    }
+  }
+});
+
+// Preserve other handlers (unchanged)
+function radarOpacityHandler() {
+  if (radarLayer) {
+    radarLayer.setOpacity(parseFloat(document.getElementById('radarOpacity')?.value || 0.8));
+  }
+}
+
+const radarLayerCheckbox = document.getElementById('radarLayer');
+if (radarLayerCheckbox) {
+  radarLayerCheckbox.removeEventListener('change', radarLayerHandler);
+  radarLayerCheckbox.addEventListener('change', radarLayerHandler);
+}
+
+function radarLayerHandler() {
+  const timeSlider = document.getElementById('timeSlider');
+  let timestamp;
+  if (timeSlider) {
+    const rawValue = timeSlider.value;
+    console.log(`radarLayerHandler - Raw slider value: ${rawValue}`);
+    if (rawValue.includes('T')) {
+      timestamp = new Date(rawValue).getTime();
+    } else if (/^\d+$/.test(rawValue)) {
+      timestamp = parseInt(rawValue, 10);
+    } else if (/^\d{2}:\d{2}$/.test(rawValue)) {
+      const [hours, minutes] = rawValue.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes, 0, 0);
+      timestamp = date.getTime();
+    } else if (rawValue.includes('-')) {
+      timestamp = new Date(rawValue.replace(' ', 'T') + ':00.000Z').getTime();
+    } else {
+      timestamp = Date.now();
+      console.warn(`radarLayerHandler - Invalid slider value, using current time: ${rawValue}`);
+    }
+    console.log(`radarLayerHandler - Parsed timestamp: ${timestamp ? new Date(timestamp).toISOString() : 'invalid'}`);
+  } else {
+    timestamp = Date.now();
+    console.warn('radarLayerHandler - No timeSlider, using current time');
+  }
+  if (!isNaN(timestamp)) {
+    updateRadarLayer(timestamp);
+  } else {
+    console.error(`Invalid timestamp in radarLayerHandler: ${timeSlider?.value}`);
+  }
+}
+
+function handleAutoRefresh() {
+  if (document.getElementById('autoRefresh')?.value !== 'Off') {
+    const timeSlider = document.getElementById('timeSlider');
+    const autoSetLatest = document.getElementById('autoSetLatest')?.checked || false;
+    let timestamp;
+    if (autoSetLatest) {
+      timestamp = Date.now();
+      console.log(`Auto-refresh - Using current time: ${new Date(timestamp).toISOString()}`);
+    } else if (timeSlider) {
+      const rawValue = timeSlider.value;
+      console.log(`Auto-refresh - Raw slider value: ${rawValue}`);
+      if (rawValue.includes('T')) {
+        timestamp = new Date(rawValue).getTime();
+      } else if (/^\d+$/.test(rawValue)) {
+        timestamp = parseInt(rawValue, 10);
+      } else if (/^\d{2}:\d{2}$/.test(rawValue)) {
+        const [hours, minutes] = rawValue.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0, 0);
+        timestamp = date.getTime();
+      } else if (rawValue.includes('-')) {
+        timestamp = new Date(rawValue.replace(' ', 'T') + ':00.000Z').getTime();
+      } else {
+        timestamp = Date.now();
+        console.warn(`Auto-refresh - Invalid slider value, using current time: ${rawValue}`);
+      }
+      console.log(`Auto-refresh - Parsed timestamp: ${timestamp ? new Date(timestamp).toISOString() : 'invalid'}`);
+    } else {
+      timestamp = Date.now();
+      console.warn('Auto-refresh - No timeSlider, using current time');
+    }
+    if (!isNaN(timestamp)) {
+      updateRadarLayer(timestamp);
+      updateLightningLayer(timestamp);
+    }
+  }
+}
+
+const autoSetLatestCheckbox = document.getElementById('autoSetLatest');
+if (autoSetLatestCheckbox) {
+  autoSetLatestCheckbox.removeEventListener('change', autoSetLatestHandler);
+  autoSetLatestCheckbox.addEventListener('change', autoSetLatestHandler);
+}
+
+function autoSetLatestHandler() {
+  const timeSlider = document.getElementById('timeSlider');
+  const autoSetLatest = document.getElementById('autoSetLatest')?.checked || false;
+  let timestamp;
+  if (autoSetLatest) {
+    timestamp = Date.now();
+    console.log(`autoSetLatestHandler - Using current time: ${new Date(timestamp).toISOString()}`);
+  } else if (timeSlider) {
+    const rawValue = timeSlider.value;
+    console.log(`autoSetLatestHandler - Raw slider value: ${rawValue}`);
+    if (rawValue.includes('T')) {
+      timestamp = new Date(rawValue).getTime();
+    } else if (/^\d+$/.test(rawValue)) {
+      timestamp = parseInt(rawValue, 10);
+    } else if (/^\d{2}:\d{2}$/.test(rawValue)) {
+      const [hours, minutes] = rawValue.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes, 0, 0);
+      timestamp = date.getTime();
+    } else if (rawValue.includes('-')) {
+      timestamp = new Date(rawValue.replace(' ', 'T') + ':00.000Z').getTime();
+    } else {
+      timestamp = Date.now();
+      console.warn(`autoSetLatestHandler - Invalid slider value, using current time: ${rawValue}`);
+    }
+    console.log(`autoSetLatestHandler - Parsed timestamp: ${timestamp ? new Date(timestamp).toISOString() : 'invalid'}`);
+  } else {
+    timestamp = Date.now();
+    console.warn('autoSetLatestHandler - No timeSlider, using current time');
+  }
+  if (!isNaN(timestamp)) {
+    updateRadarLayer(timestamp);
+    updateLightningLayer(timestamp);
+  }
+}
+
+
+
+
+
+
+
+
+
   // Function to move legend between 2D and 3D map containers
 function updateLegendContainer() {
   const legendElement = document.querySelector('.legend');
@@ -3074,6 +3448,8 @@ function addLightningFlash3D(lng, lat) {
       updateNowcast(currentFiltered);
       updateZIndex();
       updateLegend();
+      updateRadarLayer(end.getTime());
+
       if (is3DMode) update3DView();
 
       setTimeout(() => { isAdjustingHistory = false; }, 1000);
@@ -3361,88 +3737,77 @@ function addLightningFlash3D(lng, lat) {
 }
 
     function applyFilter() {
-      lastFilterMode = 'inputs';
-      let startInput = document.getElementById('start-time').value;
-      let endInput = document.getElementById('end-time').value;
-      const now = new Date();
+  isFilterApplied = true;
+  lastFilterMode = 'inputs';
+  const start = new Date(document.getElementById('start-time').value);
+  const end = new Date(document.getElementById('end-time').value);
+  if (isNaN(start) || isNaN(end)) {
+    console.error('Invalid date/time format.');
+    alert('Invalid date/time format.');
+    return;
+  }
 
-      if (!startInput) {
-        const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
-        startInput = new Date(now.getTime() - lifespanHours * 3600 * 1000).toISOString().slice(0, 16);
-        document.getElementById('start-time').value = startInput;
-      }
-      if (!endInput) {
-        endInput = now.toISOString().slice(0, 16);
-        document.getElementById('end-time').value = endInput;
-      }
+  customFilterStart = start;
+  customFilterEnd = end;
 
-      const start = new Date(startInput);
-      const end = new Date(endInput);
+  const totalMinutes = (end - start) / (60 * 1000);
+  const slider = document.getElementById('history-slider');
+  slider.max = Math.max(totalMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
+  slider.value = totalMinutes;
+  slider.min = 0;
 
-      if (isNaN(start) || isNaN(end)) {
-        console.error('Invalid date/time format.');
-        alert('Invalid date/time format.');
-        return;
-      }
+  strikeLayer.clearLayers();
+  strikeCircles = [];
+  const currentBounds = is3DMode ? map3D.getBounds() : map.getBounds();
+  const newStrikes = new Set();
 
-      customFilterStart = start;
-      customFilterEnd = end;
-
-      const totalMinutes = (end - start) / (60 * 1000);
-      const slider = document.getElementById('history-slider');
-      slider.max = Math.max(totalMinutes, parseFloat(document.getElementById('lightning-lifespan').value) * 60);
-      slider.value = totalMinutes;
-      slider.min = 0;
-
-      strikeLayer.clearLayers();
-      strikeCircles = [];
-      const currentBounds = is3DMode ? map3D.getBounds() : map.getBounds();
-      const newStrikes = new Set();
-
-      currentFiltered = strikeData.filter(s => {
-        if (showAllStrikes) {
-          return s.time >= new Date(end.getTime() - parseInt(document.getElementById('max-history-hours').value) * 3600 * 1000) && s.time <= end;
-        }
-        return s.time >= start && s.time <= end;
-      });
-
-      currentFiltered.forEach(s => {
-        const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
-        newStrikes.add(strikeKey);
-        const isNewStrike = !lastRenderedStrikes.has(strikeKey);
-        const inBounds = is3DMode ? 
-          currentBounds.contains([s.coordinates[0], s.coordinates[1]]) :
-          currentBounds.contains([s.coordinates[1], s.coordinates[0]]);
-        const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
-        const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
-        const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
-        const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
-          radius: 5,
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.8
-        }).bindPopup(s.time.toISOString());
-        strikeLayer.addLayer(circle);
-        strikeCircles.push({ circle, strike: s });
-        if (isNewStrike && inBounds && document.getElementById('lightning-layer-toggle').checked) {
-          playThunderSound();
-          if (!is3DMode) addLightningFlash2D(s.coordinates[1], s.coordinates[0]);
-        }
-      });
-
-      lastRenderedStrikes = newStrikes;
-
-      updateHeatmap(currentFiltered);
-      updateOverlay(currentFiltered);
-      updateNowcast(currentFiltered);
-      document.getElementById('time-range').innerText = `Filter applied: ${start.toLocaleString()} - ${end.toLocaleString()}`;
-      document.getElementById('history-label').innerText = formatTimeAgo(0);
-      document.getElementById('history-time').innerText = `${start.toLocaleString()} - ${end.toLocaleString()}`;
-      document.getElementById('remove-filter').style.display = 'block';
-      updateZIndex();
-      updateLegend();
-      if (is3DMode) update3DView();
+  currentFiltered = strikeData.filter(s => {
+    if (showAllStrikes) {
+      return s.time >= new Date(end.getTime() - parseInt(document.getElementById('max-history-hours').value) * 3600 * 1000) && s.time <= end;
     }
+    return s.time >= start && s.time <= end;
+  });
+
+  // Sort strikes by time (oldest first) to ensure newer strikes are plotted on top
+  currentFiltered.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+  currentFiltered.forEach(s => {
+    const strikeKey = `${s.time.toISOString()}_${s.coordinates[0]}_${s.coordinates[1]}`;
+    newStrikes.add(strikeKey);
+    const isNewStrike = !lastRenderedStrikes.has(strikeKey);
+    const inBounds = is3DMode ? 
+      currentBounds.contains([s.coordinates[0], s.coordinates[1]]) :
+      currentBounds.contains([s.coordinates[1], s.coordinates[0]]);
+    const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value);
+    const ageFraction = (end - s.time) / (lifespanHours * 3600 * 1000);
+    const color = document.getElementById('color-mode').checked ? getColorFromAge(ageFraction) : 'black';
+    const circle = L.circleMarker([s.coordinates[1], s.coordinates[0]], {
+      radius: 5,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.8
+    }).bindPopup(s.time.toISOString());
+    strikeLayer.addLayer(circle);
+    strikeCircles.push({ circle, strike: s });
+    if (isNewStrike && inBounds && document.getElementById('lightning-layer-toggle').checked) {
+      playThunderSound();
+      if (!is3DMode) addLightningFlash2D(s.coordinates[1], s.coordinates[0]);
+    }
+  });
+
+  lastRenderedStrikes = newStrikes;
+
+  updateHeatmap(currentFiltered);
+  updateOverlay(currentFiltered);
+  updateNowcast(currentFiltered);
+  document.getElementById('time-range').innerText = `Filter applied: ${start.toLocaleString()} - ${end.toLocaleString()}`;
+  document.getElementById('history-label').innerText = formatTimeAgo(0);
+  document.getElementById('history-time').innerText = `${start.toLocaleString()} - ${end.toLocaleString()}`;
+  document.getElementById('remove-filter').style.display = 'block';
+  updateZIndex();
+  updateLegend();
+  if (is3DMode) update3DView();
+}
 
     function updateStrikeColors() {
       const colorMode = document.getElementById('color-mode').checked;
@@ -4595,4 +4960,5 @@ function updateSpeedTextbox() {
     fetchData();
     setRefreshInterval();
   </script>
+<script>
 <script>
