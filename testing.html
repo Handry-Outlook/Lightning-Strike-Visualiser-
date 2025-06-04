@@ -1000,7 +1000,7 @@ body.three-d-mode #map-3d {
     <div class="animator">
       <button onclick="playAnimation()">▶️ Play</button>
       <button onclick="stopAnimation()">⏹️ Stop</button>
-      <label>Speed: <input type="range" id="speed-slider" min="1" max="100" step="1" value="50" oninput="updateSpeedTextbox()"></label>
+      <label>Speed: <input type="range" id="speed-slider" min="1" max="100" step="1" value="5" oninput="updateSpeedTextbox()"></label>
       <label>Min/Sec: <input type="number" id="playback-minutes" min="0.01" step="0.01" value="50" oninput="updateSpeedSlider()"></label>
     </div>
     <p id="time-range" class="status-info"></p>
@@ -1225,6 +1225,7 @@ const CORS_PROXIES = [
   // Add more proxies here if available
 ];
 
+
 const sixDaysInMs = 6 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
 
 async function getRadarImageUrl(timestamp) {
@@ -1242,63 +1243,41 @@ async function getRadarImageUrl(timestamp) {
   // Ensure the timestamp is within the last 6 days
   const sixDaysAgo = new Date(Date.now() - sixDaysInMs);
   const formatISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  let currentTime = new Date(date);
+  const maxAttempts = 4; // Limit to 1 hour of retries (12 * 5 minutes)
 
-  let totalAttempts = 0;
-  const maxTotalAttempts = 12; // Limit to 1 hour of retries
-  const attemptsPerProxy = 3; // 3 attempts per proxy
+  // Try up to 12 timestamps (1 hour) within the 6-day limit
+  for (let attempt = 0; attempt < maxAttempts && currentTime >= sixDaysAgo; attempt++) {
+    const radarUrl = `https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${formatISO(currentTime)}.png`;
+    console.log(`Attempt ${attempt + 1}/${maxAttempts}: Testing ${new Date(timestamp).toISOString()}`);
 
-  // Iterate through each proxy
-  for (let proxyIndex = 0; proxyIndex < CORS_PROXIES.length; proxyIndex++) {
-    const proxy = CORS_PROXIES[proxyIndex];
-    // Reset to the initial timestamp for each proxy
-    let currentTime = new Date(date);
-    let proxyAttempts = 0;
+    // Test if the image can be loaded using an <img> tag
+    const img = new Image();
+    img.src = radarUrl;
 
-    // Try up to 3 timestamps with the current proxy
-    while (
-      currentTime >= sixDaysAgo &&
-      proxyAttempts < attemptsPerProxy &&
-      totalAttempts < maxTotalAttempts
-    ) {
-      const radarUrl = `https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${formatISO(currentTime)}.png`;
-      console.log(`Attempt ${totalAttempts + 1}/${maxTotalAttempts}: Trying proxy ${proxy} for ${radarUrl}`);
+    // Wait for the image to load or fail
+    const isValid = await new Promise((resolve) => {
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      // Set a timeout to prevent hanging if the server doesn't respond
+      setTimeout(() => resolve(false), 5000);
+    });
 
-      // Handle URL encoding for proxies that require it
-      const proxiedUrl = proxy.includes('?') ? `${proxy}${encodeURIComponent(radarUrl)}` : `${proxy}${radarUrl}`;
-
-      let timeoutId = null; // Initialize timeoutId
-      try {
-        const controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), 5000); // Assign timeoutId
-        const response = await fetch(proxiedUrl, { method: 'HEAD', cache: 'no-store', signal: controller.signal });
-        clearTimeout(timeoutId); // Clear timeout if fetch succeeds
-        timeoutId = null; // Reset to avoid double-clearing
-
-        if (response.ok) {
-          console.log(`Successfully found radar image via proxy ${proxy}: ${radarUrl}`);
-          return radarUrl; // Return original URL for image overlay
-        } else {
-          console.warn(`Error ${response.status} for radar image at ${formatISO(currentTime)} with proxy ${proxy}`);
-        }
-      } catch (e) {
-        if (timeoutId !== null) {
-          clearTimeout(timeoutId); // Clear only if timeoutId was assigned
-        }
-        console.warn(`Fetch error for radar image at ${formatISO(currentTime)} with proxy ${proxy}: ${e.message}`);
-      }
-
-      // Move to previous 5-minute interval
-      currentTime.setMinutes(currentTime.getMinutes() - 5);
-      proxyAttempts++;
-      totalAttempts++;
+    if (isValid) {
+      console.log(`Valid radar image found: ${new Date(timestamp).toISOString()}`);
+      return radarUrl; // Return the URL for use in the image overlay
+    } else {
+      console.warn(`Image failed to load: ${new Date(timestamp).toISOString()}`);
     }
 
-    console.warn(`Proxy ${proxy} failed after ${proxyAttempts} attempts. Moving to next proxy.`);
+    // Move to previous 5-minute interval
+    currentTime.setMinutes(currentTime.getMinutes() - 5);
   }
 
-  console.error(`No valid radar image found within 6-day limit after ${totalAttempts} attempts across all proxies`);
+  console.error(`No valid radar image found within 6-day limit after ${maxAttempts} attempts`);
   return null;
 }
+
 async function updateRadarLayer(timestamp) {
   if (!map || !document.getElementById('radarLayer')?.checked) {
     if (radarLayer) {
@@ -1314,7 +1293,7 @@ async function updateRadarLayer(timestamp) {
   }
 
   // Check if timestamp is more than 6 days ago
-  if (currentTime - timestamp > sixDaysInMs) {
+  if (Date.now() - timestamp > sixDaysInMs) {
     console.log(`Radar layer not updated: Timestamp ${new Date(timestamp).toISOString()} is more than 6 days ago`);
     if (radarLayer) {
       map.removeLayer(radarLayer);
@@ -1324,7 +1303,7 @@ async function updateRadarLayer(timestamp) {
   }
 
   const radarUrl = await getRadarImageUrl(timestamp);
-  console.log(`Updating radar with URL: ${radarUrl} for timestamp: ${new Date(timestamp).toISOString()}`);
+  console.log(`Updating radar for timestamp: ${new Date(timestamp).toISOString()}`);
   if (!radarUrl) {
     console.warn('No valid radar image found for the selected time');
     if (radarLayer) {
