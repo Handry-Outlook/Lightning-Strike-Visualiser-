@@ -924,8 +924,7 @@ body.three-d-mode #map-3d {
     <div class="section">
       <h4>Layers</h4>
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
-        <option value="mapbox" selected>Mapbox (Handry Outlook)</option>
-        <option value="custom">Mapbox Classic</option>
+        
         <option value="osm">OpenStreetMap</option>
         <option value="opentopo">OpenTopoMap</option>
         <option value="esri">Esri World Imagery</option>
@@ -984,7 +983,7 @@ body.three-d-mode #map-3d {
         <label>PNG Layer: <input type="checkbox" id="png-layer-toggle" checked onchange="togglePNGLayer()"></label>
         <label>PNG File: <input type="file" id="png-file" accept=".png" onchange="importPNG(this)"></label>
         <label>PNG Opacity: <input type="range" id="png-opacity-slider" min="0" max="1" step="0.1" value="0.8" onchange="updatePNGOpacity()"></label>
-        <label>KML Z-Index: <input type="number" id="kml-zindex" value="1500" min="0" onchange="updateZIndex()"></label>
+        <label>KML Z-Index: <input type="number" id="kml-zindex" value="1" min="0" onchange="updateZIndex()"></label>
         <label>PNG Z-Index: <input type="number" id="png-zindex" value="1400" min="0" onchange="updateZIndex()"></label>
         <label>Lightning Z-Index: <input type="number" id="lightning-zindex" value="1000" min="0" onchange="updateZIndex()"></label>
         <label>Heatmap Z-Index: <input type="number" id="heatmap-zindex" value="70" min="0" onchange="updateZIndex()"></label>
@@ -1073,26 +1072,15 @@ body.three-d-mode #map-3d {
     let is3DMode = false;
     let map, map3D;
     let baseLayers = {
-      mapbox: L.tileLayer('https://api.mapbox.com/styles/v1/handry-outlook/cm9457ty1009d01sk37353ux2/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-        tileSize: 512,
-        zoomOffset: -1,
-        attribution: '© Mapbox © OpenStreetMap',
-        maxZoom: 18
-      }),
-      custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-        tileSize: 512,
-        zoomOffset: -1,
-        attribution: '© Mapbox © OpenStreetMap',
-        maxZoom: 18
+      opentopo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17,
+        attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
       }),
       osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
       }),
-      opentopo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-        maxZoom: 17,
-        attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
-      }),
+      
       esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19,
         attribution: 'Tiles © Esri'
@@ -1119,7 +1107,7 @@ body.three-d-mode #map-3d {
       })
     };
 
-    map = L.map('map', { layers: [baseLayers.mapbox], zoomControl: false }).setView([53.5, -4.5], 6);
+    map = L.map('map', { layers: [baseLayers.opentopo], zoomControl: false }).setView([53.5, -4.5], 6);
 
    map3D = new mapboxgl.Map({
   container: 'map-3d',
@@ -1226,7 +1214,7 @@ const CORS_PROXIES = [
 ];
 
 
-const sixDaysInMs = 6 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
+const sixDaysInMs = 7 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
 
 async function getRadarImageUrl(timestamp) {
   if (typeof timestamp !== 'number' || isNaN(timestamp)) {
@@ -1325,7 +1313,7 @@ async function updateRadarLayer(timestamp) {
   // Create new radar layer
   radarLayer = L.imageOverlay(radarUrl, bounds, {
     opacity: parseFloat(document.getElementById('radarOpacity')?.value || 0.8),
-    zIndex: 100 // Ensure radar is above base map but below lightning
+    zIndex: 150 // Ensure radar is above base map but below lightning
   }).addTo(map);
 }
 function handleTimeSliderChange(event) {
@@ -2754,7 +2742,7 @@ function close3DDrawModal() {
       const button = document.querySelector('#top-bar button[onclick="toggleDarkMode()"]');
       button.textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
       const mapStyleSelect = document.getElementById('map-style');
-      const newMapStyle = document.body.classList.contains('dark-mode') ? 'maptiler-dark' : 'mapbox';
+      const newMapStyle = document.body.classList.contains('dark-mode') ? 'maptiler-dark' : 'opentopo';
       mapStyleSelect.value = newMapStyle;
       switchBaseMap(newMapStyle);
     }
