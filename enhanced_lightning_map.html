@@ -12,12 +12,16 @@
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <style>
   .smooth-raster {
-  image-rendering: auto; /* Browser’s best scaling */
-  image-rendering: -webkit-optimize-contrast; /* Chrome/Safari */
-  image-rendering: crisp-edges; /* Firefox */
-  image-rendering: pixelated; /* Fallback for high-res images */
-  transform: translateZ(0); /* Force hardware acceleration */
-  will-change: transform; /* Hint to browser for optimization */
+  image-rendering: optimizeSpeed;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: pixelated;
+  transform: translateZ(0);
+  will-change: transform;
+  transition: opacity 0.05s ease;
+}
+
+.smooth-raster.no-transition {
+  transition: none;
 }
     .draw-toolbar {
     display: flex;
@@ -1265,12 +1269,17 @@ async function getRadarImageUrl(timestamp) {
   console.error(`No valid radar image found within 6-day limit after ${maxAttempts} attempts`);
   return null;
 }
-
+let radarLayerOld = null;
 async function updateRadarLayer(timestamp) {
   if (!map || !document.getElementById('radarLayer')?.checked) {
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
+      map.setMaxZoom(18);
+    }
+    if (radarLayerOld) {
+      map.removeLayer(radarLayerOld);
+      radarLayerOld = null;
     }
     return;
   }
@@ -1285,6 +1294,11 @@ async function updateRadarLayer(timestamp) {
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
+      map.setMaxZoom(18);
+    }
+    if (radarLayerOld) {
+      map.removeLayer(radarLayerOld);
+      radarLayerOld = null;
     }
     return;
   }
@@ -1293,42 +1307,41 @@ async function updateRadarLayer(timestamp) {
   console.log(`Updating radar for timestamp: ${new Date(timestamp).toISOString()}`);
   if (!radarUrl) {
     console.warn('No valid radar image found for the selected time');
-   Path: enhanced_lightning_map.html
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
+      map.setMaxZoom(18);
+    }
+    if (radarLayerOld) {
+      map.removeLayer(radarLayerOld);
+      radarLayerOld = null;
     }
     return;
   }
 
-  // Load image to get dimensions
-  const img = new Image();
-  img.crossOrigin = 'Anonymous';
-  img.src = radarUrl;
-
-  await new Promise((resolve) => {
-    img.onload = resolve;
-    img.onerror = () => {
-      console.warn('Failed to load radar image for bounds adjustment');
-      resolve();
-    };
-  });
-
-  let bounds = [[44.02, -25], [64, 16]]; // Default UK bounds
-  
-
-  if (radarLayer) {
-    map.removeLayer(radarLayer);
-    radarLayer = null;
-  }
-
-  radarLayer = L.imageOverlay(radarUrl, bounds, {
-    opacity: parseFloat(document.getElementById('radarOpacity')?.value || 0.8),
+  const newRadarLayer = L.imageOverlay(radarUrl, [[44.02, -25], [64, 16]], {
     zIndex: 150,
     className: 'smooth-raster'
-  }).addTo(map);
+  });
 
-  map.setMaxZoom(12); // Limit zoom to maintain clarity
+  newRadarLayer.on('load', () => {
+    if (radarLayer) {
+      map.removeLayer(radarLayer);
+    }
+    if (radarLayerOld) {
+      map.removeLayer(radarLayerOld);
+    }
+    radarLayerOld = radarLayer;
+    radarLayer = newRadarLayer;
+
+    const imgElement = radarLayer.getElement();
+    if (imgElement) {
+      imgElement.style.imageRendering = 'pixelated';
+    }
+  });
+
+  newRadarLayer.addTo(map);
+  map.setMaxZoom(12);
 }
 function handleTimeSliderChange(event) {
   const historySlider = document.getElementById('history-slider');
