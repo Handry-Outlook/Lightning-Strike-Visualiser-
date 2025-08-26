@@ -11,6 +11,14 @@
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <style>
+  .smooth-raster {
+  image-rendering: auto; /* Browser’s best scaling */
+  image-rendering: -webkit-optimize-contrast; /* Chrome/Safari */
+  image-rendering: crisp-edges; /* Firefox */
+  image-rendering: pixelated; /* Fallback for high-res images */
+  transform: translateZ(0); /* Force hardware acceleration */
+  will-change: transform; /* Hint to browser for optimization */
+}
     .draw-toolbar {
     display: flex;
     gap: 8px;
@@ -477,6 +485,7 @@ body.dark-mode .control-panel input[type="range"]::-moz-range-thumb {
       box-sizing: border-box;
       transition: background 0.3s ease, color 0.3s ease;
     }
+    
     body.dark-mode .time-slider-container {
       background: #2a2a2a;
       color: #e0e0e0;
@@ -1199,18 +1208,10 @@ legendControl.addTo(map);
    let radarLayer = null;
 let isFilterApplied = false;
   
-const currentTime = new Date(); // Current time: 2025-05-31 23:38 BST  
-// List of CORS proxy URLs to try
+const currentTime = new Date(); 
 
-const CORS_PROXIES = [
-  'https://corsproxy.io/?',
-  'https://cors-anywhere.herokuapp.com/',
-   'https://proxy.cors.sh/',
-   'https://api.cors.lol/?url=',
-   'https://api.allorigins.win/raw?url=',
 
-  // Add more proxies here if available
-];
+
 
 
 const sixDaysInMs = 7 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
@@ -1279,7 +1280,6 @@ async function updateRadarLayer(timestamp) {
     return;
   }
 
-  // Check if timestamp is more than 6 days ago
   if (Date.now() - timestamp > sixDaysInMs) {
     console.log(`Radar layer not updated: Timestamp ${new Date(timestamp).toISOString()} is more than 6 days ago`);
     if (radarLayer) {
@@ -1293,6 +1293,7 @@ async function updateRadarLayer(timestamp) {
   console.log(`Updating radar for timestamp: ${new Date(timestamp).toISOString()}`);
   if (!radarUrl) {
     console.warn('No valid radar image found for the selected time');
+   Path: enhanced_lightning_map.html
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
@@ -1300,20 +1301,34 @@ async function updateRadarLayer(timestamp) {
     return;
   }
 
-  // UK bounds for radar overlay
-  const bounds = [[44.02, -25], [64, 16]]; // [latMin, lonMin], [latMax, lonMax]
+  // Load image to get dimensions
+  const img = new Image();
+  img.crossOrigin = 'Anonymous';
+  img.src = radarUrl;
 
-  // Remove existing radar layer to ensure refresh
+  await new Promise((resolve) => {
+    img.onload = resolve;
+    img.onerror = () => {
+      console.warn('Failed to load radar image for bounds adjustment');
+      resolve();
+    };
+  });
+
+  let bounds = [[44.02, -25], [64, 16]]; // Default UK bounds
+  
+
   if (radarLayer) {
     map.removeLayer(radarLayer);
     radarLayer = null;
   }
 
-  // Create new radar layer
   radarLayer = L.imageOverlay(radarUrl, bounds, {
     opacity: parseFloat(document.getElementById('radarOpacity')?.value || 0.8),
-    zIndex: 150 // Ensure radar is above base map but below lightning
+    zIndex: 150,
+    className: 'smooth-raster'
   }).addTo(map);
+
+  map.setMaxZoom(12); // Limit zoom to maintain clarity
 }
 function handleTimeSliderChange(event) {
   const historySlider = document.getElementById('history-slider');
