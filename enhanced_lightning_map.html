@@ -1320,12 +1320,21 @@ async function updateRadarLayer(timestamp) {
     return;
   }
 
+  const initialOpacity = parseFloat(document.getElementById('radarOpacity')?.value || 0.8);
+
   const newRadarLayer = L.imageOverlay(radarUrl, [[44.02, -25], [64, 16]], {
+    opacity: initialOpacity,
     zIndex: 150,
     className: 'smooth-raster'
   });
 
   newRadarLayer.on('load', () => {
+    const imgElement = newRadarLayer.getElement();
+    if (imgElement) {
+      imgElement.style.imageRendering = 'pixelated';
+      imgElement.style.opacity = initialOpacity; // Force immediate opacity
+    }
+
     if (radarLayer) {
       map.removeLayer(radarLayer);
     }
@@ -1334,11 +1343,6 @@ async function updateRadarLayer(timestamp) {
     }
     radarLayerOld = radarLayer;
     radarLayer = newRadarLayer;
-
-    const imgElement = radarLayer.getElement();
-    if (imgElement) {
-      imgElement.style.imageRendering = 'pixelated';
-    }
   });
 
   newRadarLayer.addTo(map);
