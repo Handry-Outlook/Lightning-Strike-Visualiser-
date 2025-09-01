@@ -1207,9 +1207,7 @@ legendControl.addTo(map);
     let currentNowcasts = [];
     let minNowcastConfidence = 0.8;
     let userLocationMarker = null;
-    
-    const isPhoneUser = window.matchMedia("(max-width: 768px)").matches;
-    const isLegendVisible = !isPhoneUser; // false for phone users (≤768px), true for others (>768px)
+    let isLegendVisible = false;
     let lastDrawnRectangle = null; //
   let drawnItems = L.featureGroup().addTo(map);
   let drawControl;
