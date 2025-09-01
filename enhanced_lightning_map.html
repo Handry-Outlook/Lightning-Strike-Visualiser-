@@ -151,11 +151,12 @@
       pointer-events: none;
       z-index: 1001;
     }
+    
     @media (min-width: 769px) {
       .logo {
         position: absolute;
-        top: 70px;
-        right: 8px;
+        bottom: 20px;
+        right: 15px;
       }
     }
     @media (max-width: 768px) {
@@ -589,6 +590,7 @@ body.dark-mode .control-panel input[type="range"]::-moz-range-thumb {
   right: 10px; /* Ensure 10px margin */
   top: 10px;
 }
+   
 body.three-d-mode .legend {
   right: 10px; /* Ensure 10px margin */
   top: 10px;
@@ -900,7 +902,7 @@ body.three-d-mode #map-3d {
 
     <div>
       <button onclick="toggleDarkMode()">🌙 Dark Mode</button>
-      <button onclick="toggleLegend()">Legend</button>
+      <button onclick="toggleLegend()">Toggle Legend</button>
       <button onclick="showTutorial()">Help</button>
       <button onclick="showUserLocation()">📍</button>
       <button class="fullscreen-toggle" onclick="toggleFullScreen()">⛶</button>
@@ -933,7 +935,7 @@ body.three-d-mode #map-3d {
       <button id="remove-filter" onclick="removeTimeFilter()" style="display: none;">Remove Filter</button>
       <label>Auto Time Filter: <input type="checkbox" id="auto-time-filter" checked><span class="tooltip">Auto-adjust time based on uploaded files</span></label>
       <label>Lightning Lifespan: <input type="number" id="lightning-lifespan" value="3" min="0.1" step="0.1"> hours<span class="tooltip">Show strikes within this period</span></label>
-      <label>Max History: <input type="number" id="max-history-hours" value="48" min="1" step="1" onchange="updateHistorySliderMax()"> hours<span class="tooltip">Max hours back for slider</span></label>
+      <label>Slider's Max History: <input type="number" id="max-history-hours" value="6" min="1" step="1" onchange="updateHistorySliderMax()"> hours<span class="tooltip">Max hours back for slider</span></label>
     </div>
     <div class="section">
       <h4>Layers</h4>
@@ -953,7 +955,7 @@ body.three-d-mode #map-3d {
       <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
       <label>Radar Layer: <input type="checkbox" id="radarLayer" checked><span class="tooltip">Show rainfall radar</span></label>
 
-      <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="0.8"></label>      
+      <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="0.6"></label>      
 
       
       <!--<label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"><span class="tooltip">Switch to 3D view</span></label>-->
@@ -967,8 +969,10 @@ body.three-d-mode #map-3d {
       <h4>Automation</h4>
       <label>Auto-refresh: <select id="refresh-interval" onchange="setRefreshInterval()">
         <option value="0">Off</option>
+        <option value="0.0167">1 seconds (This might slow down your device)</option>
+        <option value="0.167" selected>10 seconds</option>
         <option value="0.5">30 seconds</option>
-        <option value="1" selected>1 minute</option>
+        <option value="1" >1 minute</option>
         <option value="5">5 minutes</option>
         <option value="10">10 minutes</option>
       </select><span class="tooltip">Set data refresh interval</span></label>
@@ -1007,7 +1011,7 @@ body.three-d-mode #map-3d {
   <div id="map"></div>
   <div id="map-3d"></div>
   <div class="time-slider-container">
-    <label><input type="range" id="history-slider" class="slider" min="0" max="2880" value="2880" oninput="updateHistory()"> <span id="history-label">Now</span></label>
+    <label><input type="range" id="history-slider" class="slider" min="0" max="360" value="360" oninput="updateHistory()"> <span id="history-label">Now</span></label>
     <p id="history-time"></p>
     <div class="animator">
       <button onclick="playAnimation()">▶️ Play</button>
@@ -1147,7 +1151,7 @@ map.invalidateSize(); // Ensure 2D map is sized correctly
 const logo = document.createElement('img');
 logo.src = 'https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png';
 logo.className = 'logo';
-logo.style.width = '80px';
+
 logo.style.pointerEvents = 'none';
 logo.style.zIndex = '1001'; // Ensure logo is above other elements
 document.body.appendChild(logo); // Append to body instead of map container
@@ -1159,6 +1163,7 @@ legendControl.onAdd = function (map) {
   const div = L.DomUtil.create('div', 'legend');
   div.innerHTML = '<h4>Legend</h4>';
   div.style.display = 'none'; // Initially hidden
+  
   return div;
 };
 legendControl.addTo(map);
@@ -1202,7 +1207,9 @@ legendControl.addTo(map);
     let currentNowcasts = [];
     let minNowcastConfidence = 0.8;
     let userLocationMarker = null;
-    let isLegendVisible = false; // Legend is initially disabled
+    
+    const isPhoneUser = window.matchMedia("(max-width: 768px)").matches;
+    const isLegendVisible = !isPhoneUser; // false for phone users (≤768px), true for others (>768px)
     let lastDrawnRectangle = null; //
   let drawnItems = L.featureGroup().addTo(map);
   let drawControl;
@@ -1348,6 +1355,7 @@ async function updateRadarLayer(timestamp) {
   newRadarLayer.addTo(map);
   map.setMaxZoom(12);
 }
+
 function handleTimeSliderChange(event) {
   const historySlider = document.getElementById('history-slider');
   if (!historySlider) {
@@ -1378,7 +1386,7 @@ function handleTimeSliderChange(event) {
     timestamp = customFilterStart.getTime() + normalizedValue * timeRangeMs;
   } else {
     // Default: Map slider to maxHistoryHours to now
-    const maxHistoryHours = parseFloat(document.getElementById('maxHistory')?.value || 48);
+    const maxHistoryHours = parseFloat(document.getElementById('maxHistory')?.value || 6);
     const maxHistoryMs = maxHistoryHours * 60 * 60 * 1000;
     const normalizedValue = (sliderMax - sliderValue) / sliderMax; // Invert: 0 = now, max = oldest
     timestamp = currentTime.getTime() - normalizedValue * maxHistoryMs;
@@ -2971,7 +2979,7 @@ function addLightningFlash3D(lng, lat) {
   const lifespanHours = parseFloat(document.getElementById('lightning-lifespan').value) || 3;
   const slider = document.getElementById('history-slider');
   let sliderValue = parseInt(slider.value);
-  const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+  const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 6) * 60;
 
   // Determine time range based on filter mode
   let startTime, endTime;
@@ -3353,7 +3361,7 @@ function addLightningFlash3D(lng, lat) {
 
     function updateHistorySliderMax() {
       if (lastFilterMode === 'slider') {
-        const maxHours = parseInt(document.getElementById('max-history-hours').value) || 48;
+        const maxHours = parseInt(document.getElementById('max-history-hours').value) || 6;
         document.getElementById('history-slider').max = maxHours * 60;
         document.getElementById('history-slider').value = maxHours * 60;
         updateHistory();
@@ -3403,7 +3411,7 @@ function addLightningFlash3D(lng, lat) {
         document.getElementById('history-label').innerText = formatTimeAgo(minutesBack);
         document.getElementById('history-time').innerText = `${start.toLocaleString()} - ${end.toLocaleString()}`;
       } else {
-        const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+        const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 6) * 60;
         sliderMax = maxMinutes;
         sliderValue = parseInt(slider.value) || maxMinutes;
         minutesBack = maxMinutes - sliderValue;
@@ -3499,7 +3507,7 @@ function addLightningFlash3D(lng, lat) {
         const start = new Date(now.getTime() - lifespanHours * 3600 * 1000);
         document.getElementById('start-time').value = start.toISOString().slice(0, 16);
         document.getElementById('end-time').value = now.toISOString().slice(0, 16);
-        const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 48) * 60;
+        const maxMinutes = (parseInt(document.getElementById('max-history-hours').value) || 6) * 60;
         document.getElementById('history-slider').value = maxMinutes;
         document.getElementById('history-label').innerText = 'Now';
         lastFilterMode = 'slider';
@@ -3670,6 +3678,7 @@ function addLightningFlash3D(lng, lat) {
   const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
   const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
   const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
+  const radarEnable = document.getElementById('radarLayer').checked;
 
   if (lightningEnabled) {
     legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
@@ -3725,6 +3734,18 @@ function addLightningFlash3D(lng, lat) {
       <div><div class="color-box" style="background: red"></div>High Confidence</div>
       <div><div class="color-box" style="background: orange"></div>Moderate Confidence</div>
       <div><div class="color-box" style="background: yellow"></div>Low Confidence</div>
+    `;
+  }
+  if (radarEnable) {
+    legendDiv.innerHTML += '<h4>Rainfall intensity</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: #b30000"></div>>32mm/h </div>
+      <div><div class="color-box" style="background: #fe0000"></div>16-32mm/h</div>
+      <div><div class="color-box" style="background: #fe9800"></div>8-16mm/h</div>
+      <div><div class="color-box" style="background: #00a300"></div>2-4mm/h</div>
+      <div><div class="color-box" style="background: #0cbcfe"></div>1-2mm/h</div>
+      <div><div class="color-box" style="background: #3265fe"></div>0.5-1mm/h</div>
+      <div><div class="color-box" style="background: #0000fe"></div><0.5mm/h</div>
     `;
   }
 
