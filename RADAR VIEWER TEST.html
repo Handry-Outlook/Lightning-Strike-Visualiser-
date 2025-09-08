@@ -615,7 +615,7 @@
                     const opacity = parseFloat(e.target.value);
                     const opacityProp = currentViewMode === '2d' ? 'fill-opacity' : 'fill-extrusion-opacity';
                     map.setPaintProperty('radar-layer', opacityProp, opacity);
-                    document.getElementById('opacity-value').textContent = `Radar: ${opacity.toFixed(1)}`;
+                    document.getElementById('opacity-value').textContent = `Radar Opacity: ${opacity.toFixed(1)}`;
                 });
 
                 document.getElementById('slider').addEventListener('input', (e) => {
