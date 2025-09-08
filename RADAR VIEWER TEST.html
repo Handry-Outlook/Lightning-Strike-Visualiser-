@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UK Radar and Satellite Imagery Map</title>
+    <title>UK Radar Imagery Map</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css" rel="stylesheet">
     <style>
@@ -29,64 +29,6 @@
         #opacity-value { margin-right: 10px; }
         button { cursor: pointer; margin-right: 5px; padding: 5px 10px; }
         #error { color: red; margin-left: 10px; }
-        .legend-control {
-            margin: 24px 24px auto auto;
-            background-color: #fff;
-            border-radius: 16px;
-            box-shadow: 0 1px 4px 0 rgba(16,40,64,.12);
-            height: 32px;
-            width: 32px;
-        }
-        #close-icon-map {
-            background-color: #fff;
-            border-radius: 24px;
-            box-shadow: 0 1px 4px 0 rgba(16,40,64,.12);
-            height: 48px;
-            left: -8px;
-            line-height: 48px;
-            text-align: center;
-            top: -8px;
-            width: 48px;
-            display: none;
-            position: relative;
-            z-index: 9999;
-            cursor: pointer;
-        }
-        #map-legend {
-            background-color: #fff;
-            box-shadow: 0 2px 4px 0 rgba(16,40,64,.2);
-            height: 120px;
-            left: -204px;
-            position: relative;
-            top: -24px;
-            width: 228px;
-            display: none;
-        }
-        #map-legend table.intensity {
-            display: inline-block;
-            margin: 34px 28px;
-        }
-        #map-legend table.intensity tr.unit { color: #87939f; }
-        #map-legend table.intensity tr.unit div { display: inline-block; width: 50%; }
-        #map-legend table.intensity tr.unit div.right { text-align: right; }
-        #map-legend table.intensity ul {
-            list-style-type: none;
-            margin: 0;
-            padding: 0;
-        }
-        #map-legend table.intensity ul li {
-            display: inline-block;
-            float: left;
-            height: 12px;
-            width: 12px;
-        }
-        #map-legend table.intensity ul li.rain-1 { background-color: rgba(0,0,254,1); }
-        #map-legend table.intensity ul li.rain-2 { background-color: rgba(0,168,243,1); }
-        #map-legend table.intensity ul li.rain-3 { background-color: rgba(196,255,14,1); }
-        #map-legend table.intensity ul li.rain-4 { background-color: rgba(255,255,51,1); }
-        #map-legend table.intensity ul li.rain-5 { background-color: rgba(255,202,24,1); }
-        #map-legend table.intensity ul li.rain-6 { background-color: rgba(255,127,39,1); }
-        #map-legend table.intensity ul li.rain-7 { background-color: rgba(236,28,36,1); }
     </style>
 </head>
 <body>
@@ -121,7 +63,7 @@
         </select>
         <span id="error"></span>
     </div>
-    <img src="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png" style="position: absolute; top: 10px; left: 10px; width: 150px; height: 150px; z-index: 10; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.3);" alt="Handry Outlook Icon">
+    <img src="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png" style="position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; z-index: 10; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.3);" alt="Handry Outlook Icon">
     <script>
         mapboxgl.accessToken = 'pk.eyJ1IjoibWV0ZW9ncm91cC1tYXBib3giLCJhIjoiY2pudWJyMWVhMDQ0bjNxdXFsNWJ5M2ZtbSJ9.ANOKYyv5s0VFVbnesnGGUQ';
 
@@ -290,7 +232,7 @@
             now.setUTCSeconds(0);
             now.setUTCMilliseconds(0);
 
-            const attempts = 12;
+            const attempts = 96; // 24 hours * 4 timeslots/hour
             const maxRetries = 2;
             let latestTimestamp = null;
             let latestTime = null;
@@ -300,35 +242,37 @@
             for (let i = 0; i < attempts; i++) {
                 const checkTime = new Date(now.getTime() - i * 15 * 60 * 1000);
                 const iso = checkTime.toISOString().slice(0, -5) + 'Z';
-                const radarTileUrl = `https://tiles.meteoguard.dtn.com/tiles/VECTOR.obs-radar.mg.eu_1km_intensity.default3/${iso}/${iso}/{z}/{x}/{y}.pbf`;
+                const radarTileUrl = `https://tiles.meteoguard.dtn.com/tiles/VECTOR.obs-radar.mg.eu_1km_intensity.default3/${iso}/${iso}/0/0/0.pbf`;
 
                 for (let retry = 0; retry < maxRetries; retry++) {
                     try {
-                        const response = await fetch(radarTileUrl.replace('{z}/{x}/{y}', '0/0/0'), { method: 'HEAD' });
-                        console.log(`Checked ${iso} (attempt ${retry + 1}): ${response.status} ${response.statusText}`);
+                        const response = await fetch(radarTileUrl, { method: 'GET' });
                         if (response.ok) {
-                            if (!latestTime || checkTime > latestTime) {
-                                latestTimestamp = iso;
-                                latestTime = checkTime;
+                            const arrayBuffer = await response.arrayBuffer();
+                            if (arrayBuffer.byteLength > 0) { // Ensure the tile has data
+                                if (!latestTime || checkTime > latestTime) {
+                                    latestTimestamp = iso;
+                                    latestTime = checkTime;
+                                }
+                                break; // Exit retry loop on success
+                            } else {
+                                console.warn(`Empty tile for ${iso} (attempt ${retry + 1})`);
                             }
-                            break;
                         } else {
                             console.warn(`Tile not available for ${iso} (attempt ${retry + 1}): ${response.status} ${response.statusText}`);
-                            if (i * 15 * 60 * 1000 > 7 * 24 * 60 * 60 * 1000) {
-                                console.warn(`Note: ${iso} is older than 7 days, API may not support 7-day data`);
-                            }
                         }
                     } catch (error) {
-                        console.warn(`Error checking tile for ${iso} (attempt ${retry + 1}):`, error);
+                        console.warn(`Error fetching tile for ${iso} (attempt ${retry + 1}):`, error);
                     }
                     if (retry < maxRetries - 1) {
                         await new Promise(resolve => setTimeout(resolve, 500));
                     }
                 }
+                if (latestTimestamp) break; // Exit early if we found a valid tile
             }
 
             if (!latestTimestamp) {
-                console.warn('No valid tiles found in the last 3 hours. Falling back to current time.');
+                console.warn('No valid tiles found in the last 24 hours. Falling back to current time.');
                 return now.toISOString().slice(0, -5) + 'Z';
             }
 
@@ -346,7 +290,6 @@
                 times.push({
                     timestamp: iso,
                     radarTileUrl: `https://tiles.meteoguard.dtn.com/tiles/VECTOR.obs-radar.mg.eu_1km_intensity.default3/${iso}/${iso}/{z}/{x}/{y}.pbf`
-                    // satTileUrl: `https://tiles.meteoguard.dtn.com/tiles/RASTER.obs-sat.mg.global-composite_data_ir.WeatherPro/${iso}/${iso}/{z}/{x}/{y}.png`
                 });
             }
             return times;
@@ -399,7 +342,6 @@
         function updateMapStyle() {
             const style = document.getElementById('map-style').value;
             map.setStyle(style);
-            // Re-add radar layer after style change
             setTimeout(() => {
                 if (!map.getSource('radar')) {
                     map.addSource('radar', {
@@ -429,33 +371,6 @@
                     });
                 }
             }, 1000);
-        }
-
-        class LegendControl {
-            onAdd(map) {
-                this._map = map;
-                this._container = document.createElement('div');
-                this._container.className = 'legend-control';
-                this._container.innerHTML = `
-                    <table class="intensity">
-                        <tr><td width="45%">Rain</td><td><ul>
-                            <li class="rain-1"></li>
-                            <li class="rain-2"></li>
-                            <li class="rain-3"></li>
-                            <li class="rain-4"></li>
-                            <li class="rain-5"></li>
-                            <li class="rain-6"></li>
-                            <li class="rain-7"></li>
-                        </ul></td></tr>
-                        <tr class="unit"><td>Intensity</td><td><div class="left">< 77</div><div class="right">> 179</div></td></tr>
-                    </table>`;
-                return this._container;
-            }
-
-            onRemove() {
-                this._container.parentNode.removeChild(this._container);
-                this._map = undefined;
-            }
         }
 
         map.on('load', () => {
@@ -496,8 +411,6 @@
                         'fill-extrusion-color': radarStyles.default
                     }
                 });
-
-                map.addControl(new LegendControl(), 'top-right');
 
                 setInterval(initializeTiles, 5 * 60 * 1000);
 
