@@ -358,108 +358,105 @@
         }
 
         function updateViewMode() {
-            currentViewMode = document.getElementById('view-mode').value;
-            if (map.getLayer('radar-layer')) {
-                map.removeLayer('radar-layer');
-            }
-            // Remove any previously added custom layers for labels, roads, or coastlines
-            ['custom-labels', 'custom-roads', 'custom-coastlines'].forEach(layerId => {
-                if (map.getLayer(layerId)) {
-                    map.removeLayer(layerId);
-                }
-            });
-            const currentStyle = document.getElementById('radar-style').value;
-            const opacity = parseFloat(document.getElementById('opacity-slider').value);
+    currentViewMode = document.getElementById('view-mode').value;
+    if (map.getLayer('radar-layer')) {
+        map.removeLayer('radar-layer');
+    }
+    // Remove any previously added custom layers for labels, roads, or coastlines
+    ['custom-labels', 'custom-roads', 'custom-coastlines'].forEach(layerId => {
+        if (map.getLayer(layerId)) {
+            map.removeLayer(layerId);
+        }
+    });
+    const currentStyle = document.getElementById('radar-style').value;
+    const opacity = parseFloat(document.getElementById('opacity-slider').value);
 
-            if (currentViewMode === '2d') {
-                map.setPitch(0); // Flatten map for 2D view
-                // Find the first label or road layer to insert the radar layer below
-                const layers = map.getStyle().layers;
-                let beforeLayerId = null;
-                for (const layer of layers) {
-                    if (layer.type === 'symbol' || layer.id.includes('label') || layer.id.includes('road') || layer.id.includes('highway')) {
-                        beforeLayerId = layer.id;
-                        break;
-                    }
-                }
-                map.addLayer({
-                    id: 'radar-layer',
-                    type: 'fill',
-                    source: 'radar',
-                    'source-layer': 'geojsonLayer',
-                    paint: {
-                        'fill-color': radarStyles[currentStyle],
-                        'fill-opacity': opacity
-                    }
-                }, beforeLayerId); // Insert below the first label or road layer
-            } else {
-                map.setPitch(45); // Restore 3D view
-                map.addLayer({
-                    id: 'radar-layer',
-                    type: 'fill-extrusion',
-                    source: 'radar',
-                    'source-layer': 'geojsonLayer',
-                    paint: {
-                        'fill-extrusion-color': radarStyles[currentStyle],
-                        'fill-extrusion-opacity': opacity,
-                        'fill-extrusion-height': [
-                            'interpolate',
-                            ['linear'],
-                            ['zoom'],
-                            0, ['*', ['interpolate', ['linear'], ['get', 'value'], 77, 0, 179, 5000], 2], // Zoom 0: scale height by 2
-                            3, ['*', ['interpolate', ['linear'], ['get', 'value'], 77, 0, 179, 5000], 1], // Zoom 3: scale height by 1
-                            5, ['*', ['interpolate', ['linear'], ['get', 'value'], 77, 0, 179, 5000], 0.5], // Zoom 5: scale height by 0.5
-                            10, ['*', ['interpolate', ['linear'], ['get', 'value'], 77, 0, 179, 5000], 0.25], // Zoom 10: scale height by 0.25
-                            15, ['*', ['interpolate', ['linear'], ['get', 'value'], 77, 0, 179, 5000], 0.0625] // Zoom 15: scale height by 0.0625
-                        ],
-                        'fill-extrusion-base': 0
-                    }
-                });
-
-                // Re-add road layers (main roads)
-                const roadLayers = map.getStyle().layers.filter(layer => layer.type === 'line' && (layer.id.includes('road') || layer.id.includes('highway')));
-                roadLayers.forEach(layer => {
-                    map.addLayer({
-                        id: `custom-${layer.id}`,
-                        type: 'line',
-                        source: layer.source,
-                        'source-layer': layer['source-layer'] || null,
-                        layout: layer.layout || {},
-                        paint: {
-                            'line-width': 0.5,
-                            'line-opacity': 0.8
-                        }
-                    });
-                });
-
-                // Re-add label layers (place names)
-                const labelLayers = map.getStyle().layers.filter(layer => layer.type === 'symbol' && (layer.id.includes('label') || layer.id.includes('place')));
-                labelLayers.forEach(layer => {
-                    map.addLayer({
-                        id: `custom-${layer.id}`,
-                        type: 'symbol',
-                        source: layer.source,
-                        'source-layer': layer['source-layer'] || null,
-                        layout: layer.layout || {},
-                        paint: layer.paint || {}
-                    });
-                });
-
-                // Add a custom coastline layer (using Mapbox's default water source)
-                if (map.getSource('composite')) {
-                    map.addLayer({
-                        id: 'custom-coastlines',
-                        type: 'line',
-                        source: 'composite',
-                        'source-layer': 'waterway', // Adjust based on style; 'water' or 'landuse' may also work
-                        paint: {
-                            'line-width': 0.5,
-                            'line-opacity': 0.8
-                        }
-                    });
-                }
+    if (currentViewMode === '2d') {
+        map.setPitch(0); // Flatten map for 2D view
+        // Find the first label or road layer to insert the radar layer below
+        const layers = map.getStyle().layers;
+        let beforeLayerId = null;
+        for (const layer of layers) {
+            if (layer.type === 'symbol' || layer.id.includes('label') || layer.id.includes('road') || layer.id.includes('highway')) {
+                beforeLayerId = layer.id;
+                break;
             }
         }
+        map.addLayer({
+            id: 'radar-layer',
+            type: 'fill',
+            source: 'radar',
+            'source-layer': 'geojsonLayer',
+            paint: {
+                'fill-color': radarStyles[currentStyle],
+                'fill-opacity': opacity
+            }
+        }, beforeLayerId); // Insert below the first label or road layer
+    } else {
+        map.setPitch(45); // Restore 3D view
+        map.addLayer({
+            id: 'radar-layer',
+            type: 'fill-extrusion',
+            source: 'radar',
+            'source-layer': 'geojsonLayer',
+            paint: {
+                'fill-extrusion-color': radarStyles[currentStyle],
+                'fill-extrusion-opacity': opacity,
+                'fill-extrusion-height': [
+                    'interpolate',
+                    ['linear'],
+                    ['get', 'value'],
+                    77, 0,
+                    179, 10000
+                ],
+                'fill-extrusion-base': 0
+            }
+        });
+
+        // Re-add road layers (main roads)
+        const roadLayers = map.getStyle().layers.filter(layer => layer.type === 'line' && (layer.id.includes('road') || layer.id.includes('highway')));
+        roadLayers.forEach(layer => {
+            map.addLayer({
+                id: `custom-${layer.id}`,
+                type: 'line',
+                source: layer.source,
+                'source-layer': layer['source-layer'] || null,
+                layout: layer.layout || {},
+                paint: {
+                    'line-width': 0.5,
+                    'line-opacity': 0.8
+                }
+            });
+        });
+
+        // Re-add label layers (place names)
+        const labelLayers = map.getStyle().layers.filter(layer => layer.type === 'symbol' && (layer.id.includes('label') || layer.id.includes('place')));
+        labelLayers.forEach(layer => {
+            map.addLayer({
+                id: `custom-${layer.id}`,
+                type: 'symbol',
+                source: layer.source,
+                'source-layer': layer['source-layer'] || null,
+                layout: layer.layout || {},
+                paint: layer.paint || {}
+            });
+        });
+
+        // Add a custom coastline layer (using Mapbox's default water source)
+        if (map.getSource('composite')) {
+            map.addLayer({
+                id: 'custom-coastlines',
+                type: 'line',
+                source: 'composite',
+                'source-layer': 'waterway',
+                paint: {
+                    'line-width': 0.5,
+                    'line-opacity': 0.8
+                }
+            });
+        }
+    }
+}
 
         function updateMapStyle() {
             const style = document.getElementById('map-style').value;
@@ -599,7 +596,7 @@
                 });
 
                 map.on('error', (e) => {
-                    document.getElementById('error').textContent = 'Error loading data. Check console.';
+                    
                     console.error('Mapbox error:', e.error);
                 });
 
