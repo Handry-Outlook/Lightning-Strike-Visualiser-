@@ -44,7 +44,8 @@
         <input type="range" id="opacity-slider" min="0" max="1" step="0.1" value="0.7">
         <span id="opacity-value">Radar: 0.7</span>
         <select id="radar-style" onchange="updateRadarStyle()">
-            <option value="default">Default Radar</option>
+            <option value="original">Default</option>
+            <option value="default">Exaggerate</option>
             <option value="viridis">Viridis</option>
             <option value="hot">Hot</option>
             <option value="cool">Cool</option>
@@ -53,6 +54,10 @@
             <option value="magma">Magma</option>
             <option value="spectral">Spectral</option>
             <option value="rainbow">Rainbow</option>
+        </select>
+        <select id="view-mode" onchange="updateViewMode()">
+            <option value="3d">3D</option>
+            <option value="2d">2D</option>
         </select>
         <select id="map-style" onchange="updateMapStyle()">
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
@@ -77,11 +82,13 @@
             projection: 'globe'
         });
 
+        let currentViewMode = '3d';
+
         const radarStyles = {
             default: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)', // Transparent for values < 77
                 77, 'rgba(0, 255, 0, 0.5)',
                 100, 'rgba(0, 183, 235, 0.6)',
                 110, 'rgba(255, 255, 0, 0.7)',
@@ -94,10 +101,15 @@
                 166, 'rgba(102, 0, 204, 1)',
                 179, 'rgba(51, 0, 102, 1)'
             ],
+            original: ['case',
+                ['has', 'fill-color'],
+                ['get', 'fill-color'],
+                'rgba(0, 0, 0, 0)' // Fallback to transparent if color is missing
+            ],
             viridis: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#440154',
                 100, '#3b528b',
                 110, '#21908d',
@@ -113,7 +125,7 @@
             hot: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#ff0000',
                 100, '#ff3300',
                 110, '#ff6600',
@@ -129,7 +141,7 @@
             cool: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#00b7eb',
                 100, '#00a3d6',
                 110, '#008fc2',
@@ -145,7 +157,7 @@
             plasma: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#0d0887',
                 100, '#3c0788',
                 110, '#63019c',
@@ -161,7 +173,7 @@
             inferno: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#000004',
                 100, '#1b0c41',
                 110, '#4a0c6b',
@@ -177,7 +189,7 @@
             magma: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#000004',
                 100, '#160b39',
                 110, '#3f0c5f',
@@ -193,7 +205,7 @@
             spectral: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#9e0142',
                 100, '#d53e4f',
                 110, '#f46d43',
@@ -209,7 +221,7 @@
             rainbow: [
                 'step',
                 ['get', 'value'],
-                '#fff',
+                'rgba(0, 0, 0, 0)',
                 77, '#ff0000',
                 100, '#ff4d00',
                 110, '#ff9900',
@@ -311,10 +323,11 @@
             if (map.getSource('radar')) {
                 map.getSource('radar').setTiles([radarTileUrl]);
             }
-            map.setPaintProperty('radar-layer', 'fill-extrusion-opacity', 0);
+            const opacityProp = currentViewMode === '2d' ? 'fill-opacity' : 'fill-extrusion-opacity';
+            map.setPaintProperty('radar-layer', opacityProp, 0);
             setTimeout(() => {
                 const radarOpacity = parseFloat(document.getElementById('opacity-slider').value);
-                map.setPaintProperty('radar-layer', 'fill-extrusion-opacity', radarOpacity);
+                map.setPaintProperty('radar-layer', opacityProp, radarOpacity);
             }, 100);
             const date = new Date(timestamp);
             document.getElementById('time-display').textContent = date.toLocaleString('en-GB', {
@@ -336,7 +349,50 @@
 
         function updateRadarStyle() {
             const style = document.getElementById('radar-style').value;
-            map.setPaintProperty('radar-layer', 'fill-extrusion-color', radarStyles[style]);
+            const colorProp = currentViewMode === '2d' ? 'fill-color' : 'fill-extrusion-color';
+            map.setPaintProperty('radar-layer', colorProp, radarStyles[style]);
+        }
+
+        function updateViewMode() {
+            currentViewMode = document.getElementById('view-mode').value;
+            if (map.getLayer('radar-layer')) {
+                map.removeLayer('radar-layer');
+            }
+            const currentStyle = document.getElementById('radar-style').value;
+            const opacity = parseFloat(document.getElementById('opacity-slider').value);
+            if (currentViewMode === '2d') {
+                map.setPitch(0); // Flatten map for 2D view
+                map.addLayer({
+                    id: 'radar-layer',
+                    type: 'fill',
+                    source: 'radar',
+                    'source-layer': 'geojsonLayer',
+                    paint: {
+                        'fill-color': radarStyles[currentStyle],
+                        'fill-opacity': opacity
+                    }
+                });
+            } else {
+                map.setPitch(45); // Restore 3D view
+                map.addLayer({
+                    id: 'radar-layer',
+                    type: 'fill-extrusion',
+                    source: 'radar',
+                    'source-layer': 'geojsonLayer',
+                    paint: {
+                        'fill-extrusion-color': radarStyles[currentStyle],
+                        'fill-extrusion-opacity': opacity,
+                        'fill-extrusion-height': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'value'],
+                            77, 0,
+                            179, 10000
+                        ],
+                        'fill-extrusion-base': 0
+                    }
+                });
+            }
         }
 
         function updateMapStyle() {
@@ -351,25 +407,8 @@
                         minzoom: 0,
                         maxzoom: 6
                     });
-                    map.addLayer({
-                        id: 'radar-layer',
-                        type: 'fill-extrusion',
-                        source: 'radar',
-                        'source-layer': 'geojsonLayer',
-                        paint: {
-                            'fill-extrusion-opacity': parseFloat(document.getElementById('opacity-slider').value),
-                            'fill-extrusion-height': [
-                                'interpolate',
-                                ['linear'],
-                                ['get', 'value'],
-                                77, 0,
-                                179, 10000
-                            ],
-                            'fill-extrusion-base': 0,
-                            'fill-extrusion-color': radarStyles[document.getElementById('radar-style').value]
-                        }
-                    });
                 }
+                updateViewMode(); // Re-add the layer based on current view mode
             }, 1000);
         }
 
@@ -408,7 +447,7 @@
                             179, 10000
                         ],
                         'fill-extrusion-base': 0,
-                        'fill-extrusion-color': radarStyles.default
+                        'fill-extrusion-color': radarStyles.original
                     }
                 });
 
@@ -419,6 +458,7 @@
                         const features = map.querySourceFeatures('radar', { sourceLayer: 'geojsonLayer' });
                         if (features.length > 0) {
                             const values = features.map(f => f.properties.value).filter(v => v !== undefined);
+                            const colors = features.map(f => f.properties.color).filter(c => c !== undefined && c !== null);
                             const allProperties = features.map(f => f.properties);
                             if (values.length > 0) {
                                 console.log('Radar value range:', {
@@ -427,7 +467,14 @@
                                     sample: values.slice(0, 10)
                                 });
                             }
-                            console.log('Feature properties:', allProperties.slice(0, 5));
+                            if (colors.length > 0) {
+                                console.log('Radar color samples:', colors.slice(0, 10));
+                            } else {
+                                console.log('No valid color properties found in radar data. Checking all properties:', allProperties.slice(0, 5));
+                            }
+                            // Log all unique property names to identify color data
+                            const propertyNames = [...new Set(features.flatMap(f => Object.keys(f.properties || {})))];
+                            console.log('Available property names:', propertyNames);
                         } else {
                             console.log('No features found for sourceLayer: geojsonLayer. Trying "intensity"...');
                             const intensityFeatures = map.querySourceFeatures('radar', { sourceLayer: 'intensity' });
@@ -458,7 +505,8 @@
 
                 document.getElementById('opacity-slider').addEventListener('input', (e) => {
                     const opacity = parseFloat(e.target.value);
-                    map.setPaintProperty('radar-layer', 'fill-extrusion-opacity', opacity);
+                    const opacityProp = currentViewMode === '2d' ? 'fill-opacity' : 'fill-extrusion-opacity';
+                    map.setPaintProperty('radar-layer', opacityProp, opacity);
                     document.getElementById('opacity-value').textContent = `Radar: ${opacity.toFixed(1)}`;
                 });
 
