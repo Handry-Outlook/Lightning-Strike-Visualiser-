@@ -579,14 +579,35 @@ body.dark-mode .control-panel input[type="range"]::-moz-range-thumb {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   font-size: 0.75em;
   color: #1a2a44;
-  max-width: 125px;
-  min-width: 110px;
+  max-width: 200px; /* Increased from 125px to make the legend wider */
+  min-width: 150px; /* Increased from 110px for consistency with wider design */
+  max-height: 300px; /* Set maximum height to limit vertical size */
+  overflow-y: auto; /* Enable vertical scrolling when content exceeds max-height */
   position: absolute;
   top: 10px; /* Consistent 10px margin from top */
   right: 10px; /* Consistent 10px margin from right */
   z-index: 1010; /* High z-index to stay above map elements */
   transition: background 0.3s ease, color 0.3s ease;
-}  
+}
+
+/* Optional: Style the scrollbar for better aesthetics (works in WebKit browsers like Chrome/Safari) */
+.legend::-webkit-scrollbar {
+  width: 8px; /* Width of the scrollbar */
+}
+
+.legend::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05); /* Light track background */
+  border-radius: 4px;
+}
+
+.legend::-webkit-scrollbar-thumb {
+  background: rgba(26, 42, 68, 0.5); /* Match color scheme (#1a2a44 with opacity) */
+  border-radius: 4px;
+}
+
+.legend::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 42, 68, 0.8); /* Darker on hover */
+}
    .fullscreen .legend {
   right: 10px; /* Ensure 10px margin */
   top: 10px;
@@ -3791,19 +3812,79 @@ function addLightningFlash3D(lng, lat) {
     `;
   }
   if (radarEnable) {
-    legendDiv.innerHTML += '<h4>Rainfall intensity</h4>';
+    legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
     legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: #7b3090"></div>Heavy</div>
-      <div><div class="color-box" style="background: #a7459b"></div></div>
-      <div><div class="color-box" style="background: #b8315c"></div></div>
-      <div><div class="color-box" style="background: #d4182c"></div></div>
-      <div><div class="color-box" style="background: #eb7126"></div></div>
-      <div><div class="color-box" style="background: #ebcf49"></div></div>
-      <div><div class="color-box" style="background: #295524"></div></div>
-      <div><div class="color-box" style="background: #2e6c30"></div></div>
-      <div><div class="color-box" style="background: #458935"></div></div>
-      <div><div class="color-box" style="background: #5da642"></div></div>
-      <div><div class="color-box" style="background: #b8e1aa"></div>Light</div>
+      <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>Very Light Rain (0.2–0.4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>Light Rain (0.5 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>Light Rain (0.6–1 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>Light to Moderate Rain (1.25 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>Moderate Rain (2 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>Moderate Rain (3–4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>Heavy Rain (5–8 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>Very Heavy Rain (10–15 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>Very Heavy Rain (20–30 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>Very Heavy Rain (35–50 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>Extreme Rain (65–100 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>Extreme Rain (150–200 mm/h)</div>
+    `;
+    legendDiv.innerHTML += '<h4>Precipitation: Freezing Rain</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>Light Freezing Rain (0.2–0.4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>Light Freezing Rain (0.5–0.6 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>Light Freezing Rain (0.7–1 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(252, 133, 145)"></div>Moderate Freezing Rain (1.25 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(250, 88, 103)"></div>Moderate Freezing Rain (2 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>Moderate Freezing Rain (3–4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>Heavy Freezing Rain (5–8 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>Very Heavy Freezing Rain (10–15 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>Very Heavy Freezing Rain (20–30 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>Extreme Freezing Rain (35–200 mm/h)</div>
+    `;
+    legendDiv.innerHTML += '<h4>Precipitation: Hail</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>Moderate Hail (8 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>Moderate Hail (10–15 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>Heavy Hail (20–30 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>Very Heavy Hail (35–200 mm/h)</div>
+    `;
+    legendDiv.innerHTML += '<h4>Precipitation: Snow</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>Light Snow (0.2–0.4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>Light Snow (0.5–0.6 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>Light Snow (0.7–1 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(34, 145, 176)"></div>Moderate Snow (1.25 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(8, 98, 138)"></div>Moderate Snow (2 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>Moderate Snow (3–4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>Heavy Snow (5–8 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>Very Heavy Snow (10–200 mm/h)</div>
+    `;
+    legendDiv.innerHTML += '<h4>Precipitation: Rain and Snow</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>Light Rain and Snow (0.2–0.3 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>Light Rain and Snow (0.4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>Light Rain and Snow (0.5–0.6 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>Light Rain and Snow (0.7–1 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>Moderate Rain and Snow (1.25 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>Moderate Rain and Snow (2 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>Moderate Rain and Snow (3–4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>Heavy Rain and Snow (5–8 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>Very Heavy Rain and Snow (10–15 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>Very Heavy Rain and Snow (20–30 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>Extreme Rain and Snow (35–200 mm/h)</div>
+    `;
+    legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>Light Snow Pellets (0.2–0.3 mm/h)</div>
+    `;
+    legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets and Hail</h4>';
+    legendDiv.innerHTML += `
+      <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>Light Snow Pellets and Hail (0.4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>Light Snow Pellets and Hail (0.5–0.6 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>Light Snow Pellets and Hail (0.7–1 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>Moderate Snow Pellets and Hail (1.25 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>Moderate Snow Pellets and Hail (2 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>Moderate Snow Pellets and Hail (3–4 mm/h)</div>
+      <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>Heavy Snow Pellets and Hail (5 mm/h)</div>
     `;
   }
 
