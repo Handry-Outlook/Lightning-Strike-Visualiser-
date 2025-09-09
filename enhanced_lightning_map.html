@@ -939,8 +939,10 @@ body.three-d-mode #map-3d {
     </div>
     <div class="section">
       <h4>Layers</h4>
+      <a href="https://handry-outlook.github.io/Lightning-Strike-Visualiser-/enhanced_lightning_map_new_radar.html" target="_blank"><button>Change Radar Source</button></a>
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
         <option value="opentopo">OpenTopoMap</option>
+        <option value="custom">Mapbox Classic</option>
         <option value="osm">OpenStreetMap</option>
         <option value="esri">Esri World Imagery</option>
         <option value="maptiler-streets">MapTiler Streets</option>
@@ -1066,7 +1068,7 @@ body.three-d-mode #map-3d {
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.js"></script>
   <script>
-    const mapboxAccessToken = 'pk.eyJ1IjoiaGFuZHJ5MjAxOTEwMjYiLCJhIjoiY21jYWg2eG1lMDNkYTJxczVyOWM5bW9mciJ9.bA-qxiByTB_RseY1fgU4rg';
+    const mapboxAccessToken = 'pk.eyJ1IjoibWV0ZW9ncm91cC1tYXBib3giLCJhIjoiY2pudWJyMWVhMDQ0bjNxdXFsNWJ5M2ZtbSJ9.ANOKYyv5s0VFVbnesnGGUQ';
     const maptilerApiKey = 'd6FiSbcpDtzJ4g4e0oD4';
 
     const risk_colors = {
@@ -1093,6 +1095,13 @@ body.three-d-mode #map-3d {
         maxZoom: 17,
         attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
       }),
+      custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+        tileSize: 512,
+        zoomOffset: -1,
+        attribution: '© Mapbox © OpenStreetMap',
+        maxZoom: 18
+      }),
+      
       osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
@@ -1205,6 +1214,7 @@ legendControl.addTo(map);
     let nowcastLayer = L.layerGroup();
     let nowcastLayer3D = [];
     let currentNowcasts = [];
+    
     let minNowcastConfidence = 0.8;
     let userLocationMarker = null;
     let isLegendVisible = false;
