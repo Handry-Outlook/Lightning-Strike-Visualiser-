@@ -12,6 +12,7 @@
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.js"></script>
+  <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.min.js"></script>
   <style>
   .smooth-raster {
   image-rendering: optimizeSpeed;
@@ -961,7 +962,7 @@ body.three-d-mode #map-3d {
     </div>
     <div class="section">
       <h4>Layers</h4>
-      <a href="https://handry-outlook.github.io/Lightning-Strike-Visualiser-/enhanced_lightning_map.html" target="_blank"><button>Change Radar Source</button></a>
+      
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
         <option value="opentopo">OpenTopoMap</option>
         <option value="custom">Mapbox Classic</option>
@@ -977,8 +978,16 @@ body.three-d-mode #map-3d {
       <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"><span class="tooltip">Show 2D heatmap</span></label>
       <!--<label id="heatmap-3d-toggle-label">3D Heatmap: <input type="checkbox" id="heatmap-3d-toggle" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Show 3D heatmap in 3D mode</span></label>-->
       <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
-      <label>Radar Layer: <input type="checkbox" id="radarLayer" checked><span class="tooltip">Show rainfall radar</span></label>
-
+      <label>Radar Layer: 
+        <select id="radarLayer" onchange="updateRadarLayerSelection()">
+          <option value="uk-precip-intensity">UK High Resolution Rainfall Intensity (Smoothed)</option>
+          <option value="uk-precip-intensity-pixelated">UK High Resolution Rainfall Intensity (Pixelated)</option>
+          <option value="uk-precip-type">UK High Resolution Precipitation Type</option>
+          <option value="europe-precip-intensity">Europe Low Resolution Rainfall Intensity</option>
+          <option value="europe-precip-type">Europe Low Resolution Precipitation Type</option>
+          <option value="none">None</option>
+        </select><span class="tooltip">Select radar data layer</span>
+      </label>
       <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="1"></label>      
 
       
@@ -1236,7 +1245,7 @@ legendControl.addTo(map);
     let nowcastLayer = L.layerGroup();
     let nowcastLayer3D = [];
     let currentNowcasts = [];
-    
+    let lastValidTileUrls = {};
     let minNowcastConfidence = 0.8;
     let userLocationMarker = null;
     let isLegendVisible = false;
@@ -1247,126 +1256,151 @@ legendControl.addTo(map);
   let drawnItems3D = [];
   let isDrawingEnabled = false;
   let editingLayerId = null;
-  
+ 
+let lastRadarType = null;
 let isFilterApplied = false;
   
 const currentTime = new Date(); 
-
+const radarOptions = {
+      'uk-precip-intensity': {
+        url: 'https://tiles.meteoguard.dtn.com/tiles/radar-precip-intensity-uk-contours/${iso}/${iso}/{z}/{x}/{y}.pbf',
+        interval: 5 * 60 * 1000,
+        type: 'vector'
+      },
+      'uk-precip-type': {
+        url: 'https://tiles.meteoguard.dtn.com/tiles/radar-precip-type-uk-contours/${iso}/${iso}/{z}/{x}/{y}.pbf',
+        interval: 5 * 60 * 1000,
+        type: 'vector'
+      },
+      'europe-precip-intensity': {
+        url: 'https://tiles.meteoguard.dtn.com/tiles/radar-precip-intensity-europe-contours/${iso}/${iso}/{z}/{x}/{y}.pbf',
+        interval: 15 * 60 * 1000,
+        type: 'vector'
+      },
+      'europe-precip-type': {
+        url: 'https://tiles.meteoguard.dtn.com/tiles/radar-precip-type-europe-contours/${iso}/${iso}/{z}/{x}/{y}.pbf',
+        interval: 15 * 60 * 1000,
+        type: 'vector'
+      },
+      'uk-precip-intensity-pixelated': {
+        url: 'https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar/${iso}.png',
+        interval: 5 * 60 * 1000,
+        type: 'image',
+        bounds: [[44.02, -25], [64, 16]]
+      }
+    };
 let radarLayer = null;
 let radarLayerOld = null;
 let lastRadarTimestamp = null; // Track the last rounded timestamp used for radar fetch
-
+const sixDaysInMs = 7 * 24 * 60 * 60 * 1000; // 6 days in milliseconds
 let lastValidTileUrl = null; // Cache the last valid tile URL as a fallback
-async function getRadarImageUrl(timestamp) {
+async function getRadarImageUrl(timestamp, radarType) {
+  updateLegend()
   if (typeof timestamp !== 'number' || isNaN(timestamp)) {
     console.error(`Invalid timestamp passed to getRadarImageUrl: ${JSON.stringify(timestamp)}`);
-    return lastValidTileUrl; // Return last valid URL to ensure a plot
+    return lastValidTileUrls[radarType] || null;
   }
-
   const date = new Date(timestamp);
-  // Round to previous 5-minute interval
-  date.setMinutes(Math.floor(date.getMinutes() / 5) * 5);
+  const interval = radarOptions[radarType]?.interval || 5 * 60 * 1000;
+  date.setMinutes(Math.floor(date.getMinutes() / (interval / 60 / 1000)) * (interval / 60 / 1000));
   date.setSeconds(0);
   date.setMilliseconds(0);
-
-  // Respect time filter if applied
-  let minTime = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000); // Default: 6 days ago
-  let maxTime = new Date(Date.now()); // Default: now
+  let minTime = new Date(Date.now() - sixDaysInMs);
+  let maxTime = new Date(Date.now());
   if (isFilterApplied && customFilterStart && customFilterEnd && !isNaN(customFilterStart) && !isNaN(customFilterEnd)) {
     minTime = new Date(customFilterStart);
     maxTime = new Date(customFilterEnd);
   }
-
   const formatISO = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
   let currentTime = new Date(date);
-  const maxRetries = 2; // Retry each timestamp up to 2 times
-  const maxAttempts = 288; // 24 hours * 12 five-minute intervals
-
-  // Ensure the timestamp is within the filter range or 6-day limit
+  const maxRetries = 2;
+  const maxAttempts = radarType === 'uk-precip-intensity-pixelated' ? 4 : 288;
   if (currentTime < minTime || currentTime > maxTime) {
     console.warn(`Timestamp ${currentTime.toISOString()} is outside filter range (${minTime.toISOString()} to ${maxTime.toISOString()})`);
     currentTime = new Date(Math.min(Math.max(currentTime.getTime(), minTime.getTime()), maxTime.getTime()));
-    currentTime.setMinutes(Math.floor(currentTime.getMinutes() / 5) * 5);
+    currentTime.setMinutes(Math.floor(currentTime.getMinutes() / (interval / 60 / 1000)) * (interval / 60 / 1000));
     currentTime.setSeconds(0);
     currentTime.setMilliseconds(0);
   }
-
-  // Function to validate a tile URL
-  async function validateTile(checkTime) {
-    if (checkTime < minTime || checkTime > maxTime) {
-      console.warn(`Timestamp ${checkTime.toISOString()} is outside filter range`);
+  if (radarOptions[radarType].type === 'image') {
+    for (let attempt = 0; attempt < maxAttempts && currentTime >= minTime; attempt++) {
+      const radarUrl = radarOptions[radarType].url.replace(/\${iso}/g, formatISO(currentTime));
+      console.log(`Attempt ${attempt + 1}/${maxAttempts}: Testing ${new Date(timestamp).toISOString()}`);
+      const img = new Image();
+      img.src = radarUrl;
+      const isValid = await new Promise((resolve) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        setTimeout(() => resolve(false), 5000);
+      });
+      if (isValid) {
+        console.log(`Valid radar image found: ${new Date(timestamp).toISOString()}`);
+        lastValidTileUrls[radarType] = radarUrl;
+        return radarUrl;
+      } else {
+        console.warn(`Image failed to load: ${new Date(timestamp).toISOString()}`);
+      }
+      currentTime.setMinutes(currentTime.getMinutes() - (interval / 60 / 1000));
+    }
+    console.error(`No valid radar image found within limit after ${maxAttempts} attempts`);
+    return lastValidTileUrls[radarType] || null;
+  } else {
+    async function validateTile(checkTime) {
+      if (checkTime < minTime || checkTime > maxTime) {
+        console.warn(`Timestamp ${checkTime.toISOString()} is outside filter range`);
+        return null;
+      }
+      const iso = formatISO(checkTime);
+      const tileUrl = radarOptions[radarType].url.replace(/\${iso}/g, iso);
+      for (let retry = 0; retry < maxRetries; retry++) {
+        try {
+          const response = await fetch(tileUrl.replace('{z}/{x}/{y}', '0/0/0'), { method: 'GET' });
+          if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer();
+            if (arrayBuffer.byteLength > 0) {
+              console.log(`Valid tile found for ${iso}`);
+              return radarOptions[radarType].url.replace(/\${iso}/g, iso);
+            } else {
+              console.warn(`Empty tile for ${iso} (attempt ${retry + 1})`);
+            }
+          } else {
+            console.warn(`Tile not available for ${iso} (attempt ${retry + 1}): ${response.status} ${response.statusText}`);
+          }
+        } catch (error) {
+          console.warn(`Error fetching tile for ${iso} (attempt ${retry + 1}):`, error);
+        }
+        if (retry < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
       return null;
     }
-    const iso = formatISO(checkTime);
-    const tileUrl = `https://tiles.meteoguard.dtn.com/tiles/radar-precip-type-uk-contours/${iso}/${iso}/0/0/0.pbf`;
-
-    for (let retry = 0; retry < maxRetries; retry++) {
-      try {
-        const response = await fetch(tileUrl, { method: 'GET' });
-        if (response.ok) {
-          const arrayBuffer = await response.arrayBuffer();
-          if (arrayBuffer.byteLength > 0) {
-            console.log(`Valid tile found for ${iso}`);
-            return `https://tiles.meteoguard.dtn.com/tiles/radar-precip-type-uk-contours/${iso}/${iso}/{z}/{x}/{y}.pbf`;
-          } else {
-            console.warn(`Empty tile for ${iso} (attempt ${retry + 1})`);
-          }
-        } else {
-          console.warn(`Tile not available for ${iso} (attempt ${retry + 1}): ${response.status} ${response.statusText}`);
-        }
-      } catch (error) {
-        console.warn(`Error fetching tile for ${iso} (attempt ${retry + 1}):`, error);
-      }
-      if (retry < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500)); // Delay between retries
+    for (let i = 0; i < maxAttempts; i++) {
+      const checkTime = new Date(currentTime.getTime() - i * interval);
+      const tileUrl = await validateTile(checkTime);
+      if (tileUrl) {
+        lastValidTileUrls[radarType] = tileUrl;
+        console.log(`Using timestamp ${formatISO(checkTime)} for request: ${new Date(timestamp).toISOString()}`);
+        return tileUrl;
       }
     }
+    console.error(`No valid tiles found within 24 hours for timestamp ${new Date(timestamp).toISOString()}`);
+    if (lastValidTileUrls[radarType]) {
+      console.log(`Falling back to last valid tile for ${radarType}: ${lastValidTileUrls[radarType]}`);
+      return lastValidTileUrls[radarType];
+    }
+    console.error('No valid tiles available, including fallback');
     return null;
+    updateLegend()
   }
-
-  // Try to find a valid tile, starting from the rounded timestamp
-  for (let i = 0; i < maxAttempts; i++) {
-    const checkTime = new Date(currentTime.getTime() - i * 5 * 60 * 1000);
-    const tileUrl = await validateTile(checkTime);
-    if (tileUrl) {
-      lastValidTileUrl = tileUrl; // Cache the valid URL
-      console.log(`Using timestamp ${formatISO(checkTime)} for request: ${new Date(timestamp).toISOString()}`);
-      return tileUrl;
-    }
-  }
-
-  console.error(`No valid tiles found within 24 hours for timestamp ${new Date(timestamp).toISOString()}`);
-  if (lastValidTileUrl) {
-    console.log(`Falling back to last valid tile: ${lastValidTileUrl}`);
-    return lastValidTileUrl; // Use cached valid URL to ensure a plot
-  }
-
-  console.error('No valid tiles available, including fallback');
-  return null;
 }
+
 async function updateRadarLayer(timestamp) {
-  if (!map || !document.getElementById('radarLayer')?.checked) {
-    if (radarLayer) {
-      map.removeLayer(radarLayer);
-      radarLayer = null;
-      map.setMaxZoom(18);
-    }
-    if (radarLayerOld) {
-      map.removeLayer(radarLayerOld);
-      radarLayerOld = null;
-    }
-    lastRadarTimestamp = null; // Reset last timestamp when radar is disabled
-    return;
+  const radarType = document.getElementById('radarLayer').value;
+  if (radarType !== lastRadarType) {
+    timestamp = lastRadarTimestamp || Date.now();
   }
-
-  if (typeof timestamp !== 'number' || isNaN(timestamp)) {
-    console.error(`Invalid timestamp in updateRadarLayer: ${JSON.stringify(timestamp)}`);
-    return;
-  }
-
-  const sixDaysInMs = 6 * 24 * 60 * 60 * 1000;
-  if (Date.now() - timestamp > sixDaysInMs) {
-    console.log(`Radar layer not updated: Timestamp ${new Date(timestamp).toISOString()} is more than 6 days ago`);
+  if (!map || radarType === 'none') {
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
@@ -1377,26 +1411,77 @@ async function updateRadarLayer(timestamp) {
       radarLayerOld = null;
     }
     lastRadarTimestamp = null;
+    lastRadarType = null;
     return;
   }
-
-  // Round timestamp to check if it matches the last fetched timestamp
+  if (typeof timestamp !== 'number' || isNaN(timestamp) || timestamp < Date.now() - sixDaysInMs || timestamp < 31536000000) { // Reject 1970 or earlier
+    console.error(`Invalid or outdated timestamp in updateRadarLayer: ${JSON.stringify(timestamp)}`);
+    if (lastValidTileUrls[radarType]) {
+      console.log(`Using last valid URL for ${radarType}: ${lastValidTileUrls[radarType]}`);
+      const initialOpacity = parseFloat(document.getElementById('radarOpacity')?.value || 0.8);
+      let newRadarLayer;
+      if (radarOptions[radarType].type === 'image') {
+        newRadarLayer = L.imageOverlay(lastValidTileUrls[radarType], radarOptions[radarType].bounds, {
+          opacity: initialOpacity,
+          zIndex: 150,
+          className: 'smooth-raster'
+        });
+        newRadarLayer.on('load', () => {
+          const imgElement = newRadarLayer.getElement();
+          if (imgElement) {
+            imgElement.style.imageRendering = 'pixelated';
+            imgElement.style.opacity = initialOpacity;
+          }
+        });
+      } else {
+        newRadarLayer = L.vectorGrid.protobuf(lastValidTileUrls[radarType], {
+          rendererFactory: L.canvas.tile,
+          vectorTileLayerStyles: {
+            'default': { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' },
+            [radarType]: { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' },
+            'features': { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' }
+          },
+          zIndex: 150,
+          interactive: false,
+          maxZoom: 12
+        });
+      }
+      if (radarLayer) map.removeLayer(radarLayer);
+      if (radarLayerOld) map.removeLayer(radarLayerOld);
+      radarLayerOld = radarLayer;
+      radarLayer = newRadarLayer;
+      newRadarLayer.addTo(map);
+      map.setMaxZoom(12);
+    } else {
+      if (radarLayer) {
+        map.removeLayer(radarLayer);
+        radarLayer = null;
+        map.setMaxZoom(18);
+      }
+      if (radarLayerOld) {
+        map.removeLayer(radarLayerOld);
+        radarLayerOld = null;
+      }
+      lastRadarTimestamp = null;
+      lastRadarType = null;
+    }
+    updateLegend()
+    return;
+  }
+  const interval = radarOptions[radarType].interval;
   const roundedTimestamp = new Date(timestamp);
-  roundedTimestamp.setMinutes(Math.floor(roundedTimestamp.getMinutes() / 5) * 5);
+  roundedTimestamp.setMinutes(Math.floor(roundedTimestamp.getMinutes() / (interval / 60 / 1000)) * (interval / 60 / 1000));
   roundedTimestamp.setSeconds(0);
   roundedTimestamp.setMilliseconds(0);
   const roundedTimestampMs = roundedTimestamp.getTime();
-
-  // Skip fetch if the rounded timestamp hasn't changed (prevents redundant fetches in animation)
-  if (lastRadarTimestamp === roundedTimestampMs) {
-    console.log(`Skipping radar fetch for ${new Date(timestamp).toISOString()} (same as last: ${new Date(lastRadarTimestamp).toISOString()})`);
+  if (lastRadarTimestamp === roundedTimestampMs && lastRadarType === radarType) {
+    console.log(`Skipping radar fetch for ${new Date(timestamp).toISOString()} (same as last: ${new Date(lastRadarTimestamp).toISOString()}, type: ${radarType})`);
     return;
   }
-
-  const tileUrl = await getRadarImageUrl(timestamp);
-  console.log(`Updating radar for timestamp: ${new Date(timestamp).toISOString()}`);
-  if (!tileUrl) {
-    console.warn('No valid radar tile found for the selected time');
+  const radarUrl = await getRadarImageUrl(timestamp, radarType);
+  console.log(`Updating radar for timestamp: ${new Date(timestamp).toISOString()}, type: ${radarType}`);
+  if (!radarUrl) {
+    console.warn('No valid radar data found for the selected time');
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
@@ -1407,70 +1492,24 @@ async function updateRadarLayer(timestamp) {
       radarLayerOld = null;
     }
     lastRadarTimestamp = null;
+    lastRadarType = null;
     return;
   }
-
-  lastRadarTimestamp = roundedTimestampMs; // Update last fetched timestamp
+  lastRadarTimestamp = roundedTimestampMs;
+  lastRadarType = radarType;
   const initialOpacity = parseFloat(document.getElementById('radarOpacity')?.value || 0.8);
-
-  // Check if VectorGrid is available
-  if (typeof L === 'undefined' || !L.vectorGrid || !L.vectorGrid.protobuf) {
-    console.error('Leaflet.VectorGrid is not loaded. Please include the VectorGrid library.');
-    console.warn('Falling back to a simple tile layer (this may not work correctly for PBF tiles)');
-    
-    const newRadarLayer = L.tileLayer(tileUrl, {
+  if (radarOptions[radarType].type === 'image') {
+    const newRadarLayer = L.imageOverlay(radarUrl, radarOptions[radarType].bounds, {
       opacity: initialOpacity,
       zIndex: 150,
-      maxZoom: 12,
-      attribution: 'DTN Meteoguard'
+      className: 'smooth-raster'
     });
-
-    if (radarLayer) {
-      map.removeLayer(radarLayer);
-    }
-    if (radarLayerOld) {
-      map.removeLayer(radarLayerOld);
-    }
-    radarLayerOld = radarLayer;
-    radarLayer = newRadarLayer;
-    newRadarLayer.addTo(map);
-    map.setMaxZoom(12);
-    return;
-  }
-
-  try {
-    const newRadarLayer = L.vectorGrid.protobuf(tileUrl, {
-      rendererFactory: L.canvas.tile,
-      vectorTileLayerStyles: {
-        'default': {
-          fill: true,
-          opacity: initialOpacity,
-          fillOpacity: initialOpacity,
-          weight: 0,
-          color: 'inherit'
-        },
-        'radar-precip-intensity-uk-contours': {
-          fill: true,
-          opacity: initialOpacity,
-          fillOpacity: initialOpacity,
-          weight: 0,
-          color: 'inherit'
-        },
-        'features': {
-          fill: true,
-          opacity: initialOpacity,
-          fillOpacity: initialOpacity,
-          weight: 0,
-          color: 'inherit'
-        }
-      },
-      zIndex: 150,
-      interactive: false,
-      maxZoom: 12
-    });
-
     newRadarLayer.on('load', () => {
-      console.log('Vector tile layer loaded successfully');
+      const imgElement = newRadarLayer.getElement();
+      if (imgElement) {
+        imgElement.style.imageRendering = 'pixelated';
+        imgElement.style.opacity = initialOpacity;
+      }
       if (radarLayer) {
         map.removeLayer(radarLayer);
       }
@@ -1480,35 +1519,109 @@ async function updateRadarLayer(timestamp) {
       radarLayerOld = radarLayer;
       radarLayer = newRadarLayer;
     });
-
-    newRadarLayer.on('error', (e) => {
-      console.error('Vector tile layer error:', e);
-    });
-
     newRadarLayer.addTo(map);
     map.setMaxZoom(12);
-  } catch (error) {
-    console.error('Error creating vector tile layer:', error);
-    const newRadarLayer = L.tileLayer(tileUrl, {
-      opacity: initialOpacity,
-      zIndex: 150,
-      maxZoom: 12,
-      attribution: 'DTN Meteoguard'
-    });
-
-    if (radarLayer) {
-      map.removeLayer(radarLayer);
+  } else {
+    if (typeof L === 'undefined' || !L.vectorGrid || !L.vectorGrid.protobuf) {
+      console.error('Leaflet.VectorGrid is not loaded. Please include the VectorGrid library.');
+      console.warn('Falling back to a simple tile layer (this may not work correctly for PBF tiles)');
+      const newRadarLayer = L.tileLayer(radarUrl, {
+        opacity: initialOpacity,
+        zIndex: 150,
+        maxZoom: 12,
+        attribution: 'DTN Meteoguard'
+      });
+      if (radarLayer) {
+        map.removeLayer(radarLayer);
+      }
+      if (radarLayerOld) {
+        map.removeLayer(radarLayerOld);
+      }
+      radarLayerOld = radarLayer;
+      radarLayer = newRadarLayer;
+      newRadarLayer.addTo(map);
+      map.setMaxZoom(12);
+      return;
     }
-    if (radarLayerOld) {
-      map.removeLayer(radarLayerOld);
+    try {
+      const newRadarLayer = L.vectorGrid.protobuf(radarUrl, {
+        rendererFactory: L.canvas.tile,
+        vectorTileLayerStyles: {
+          'default': {
+            fill: true,
+            opacity: initialOpacity,
+            fillOpacity: initialOpacity,
+            weight: 0,
+            color: 'inherit'
+          },
+          [radarType]: {
+            fill: true,
+            opacity: initialOpacity,
+            fillOpacity: initialOpacity,
+            weight: 0,
+            color: 'inherit'
+          },
+          'features': {
+            fill: true,
+            opacity: initialOpacity,
+            fillOpacity: initialOpacity,
+            weight: 0,
+            color: 'inherit'
+          }
+        },
+        zIndex: 150,
+        interactive: false,
+        maxZoom: 12
+      });
+      newRadarLayer.on('load', () => {
+        console.log('Vector tile layer loaded successfully');
+        if (radarLayer) {
+          map.removeLayer(radarLayer);
+        }
+        if (radarLayerOld) {
+          map.removeLayer(radarLayerOld);
+        }
+        radarLayerOld = radarLayer;
+        radarLayer = newRadarLayer;
+      });
+      newRadarLayer.on('error', (e) => {
+        console.error('Vector tile layer error:', e);
+      });
+      newRadarLayer.addTo(map);
+      map.setMaxZoom(12);
+    } catch (error) {
+      console.error('Error creating vector tile layer:', error);
+      const newRadarLayer = L.tileLayer(radarUrl, {
+        opacity: initialOpacity,
+        zIndex: 150,
+        maxZoom: 12,
+        attribution: 'DTN Meteoguard'
+      });
+      if (radarLayer) {
+        map.removeLayer(radarLayer);
+      }
+      if (radarLayerOld) {
+        map.removeLayer(radarLayerOld);
+      }
+      radarLayerOld = radarLayer;
+      radarLayer = newRadarLayer;
+      newRadarLayer.addTo(map);
+      map.setMaxZoom(12);
     }
-    radarLayerOld = radarLayer;
-    radarLayer = newRadarLayer;
-    newRadarLayer.addTo(map);
-    map.setMaxZoom(12);
   }
 }
 
+
+    function updateRadarLayerSelection() {
+      updateRadarLayer(Date.now());
+    }
+
+    function updateRadarOpacity() {
+      const opacity = parseFloat(document.getElementById('radarOpacity').value);
+      if (radarLayer) {
+        radarLayer.setOpacity(opacity);
+      }
+    }
 function handleTimeSliderChange(event) {
   const historySlider = document.getElementById('history-slider');
   if (!historySlider) {
@@ -3753,7 +3866,11 @@ function addLightningFlash3D(lng, lat) {
   const kmlEnabled = document.getElementById('kml-layer-toggle')?.checked;
   const pngEnabled = document.getElementById('png-layer-toggle')?.checked;
   const nowcastEnabled = document.getElementById('nowcast-toggle').checked;
-  const radarEnable = document.getElementById('radarLayer').checked;
+  
+  // Fix: Get radar type from select value and check if enabled
+  const radarSelect = document.getElementById('radarLayer');
+  const radarEnabled = radarSelect && radarSelect.value !== 'none';
+  const radarType = radarSelect ? radarSelect.value : null;
 
   if (lightningEnabled) {
     legendDiv.innerHTML += '<h4>Lightning Strikes</h4>';
@@ -3811,81 +3928,383 @@ function addLightningFlash3D(lng, lat) {
       <div><div class="color-box" style="background: yellow"></div>Low Confidence</div>
     `;
   }
-  if (radarEnable) {
-    legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>Very Light Rain (0.2–0.4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>Light Rain (0.5 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>Light Rain (0.6–1 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>Light to Moderate Rain (1.25 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>Moderate Rain (2 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>Moderate Rain (3–4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>Heavy Rain (5–8 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>Very Heavy Rain (10–15 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>Very Heavy Rain (20–30 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>Very Heavy Rain (35–50 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>Extreme Rain (65–100 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>Extreme Rain (150–200 mm/h)</div>
-    `;
-    legendDiv.innerHTML += '<h4>Precipitation: Freezing Rain</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>Light Freezing Rain (0.2–0.4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>Light Freezing Rain (0.5–0.6 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>Light Freezing Rain (0.7–1 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(252, 133, 145)"></div>Moderate Freezing Rain (1.25 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(250, 88, 103)"></div>Moderate Freezing Rain (2 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>Moderate Freezing Rain (3–4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>Heavy Freezing Rain (5–8 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>Very Heavy Freezing Rain (10–15 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>Very Heavy Freezing Rain (20–30 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>Extreme Freezing Rain (35–200 mm/h)</div>
-    `;
-    legendDiv.innerHTML += '<h4>Precipitation: Hail</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>Moderate Hail (8 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>Moderate Hail (10–15 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>Heavy Hail (20–30 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>Very Heavy Hail (35–200 mm/h)</div>
-    `;
-    legendDiv.innerHTML += '<h4>Precipitation: Snow</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>Light Snow (0.2–0.4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>Light Snow (0.5–0.6 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>Light Snow (0.7–1 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(34, 145, 176)"></div>Moderate Snow (1.25 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(8, 98, 138)"></div>Moderate Snow (2 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>Moderate Snow (3–4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>Heavy Snow (5–8 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>Very Heavy Snow (10–200 mm/h)</div>
-    `;
-    legendDiv.innerHTML += '<h4>Precipitation: Rain and Snow (Sleet)</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>Light Rain and Snow (0.2–0.3 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>Light Rain and Snow (0.4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>Light Rain and Snow (0.5–0.6 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>Light Rain and Snow (0.7–1 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>Moderate Rain and Snow (1.25 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>Moderate Rain and Snow (2 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>Moderate Rain and Snow (3–4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>Heavy Rain and Snow (5–8 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>Very Heavy Rain and Snow (10–15 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>Very Heavy Rain and Snow (20–30 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>Extreme Rain and Snow (35–200 mm/h)</div>
-    `;
-    legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>Light Snow Pellets (0.2–0.3 mm/h)</div>
-    `;
-    legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets and Hail</h4>';
-    legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>Light Snow Pellets and Hail (0.4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>Light Snow Pellets and Hail (0.5–0.6 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>Light Snow Pellets and Hail (0.7–1 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>Moderate Snow Pellets and Hail (1.25 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>Moderate Snow Pellets and Hail (2 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>Moderate Snow Pellets and Hail (3–4 mm/h)</div>
-      <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>Heavy Snow Pellets and Hail (5 mm/h)</div>
-    `;
+
+  // Fix: Proper radar legend structure with all conditions inside radarEnabled check
+  if (radarEnabled && radarType) {
+    if (radarType === 'uk-precip-intensity-pixelated') {
+      legendDiv.innerHTML += '<h4>Rainfall Intensity</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: #b30000"></div>>32mm/h</div>
+        <div><div class="color-box" style="background: #fe0000"></div>16-32mm/h</div>
+        <div><div class="color-box" style="background: #fe9800"></div>8-16mm/h</div>
+        <div><div class="color-box" style="background: #00a300"></div>2-4mm/h</div>
+        <div><div class="color-box" style="background: #0cbcfe"></div>1-2mm/h</div>
+        <div><div class="color-box" style="background: #3265fe"></div>0.5-1mm/h</div>
+        <div><div class="color-box" style="background: #0000fe"></div><0.5mm/h</div>
+      `;
+    } else if (radarType === 'uk-precip-type') {
+      legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Freezing Rain</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(252, 133, 145)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 88, 103)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Hail</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Snow</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(34, 145, 176)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(8, 98, 138)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Rain and Snow (Sleet)</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets and Hail</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
+      `;
+      
+    } else if (radarType === 'europe-precip-type') {
+      legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Freezing Rain</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(252, 133, 145)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(250, 88, 103)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Hail</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Snow</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(34, 145, 176)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(8, 98, 138)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Rain and Snow (Sleet)</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
+      `;
+      legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets and Hail</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
+      `;
+    } else {
+      // Default for other radar types (e.g., smooth Europe radar)
+      legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>0.5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.6 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.7 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>1 mm/h</div>
+        <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>1.25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>2 mm/h</div>
+        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>3 mm/h</div>
+        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>4 mm/h</div>
+        <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>5 mm/h</div>
+        <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>8 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>10 mm/h</div>
+        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>15 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>20 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>25 mm/h</div>
+        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>30 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>35 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>40 mm/h</div>
+        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>50 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>65 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>75 mm/h</div>
+        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>100 mm/h</div>
+        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>150 mm/h</div>
+        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>200 mm/h</div>
+      `;
+    }
   }
 
   // Show or hide based on isLegendVisible and content
