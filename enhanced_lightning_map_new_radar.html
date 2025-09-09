@@ -958,7 +958,7 @@ body.three-d-mode #map-3d {
       <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
       <label>Radar Layer: <input type="checkbox" id="radarLayer" checked><span class="tooltip">Show rainfall radar</span></label>
 
-      <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="1"></label>      
+      <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="0.8"></label>      
 
       
       <!--<label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"><span class="tooltip">Switch to 3D view</span></label>-->
@@ -1277,7 +1277,7 @@ async function getRadarImageUrl(timestamp) {
       return null;
     }
     const iso = formatISO(checkTime);
-    const tileUrl = `https://tiles.meteoguard.dtn.com/tiles/radar-precip-intensity-uk-contours/${iso}/${iso}/0/0/0.pbf`;
+    const tileUrl = `https://tiles.meteoguard.dtn.com/tiles/radar-precip-type-uk-contours/${iso}/${iso}/0/0/0.pbf`;
 
     for (let retry = 0; retry < maxRetries; retry++) {
       try {
@@ -1286,7 +1286,7 @@ async function getRadarImageUrl(timestamp) {
           const arrayBuffer = await response.arrayBuffer();
           if (arrayBuffer.byteLength > 0) {
             console.log(`Valid tile found for ${iso}`);
-            return `https://tiles.meteoguard.dtn.com/tiles/radar-precip-intensity-uk-contours/${iso}/${iso}/{z}/{x}/{y}.pbf`;
+            return `https://tiles.meteoguard.dtn.com/tiles/radar-precip-type-uk-contours/${iso}/${iso}/{z}/{x}/{y}.pbf`;
           } else {
             console.warn(`Empty tile for ${iso} (attempt ${retry + 1})`);
           }
