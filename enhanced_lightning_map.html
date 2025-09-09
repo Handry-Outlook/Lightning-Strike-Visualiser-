@@ -1395,12 +1395,21 @@ async function getRadarImageUrl(timestamp, radarType) {
   }
 }
 
+let lastSliderPosition = null;
+
 async function updateRadarLayer(timestamp) {
   const radarType = document.getElementById('radarLayer').value;
-  if (radarType !== lastRadarType) {
-    timestamp = lastRadarTimestamp || Date.now();
-  }
+  const timeSlider = document.getElementById('timeSlider');
+  const currentSliderPosition = timeSlider ? timeSlider.value : null;
+  const isMaxTime = timeSlider && timeSlider.value === timeSlider.max;
+  const isHistorical = Date.now() - timestamp >= 60000; // Timestamp is 1 minute or more in the past
+  const isNonConsecutiveNow = isMaxTime && (lastSliderPosition !== currentSliderPosition || !lastRadarTimestamp || Math.abs(timestamp - lastRadarTimestamp) >= radarOptions[radarType].interval);
+
+  console.log(`updateRadarLayer called: timestamp=${new Date(timestamp).toISOString()}, radarType=${radarType}, sliderPosition=${currentSliderPosition}, isMaxTime=${isMaxTime}, isHistorical=${isHistorical}, isNonConsecutiveNow=${isNonConsecutiveNow}`);
+
+  // Clear layers if radarType is 'none' or map is not available
   if (!map || radarType === 'none') {
+    console.log('Clearing layers: no map or radarType is none');
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
@@ -1412,94 +1421,112 @@ async function updateRadarLayer(timestamp) {
     }
     lastRadarTimestamp = null;
     lastRadarType = null;
+    lastRadarUrl = null;
+    lastSliderPosition = null;
+    updateLegend();
     return;
   }
-  if (typeof timestamp !== 'number' || isNaN(timestamp) || timestamp < Date.now() - sixDaysInMs || timestamp < 31536000000) { // Reject 1970 or earlier
-    console.error(`Invalid or outdated timestamp in updateRadarLayer: ${JSON.stringify(timestamp)}`);
+
+  // Validate timestamp
+  if (typeof timestamp !== 'number' || isNaN(timestamp) || timestamp < Date.now() - sixDaysInMs || timestamp < 31536000000) {
+    console.error(`Invalid or outdated timestamp: ${JSON.stringify(timestamp)}`);
     if (lastValidTileUrls[radarType]) {
       console.log(`Using last valid URL for ${radarType}: ${lastValidTileUrls[radarType]}`);
-      const initialOpacity = parseFloat(document.getElementById('radarOpacity')?.value || 0.8);
-      let newRadarLayer;
-      if (radarOptions[radarType].type === 'image') {
-        newRadarLayer = L.imageOverlay(lastValidTileUrls[radarType], radarOptions[radarType].bounds, {
-          opacity: initialOpacity,
-          zIndex: 150,
-          className: 'smooth-raster'
-        });
-        newRadarLayer.on('load', () => {
-          const imgElement = newRadarLayer.getElement();
-          if (imgElement) {
-            imgElement.style.imageRendering = 'pixelated';
-            imgElement.style.opacity = initialOpacity;
-          }
-        });
-      } else {
-        newRadarLayer = L.vectorGrid.protobuf(lastValidTileUrls[radarType], {
-          rendererFactory: L.canvas.tile,
-          vectorTileLayerStyles: {
-            'default': { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' },
-            [radarType]: { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' },
-            'features': { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' }
-          },
-          zIndex: 150,
-          interactive: false,
-          maxZoom: 12
-        });
-      }
-      if (radarLayer) map.removeLayer(radarLayer);
-      if (radarLayerOld) map.removeLayer(radarLayerOld);
-      radarLayerOld = radarLayer;
-      radarLayer = newRadarLayer;
-      newRadarLayer.addTo(map);
-      map.setMaxZoom(12);
+      await plotRadarLayer(lastValidTileUrls[radarType], radarType);
     } else {
-      if (radarLayer) {
-        map.removeLayer(radarLayer);
-        radarLayer = null;
-        map.setMaxZoom(18);
-      }
-      if (radarLayerOld) {
-        map.removeLayer(radarLayerOld);
-        radarLayerOld = null;
-      }
-      lastRadarTimestamp = null;
-      lastRadarType = null;
+      console.log('No valid URL available, clearing layers');
+      clearRadarLayers();
     }
-    updateLegend()
+    lastSliderPosition = currentSliderPosition;
+    updateLegend();
     return;
   }
+
+  // Round timestamp to match radar data intervals
   const interval = radarOptions[radarType].interval;
   const roundedTimestamp = new Date(timestamp);
   roundedTimestamp.setMinutes(Math.floor(roundedTimestamp.getMinutes() / (interval / 60 / 1000)) * (interval / 60 / 1000));
   roundedTimestamp.setSeconds(0);
   roundedTimestamp.setMilliseconds(0);
   const roundedTimestampMs = roundedTimestamp.getTime();
-  if (lastRadarTimestamp === roundedTimestampMs && lastRadarType === radarType) {
-    console.log(`Skipping radar fetch for ${new Date(timestamp).toISOString()} (same as last: ${new Date(lastRadarTimestamp).toISOString()}, type: ${radarType})`);
+
+  console.log(`Rounded timestamp: ${new Date(roundedTimestampMs).toISOString()}, interval: ${interval}ms`);
+
+  // Calculate timestamps for the previous two intervals
+  const previousTimestamp1 = roundedTimestampMs - interval;
+  const previousTimestamp2 = roundedTimestampMs - 2 * interval;
+
+  // Fetch URLs for current and past two timestamps
+  console.log(`Fetching URLs for timestamps: ${new Date(roundedTimestampMs).toISOString()}, ${new Date(previousTimestamp1).toISOString()}, ${new Date(previousTimestamp2).toISOString()}`);
+  const radarUrls = await Promise.all([
+    getRadarImageUrl(roundedTimestampMs, radarType).catch(() => null),
+    getRadarImageUrl(previousTimestamp1, radarType).catch(() => null),
+    getRadarImageUrl(previousTimestamp2, radarType).catch(() => null)
+  ]);
+
+  const [currentRadarUrl, previousRadarUrl1, previousRadarUrl2] = radarUrls;
+  console.log(`Fetched URLs: current=${currentRadarUrl}, prev1=${previousRadarUrl1}, prev2=${previousRadarUrl2}`);
+
+  // If no valid URL for the current timestamp, try fallback to previous URLs or last valid URL
+  if (!currentRadarUrl) {
+    console.warn(`No valid radar data found for timestamp: ${new Date(roundedTimestampMs).toISOString()}`);
+    if (previousRadarUrl1) {
+      console.log(`Falling back to previous timestamp: ${new Date(previousTimestamp1).toISOString()}`);
+      await plotRadarLayer(previousRadarUrl1, radarType, previousTimestamp1);
+      lastValidTileUrls[radarType] = previousRadarUrl1;
+    } else if (previousRadarUrl2) {
+      console.log(`Falling back to second previous timestamp: ${new Date(previousTimestamp2).toISOString()}`);
+      await plotRadarLayer(previousRadarUrl2, radarType, previousTimestamp2);
+      lastValidTileUrls[radarType] = previousRadarUrl2;
+    } else if (lastValidTileUrls[radarType]) {
+      console.log(`Using last valid URL for ${radarType}: ${lastValidTileUrls[radarType]}`);
+      await plotRadarLayer(lastValidTileUrls[radarType], radarType);
+    } else {
+      console.log('No valid URLs available, clearing layers');
+      clearRadarLayers();
+    }
+    lastSliderPosition = currentSliderPosition;
+    updateLegend();
     return;
   }
-  const radarUrl = await getRadarImageUrl(timestamp, radarType);
-  console.log(`Updating radar for timestamp: ${new Date(timestamp).toISOString()}, type: ${radarType}`);
-  if (!radarUrl) {
-    console.warn('No valid radar data found for the selected time');
-    if (radarLayer) {
-      map.removeLayer(radarLayer);
-      radarLayer = null;
-      map.setMaxZoom(18);
-    }
-    if (radarLayerOld) {
-      map.removeLayer(radarLayerOld);
-      radarLayerOld = null;
-    }
-    lastRadarTimestamp = null;
-    lastRadarType = null;
+
+  // For historical timestamps (>= 1 min ago), skip update only if timestamp, radar type, and slider position are unchanged
+  if (isHistorical && currentSliderPosition === lastSliderPosition && lastRadarType === radarType && lastRadarTimestamp === roundedTimestampMs) {
+    console.log(`No update needed for historical timestamp. Slider position unchanged at ${currentSliderPosition}, radar data for ${radarType} at ${new Date(lastRadarTimestamp).toISOString()}`);
     return;
   }
-  lastRadarTimestamp = roundedTimestampMs;
-  lastRadarType = radarType;
+
+  // For NOW, skip update only if not a non-consecutive request, radar type is unchanged, timestamp is not newer, and URL is unchanged
+  if (isMaxTime && !isNonConsecutiveNow && lastRadarTimestamp && lastRadarType === radarType && roundedTimestampMs <= lastRadarTimestamp && lastRadarUrl === currentRadarUrl) {
+    console.log(`No newer radar data available for NOW. Current: ${new Date(lastRadarTimestamp).toISOString()}, Requested: ${new Date(roundedTimestampMs).toISOString()}`);
+    lastSliderPosition = currentSliderPosition;
+    return;
+  }
+
+  // For non-historical, non-max-time timestamps (less than 1 min ago), skip if slider position, radar type, URL, and timestamp are unchanged
+  if (!isMaxTime && !isHistorical && currentSliderPosition === lastSliderPosition && lastRadarType === radarType && lastRadarUrl === currentRadarUrl && lastRadarTimestamp === roundedTimestampMs) {
+    console.log(`No update needed. Slider position unchanged at ${currentSliderPosition}, radar data for ${radarType} at ${new Date(lastRadarTimestamp).toISOString()}`);
+    return;
+  }
+
+  // Plot new radar layer with the current timestamp
+  console.log(`Plotting radar for timestamp: ${new Date(roundedTimestampMs).toISOString()}, type: ${radarType}, URL: ${currentRadarUrl}`);
+  await plotRadarLayer(currentRadarUrl, radarType, roundedTimestampMs);
+  lastValidTileUrls[radarType] = currentRadarUrl;
+  lastSliderPosition = currentSliderPosition;
+  updateLegend();
+
+  // Store previous URLs in lastValidTileUrls for potential fallback
+  if (previousRadarUrl1) lastValidTileUrls[radarType + '_prev1'] = previousRadarUrl1;
+  if (previousRadarUrl2) lastValidTileUrls[radarType + '_prev2'] = previousRadarUrl2;
+}
+
+async function plotRadarLayer(radarUrl, radarType, timestamp) {
   const initialOpacity = parseFloat(document.getElementById('radarOpacity')?.value || 0.8);
+  let newRadarLayer;
+
   if (radarOptions[radarType].type === 'image') {
-    const newRadarLayer = L.imageOverlay(radarUrl, radarOptions[radarType].bounds, {
+    newRadarLayer = L.imageOverlay(radarUrl, radarOptions[radarType].bounds, {
       opacity: initialOpacity,
       zIndex: 150,
       className: 'smooth-raster'
@@ -1510,105 +1537,61 @@ async function updateRadarLayer(timestamp) {
         imgElement.style.imageRendering = 'pixelated';
         imgElement.style.opacity = initialOpacity;
       }
-      if (radarLayer) {
-        map.removeLayer(radarLayer);
-      }
-      if (radarLayerOld) {
-        map.removeLayer(radarLayerOld);
-      }
-      radarLayerOld = radarLayer;
-      radarLayer = newRadarLayer;
     });
-    newRadarLayer.addTo(map);
-    map.setMaxZoom(12);
   } else {
-    if (typeof L === 'undefined' || !L.vectorGrid || !L.vectorGrid.protobuf) {
-      console.error('Leaflet.VectorGrid is not loaded. Please include the VectorGrid library.');
-      console.warn('Falling back to a simple tile layer (this may not work correctly for PBF tiles)');
-      const newRadarLayer = L.tileLayer(radarUrl, {
-        opacity: initialOpacity,
-        zIndex: 150,
-        maxZoom: 12,
-        attribution: 'DTN Meteoguard'
-      });
-      if (radarLayer) {
-        map.removeLayer(radarLayer);
-      }
-      if (radarLayerOld) {
-        map.removeLayer(radarLayerOld);
-      }
-      radarLayerOld = radarLayer;
-      radarLayer = newRadarLayer;
-      newRadarLayer.addTo(map);
-      map.setMaxZoom(12);
-      return;
-    }
     try {
-      const newRadarLayer = L.vectorGrid.protobuf(radarUrl, {
+      newRadarLayer = L.vectorGrid.protobuf(radarUrl, {
         rendererFactory: L.canvas.tile,
         vectorTileLayerStyles: {
-          'default': {
-            fill: true,
-            opacity: initialOpacity,
-            fillOpacity: initialOpacity,
-            weight: 0,
-            color: 'inherit'
-          },
-          [radarType]: {
-            fill: true,
-            opacity: initialOpacity,
-            fillOpacity: initialOpacity,
-            weight: 0,
-            color: 'inherit'
-          },
-          'features': {
-            fill: true,
-            opacity: initialOpacity,
-            fillOpacity: initialOpacity,
-            weight: 0,
-            color: 'inherit'
-          }
+          'default': { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' },
+          [radarType]: { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' },
+          'features': { fill: true, opacity: initialOpacity, fillOpacity: initialOpacity, weight: 0, color: 'inherit' }
         },
         zIndex: 150,
         interactive: false,
         maxZoom: 12
       });
-      newRadarLayer.on('load', () => {
-        console.log('Vector tile layer loaded successfully');
-        if (radarLayer) {
-          map.removeLayer(radarLayer);
-        }
-        if (radarLayerOld) {
-          map.removeLayer(radarLayerOld);
-        }
-        radarLayerOld = radarLayer;
-        radarLayer = newRadarLayer;
-      });
-      newRadarLayer.on('error', (e) => {
-        console.error('Vector tile layer error:', e);
-      });
-      newRadarLayer.addTo(map);
-      map.setMaxZoom(12);
+      newRadarLayer.on('error', (e) => console.error('Vector tile layer error:', e));
     } catch (error) {
       console.error('Error creating vector tile layer:', error);
-      const newRadarLayer = L.tileLayer(radarUrl, {
+      newRadarLayer = L.tileLayer(radarUrl, {
         opacity: initialOpacity,
         zIndex: 150,
         maxZoom: 12,
         attribution: 'DTN Meteoguard'
       });
-      if (radarLayer) {
-        map.removeLayer(radarLayer);
-      }
-      if (radarLayerOld) {
-        map.removeLayer(radarLayerOld);
-      }
-      radarLayerOld = radarLayer;
-      radarLayer = newRadarLayer;
-      newRadarLayer.addTo(map);
-      map.setMaxZoom(12);
     }
   }
+
+  // Update layers
+  if (radarLayer) map.removeLayer(radarLayer);
+  if (radarLayerOld) map.removeLayer(radarLayerOld);
+  radarLayerOld = radarLayer;
+  radarLayer = newRadarLayer;
+  newRadarLayer.addTo(map);
+  map.setMaxZoom(12);
+
+  // Update tracking variables
+  lastValidTileUrls[radarType] = radarUrl;
+  lastRadarTimestamp = timestamp || lastRadarTimestamp;
+  lastRadarType = radarType;
+  lastRadarUrl = radarUrl;
+}
+
+function clearRadarLayers() {
+  if (radarLayer) {
+    map.removeLayer(radarLayer);
+    radarLayer = null;
+    map.setMaxZoom(18);
+  }
+  if (radarLayerOld) {
+    map.removeLayer(radarLayerOld);
+    radarLayerOld = null;
+  }
+  lastRadarTimestamp = null;
+  lastRadarType = null;
+  lastRadarUrl = null;
+  lastSliderPosition = null;
 }
 
 
@@ -3670,7 +3653,7 @@ function addLightningFlash3D(lng, lat) {
 
       setTimeout(() => { isAdjustingHistory = false; }, 1000);
     }
-
+    
     function removeTimeFilter() {
       lastFilterMode = 'slider';
       customFilterStart = null;
