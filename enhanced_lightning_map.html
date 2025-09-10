@@ -987,13 +987,14 @@ body.three-d-mode #map-3d {
       <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"><span class="tooltip">Show 2D heatmap</span></label>
       <!--<label id="heatmap-3d-toggle-label">3D Heatmap: <input type="checkbox" id="heatmap-3d-toggle" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Show 3D heatmap in 3D mode</span></label>-->
       <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
-      <label>Radar Layer: 
+      <label>Radar and Satellite Layer: 
         <select id="radarLayer" onchange="updateRadarLayerSelection()">
           <option value="uk-precip-intensity">UK High Resolution Rainfall Intensity (Smoothed)</option>
           <option value="uk-precip-intensity-pixelated">UK High Resolution Rainfall Intensity (Pixelated)</option>
           <option value="uk-precip-type">UK High Resolution Precipitation Type</option>
           <option value="europe-precip-intensity">Europe Low Resolution Rainfall Intensity</option>
           <option value="europe-precip-type">Europe Low Resolution Precipitation Type</option>
+          <option value="satellite">Satellite Imagery</option>
           <option value="none">None</option>
         </select><span class="tooltip">Select radar data layer</span>
       </label>
@@ -1132,21 +1133,21 @@ body.three-d-mode #map-3d {
     let map, map3D;
     let baseLayers = {
   opentopo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-    maxZoom: 17,
+    
     attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
   }),
   custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
+    
     attribution: '© OpenStreetMap'
   }),
   esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
+    
     attribution: 'Tiles © Esri'
   }),
   'maptiler-streets': L.maptiler.maptilerLayer({
@@ -1170,64 +1171,64 @@ body.three-d-mode #map-3d {
     attribution: '© MapTiler © OpenStreetMap contributors'
   }),
   'mapbox-satellite': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-outdoors': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-dark': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-navigation': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/navigation-day-v1/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-light': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-streets-satellite': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-navigation-night': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/navigation-night-v1/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-traffic-day': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/traffic-day-v2/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-traffic-night': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/traffic-night-v2/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   }),
   'mapbox-contrast': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/high-contrast-v1/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-    tileSize: 512,
-    zoomOffset: -1,
+    tileSize: 256,
+    
     attribution: '© Mapbox © OpenStreetMap',
-    maxZoom: 18
+    
   })
 };
 
@@ -1347,6 +1348,11 @@ const radarOptions = {
       'europe-precip-type': {
         url: 'https://tiles.meteoguard.dtn.com/tiles/radar-precip-type-europe-contours/${iso}/${iso}/{z}/{x}/{y}.pbf',
         interval: 15 * 60 * 1000,
+        type: 'vector'
+      },
+      'satellite': {
+        url: 'https://tiles.meteoguard.dtn.com/tiles/RASTER.obs-sat.mg.global-composite_data_ir.WeatherPro/${iso}/${iso}/{z}/{x}/{y}.pbf',
+        interval: 10 * 60 * 1000,
         type: 'vector'
       },
       'uk-precip-intensity-pixelated': {
@@ -1480,7 +1486,7 @@ async function updateRadarLayer(timestamp) {
     if (radarLayer) {
       map.removeLayer(radarLayer);
       radarLayer = null;
-      map.setMaxZoom(18);
+      
     }
     if (radarLayerOld) {
       map.removeLayer(radarLayerOld);
@@ -1616,7 +1622,7 @@ async function plotRadarLayer(radarUrl, radarType, timestamp) {
         },
         zIndex: 150,
         interactive: false,
-        maxZoom: 12
+        
       });
       newRadarLayer.on('error', (e) => console.error('Vector tile layer error:', e));
     } catch (error) {
@@ -1624,7 +1630,7 @@ async function plotRadarLayer(radarUrl, radarType, timestamp) {
       newRadarLayer = L.tileLayer(radarUrl, {
         opacity: initialOpacity,
         zIndex: 150,
-        maxZoom: 12,
+        
         attribution: 'DTN Meteoguard'
       });
     }
@@ -1636,7 +1642,7 @@ async function plotRadarLayer(radarUrl, radarType, timestamp) {
   radarLayerOld = radarLayer;
   radarLayer = newRadarLayer;
   newRadarLayer.addTo(map);
-  map.setMaxZoom(12);
+ 
 
   // Update tracking variables
   lastValidTileUrls[radarType] = radarUrl;
@@ -1649,7 +1655,7 @@ function clearRadarLayers() {
   if (radarLayer) {
     map.removeLayer(radarLayer);
     radarLayer = null;
-    map.setMaxZoom(18);
+    
   }
   if (radarLayerOld) {
     map.removeLayer(radarLayerOld);
