@@ -964,14 +964,14 @@ body.three-d-mode #map-3d {
       <h4>Layers</h4>
       
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
-        <option value="mapbox-navigation">Mapbox Navigation</option>
+        <option value="mapbox-navigation-night">Mapbox Navigation Night</option>
         <option value="custom">Mapbox Classic</option>
         <option value="mapbox-satellite">Mapbox Satellite</option>
         <option value="mapbox-outdoors">Mapbox Outdoors</option>
         <option value="mapbox-dark">Mapbox Dark</option>
         <option value="mapbox-light">Mapbox Light</option>
         <option value="mapbox-streets-satellite">Mapbox Streets-Satellite</option>
-        <option value="mapbox-navigation-night">Mapbox Navigation Night</option>
+        <option value="mapbox-navigation">Mapbox Navigation</option>
         <option value="mapbox-traffic-day">Mapbox Traffic Day</option>
         <option value="mapbox-traffic-night">Mapbox Traffic Night</option>
         <option value="osm">OpenStreetMap</option>
@@ -987,14 +987,14 @@ body.three-d-mode #map-3d {
       <label>Heatmap: <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"><span class="tooltip">Show 2D heatmap</span></label>
       <!--<label id="heatmap-3d-toggle-label">3D Heatmap: <input type="checkbox" id="heatmap-3d-toggle" onchange="updateHeatmap(currentFiltered)"><span class="tooltip">Show 3D heatmap in 3D mode</span></label>-->
       <label>Overlay Numbers: <input type="checkbox" id="number-overlay-toggle" onchange="updateOverlay(currentFiltered)"><span class="tooltip">Show strike counts</span></label>
-      <label>Radar and Satellite Layer: 
+      <label>Radar Layer: 
         <select id="radarLayer" onchange="updateRadarLayerSelection()">
           <option value="uk-precip-intensity">UK High Resolution Rainfall Intensity (Smoothed)</option>
           <option value="uk-precip-intensity-pixelated">UK High Resolution Rainfall Intensity (Pixelated)</option>
           <option value="uk-precip-type">UK High Resolution Precipitation Type</option>
           <option value="europe-precip-intensity">Europe Low Resolution Rainfall Intensity</option>
           <option value="europe-precip-type">Europe Low Resolution Precipitation Type</option>
-          <option value="satellite">Satellite Imagery</option>
+          
           <option value="none">None</option>
         </select><span class="tooltip">Select radar data layer</span>
       </label>
@@ -1232,7 +1232,7 @@ body.three-d-mode #map-3d {
   })
 };
 
-    map = L.map('map', { layers: [baseLayers['mapbox-navigation']], zoomControl: false }).setView([53.5, -4.5], 6);
+    map = L.map('map', { layers: [baseLayers['mapbox-navigation-night']], zoomControl: false }).setView([53.5, -4.5], 6);
 
    map3D = new mapboxgl.Map({
   container: 'map-3d',
@@ -3026,7 +3026,7 @@ function close3DDrawModal() {
       const button = document.querySelector('#top-bar button[onclick="toggleDarkMode()"]');
       button.textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
       const mapStyleSelect = document.getElementById('map-style');
-      const newMapStyle = document.body.classList.contains('dark-mode') ? 'mapbox-traffic-night' : 'mapbox-navigation';
+      const newMapStyle = document.body.classList.contains('dark-mode') ? 'mapbox-traffic-night' : 'mapbox-navigation-night';
       mapStyleSelect.value = newMapStyle;
       switchBaseMap(newMapStyle);
     }
