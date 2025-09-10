@@ -964,14 +964,23 @@ body.three-d-mode #map-3d {
       <h4>Layers</h4>
       
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
-        <option value="opentopo">OpenTopoMap</option>
+        <option value="mapbox-navigation">Mapbox Navigation</option>
         <option value="custom">Mapbox Classic</option>
+        <option value="mapbox-satellite">Mapbox Satellite</option>
+        <option value="mapbox-outdoors">Mapbox Outdoors</option>
+        <option value="mapbox-dark">Mapbox Dark</option>
+        <option value="mapbox-light">Mapbox Light</option>
+        <option value="mapbox-streets-satellite">Mapbox Streets-Satellite</option>
+        <option value="mapbox-navigation-night">Mapbox Navigation Night</option>
+        <option value="mapbox-traffic-day">Mapbox Traffic Day</option>
+        <option value="mapbox-traffic-night">Mapbox Traffic Night</option>
         <option value="osm">OpenStreetMap</option>
+        <option value="opentopo">OpenTopoMap</option>
         <option value="esri">Esri World Imagery</option>
         <option value="maptiler-streets">MapTiler Streets</option>
         <option value="maptiler-outdoor">MapTiler Outdoor</option>
-        <option value="maptiler-dark">MapTiler Dark</option>
         <option value="maptiler-light">MapTiler Light</option>
+        <option value="maptiler-dark">MapTiler Dark</option>
       </select><span class="tooltip">Choose map background</span></label>
       <label>Color by Age: <input type="checkbox" id="color-mode" checked onchange="updateStrikeColors()"><span class="tooltip">Color strikes by age</span></label>
       <label>Lightning Layer: <input type="checkbox" id="lightning-layer-toggle" checked onchange="toggleLightningLayer()"><span class="tooltip">Show lightning strikes</span></label>
@@ -988,7 +997,7 @@ body.three-d-mode #map-3d {
           <option value="none">None</option>
         </select><span class="tooltip">Select radar data layer</span>
       </label>
-      <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="1"></label>      
+      <label>Radar Opacity: <input type="range" id="radarOpacity" min="0" max="1" step="0.1" value="0.9"></label>      
 
       
       <!--<label>3D Mode: <input type="checkbox" id="3d-mode-toggle" onchange="toggle3DMode()"><span class="tooltip">Switch to 3D view</span></label>-->
@@ -1049,8 +1058,8 @@ body.three-d-mode #map-3d {
     <div class="animator">
       <button onclick="playAnimation()">▶️ Play</button>
       <button onclick="stopAnimation()">⏹️ Stop</button>
-      <label>Speed: <input type="range" id="speed-slider" min="1" max="100" step="1" value="5" oninput="updateSpeedTextbox()"></label>
-      <label>Min/Sec: <input type="number" id="playback-minutes" min="0.01" step="0.01" value="5" oninput="updateSpeedSlider()"></label>
+      <label>Speed: <input type="range" id="speed-slider" min="1" max="100" step="1" value="3" oninput="updateSpeedTextbox()"></label>
+      <label>Min/Sec: <input type="number" id="playback-minutes" min="0.01" step="1" value="3" oninput="updateSpeedSlider()"></label>
     </div>
     <p id="time-range" class="status-info"></p>
     <div class="status-info-container">
@@ -1122,49 +1131,107 @@ body.three-d-mode #map-3d {
     let is3DMode = false;
     let map, map3D;
     let baseLayers = {
-      opentopo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-        maxZoom: 17,
-        attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
-      }),
-      custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
-        tileSize: 512,
-        zoomOffset: -1,
-        attribution: '© Mapbox © OpenStreetMap',
-        maxZoom: 18
-      }),
-      
-      osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-      }),
-      
-      esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
-        attribution: 'Tiles © Esri'
-      }),
-      'maptiler-streets': L.maptiler.maptilerLayer({
-        apiKey: maptilerApiKey,
-        style: L.maptiler.MapStyle.STREETS,
-        attribution: '© MapTiler © OpenStreetMap contributors'
-      }),
-      'maptiler-outdoor': L.maptiler.maptilerLayer({
-        apiKey: maptilerApiKey,
-        style: L.maptiler.MapStyle.OUTDOOR,
-        attribution: '© MapTiler © OpenStreetMap contributors'
-      }),
-      'maptiler-dark': L.maptiler.maptilerLayer({
-        apiKey: maptilerApiKey,
-        style: L.maptiler.MapStyle.DATAVIZ.DARK,
-        attribution: '© MapTiler © OpenStreetMap contributors'
-      }),
-      'maptiler-light': L.maptiler.maptilerLayer({
-        apiKey: maptilerApiKey,
-        style: L.maptiler.MapStyle.DATAVIZ.LIGHT,
-        attribution: '© MapTiler © OpenStreetMap contributors'
-      })
-    };
+  opentopo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: 'Map data: © OpenTopoMap (CC-BY-SA)'
+  }),
+  custom: L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }),
+  esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles © Esri'
+  }),
+  'maptiler-streets': L.maptiler.maptilerLayer({
+    apiKey: maptilerApiKey,
+    style: L.maptiler.MapStyle.STREETS,
+    attribution: '© MapTiler © OpenStreetMap contributors'
+  }),
+  'maptiler-outdoor': L.maptiler.maptilerLayer({
+    apiKey: maptilerApiKey,
+    style: L.maptiler.MapStyle.OUTDOOR,
+    attribution: '© MapTiler © OpenStreetMap contributors'
+  }),
+  'maptiler-dark': L.maptiler.maptilerLayer({
+    apiKey: maptilerApiKey,
+    style: L.maptiler.MapStyle.DATAVIZ.DARK,
+    attribution: '© MapTiler © OpenStreetMap contributors'
+  }),
+  'maptiler-light': L.maptiler.maptilerLayer({
+    apiKey: maptilerApiKey,
+    style: L.maptiler.MapStyle.DATAVIZ.LIGHT,
+    attribution: '© MapTiler © OpenStreetMap contributors'
+  }),
+  'mapbox-satellite': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-outdoors': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-dark': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-navigation': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/navigation-day-v1/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-light': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-streets-satellite': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-navigation-night': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/navigation-night-v1/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-traffic-day': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/traffic-day-v2/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-traffic-night': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/traffic-night-v2/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  }),
+  'mapbox-contrast': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/high-contrast-v1/tiles/256/{z}/{x}/{y}@2x?access_token=' + mapboxAccessToken, {
+    tileSize: 512,
+    zoomOffset: -1,
+    attribution: '© Mapbox © OpenStreetMap',
+    maxZoom: 18
+  })
+};
 
-    map = L.map('map', { layers: [baseLayers['maptiler-light']], zoomControl: false }).setView([53.5, -4.5], 6);
+    map = L.map('map', { layers: [baseLayers['mapbox-navigation']], zoomControl: false }).setView([53.5, -4.5], 6);
 
    map3D = new mapboxgl.Map({
   container: 'map-3d',
@@ -2953,7 +3020,7 @@ function close3DDrawModal() {
       const button = document.querySelector('#top-bar button[onclick="toggleDarkMode()"]');
       button.textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
       const mapStyleSelect = document.getElementById('map-style');
-      const newMapStyle = document.body.classList.contains('dark-mode') ? 'maptiler-dark' : 'maptiler-light';
+      const newMapStyle = document.body.classList.contains('dark-mode') ? 'mapbox-traffic-night' : 'mapbox-navigation';
       mapStyleSelect.value = newMapStyle;
       switchBaseMap(newMapStyle);
     }
