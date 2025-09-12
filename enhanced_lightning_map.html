@@ -573,23 +573,44 @@ body.dark-mode .control-panel input[type="range"]::-moz-range-thumb {
       gap: 10px;
       margin-top: 4px;
     }
-    .legend {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 8px;
-  border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  font-size: 0.75em;
-  color: #1a2a44;
-  max-width: 200px; /* Increased from 125px to make the legend wider */
-  min-width: 150px; /* Increased from 110px for consistency with wider design */
-  max-height: 300px; /* Set maximum height to limit vertical size */
-  overflow-y: auto; /* Enable vertical scrolling when content exceeds max-height */
-  position: absolute;
-  top: 10px; /* Consistent 10px margin from top */
-  right: 10px; /* Consistent 10px margin from right */
-  z-index: 1010; /* High z-index to stay above map elements */
-  transition: background 0.3s ease, color 0.3s ease;
-}
+    @media (max-width: 768px) {
+        .legend {
+          background: rgba(255, 255, 255, 0.95);
+          padding: 8px;
+          border-radius: 6px;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+          font-size: 0.75em;
+          color: #1a2a44;
+          max-width: 200px; /* Increased from 125px to make the legend wider */
+          min-width: 150px; /* Increased from 110px for consistency with wider design */
+          max-height: 300px; /* Set maximum height to limit vertical size */
+          overflow-y: auto; /* Enable vertical scrolling when content exceeds max-height */
+          position: absolute;
+          top: 10px; /* Consistent 10px margin from top */
+          right: 10px; /* Consistent 10px margin from right */
+          z-index: 1010; /* High z-index to stay above map elements */
+          transition: background 0.3s ease, color 0.3s ease;
+        }
+      }
+    @media (min-width: 769px) {
+        .legend {
+          background: rgba(255, 255, 255, 0.95);
+          padding: 8px;
+          border-radius: 6px;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+          font-size: 0.75em;
+          color: #1a2a44;
+          max-width: 200px; /* Increased from 125px to make the legend wider */
+          min-width: 150px; /* Increased from 110px for consistency with wider design */
+          max-height: 700px; /* Set maximum height to limit vertical size */
+          overflow-y: auto; /* Enable vertical scrolling when content exceeds max-height */
+          position: absolute;
+          top: 10px; /* Consistent 10px margin from top */
+          right: 10px; /* Consistent 10px margin from right */
+          z-index: 1010; /* High z-index to stay above map elements */
+          transition: background 0.3s ease, color 0.3s ease;
+        }
+      }
 
 /* Optional: Style the scrollbar for better aesthetics (works in WebKit browsers like Chrome/Safari) */
 .legend::-webkit-scrollbar {
@@ -991,6 +1012,7 @@ body.three-d-mode #map-3d {
         <select id="radarLayer" onchange="updateRadarLayerSelection()">
           <option value="uk-precip-intensity">UK High Resolution Rainfall Intensity (Smoothed)</option>
           <option value="uk-precip-intensity-pixelated">UK High Resolution Rainfall Intensity (Pixelated)</option>
+          <option value="uk-precip-intensity-pixelated-color">UK High Resolution Rainfall Intensity (Pixelated + Alternative Color)</option>
           <option value="uk-precip-type">UK High Resolution Precipitation Type</option>
           <option value="europe-precip-intensity">Europe Low Resolution Rainfall Intensity</option>
           <option value="europe-precip-type">Europe Low Resolution Precipitation Type</option>
@@ -1360,6 +1382,12 @@ const radarOptions = {
         interval: 5 * 60 * 1000,
         type: 'image',
         bounds: [[44.02, -25], [64, 16]]
+      },
+      'uk-precip-intensity-pixelated-color': {
+        url: 'https://maps.consumer-digital.api.metoffice.gov.uk/wms_ob/single/high-res/rainfall_radar_accessible/${iso}.png',
+        interval: 5 * 60 * 1000,
+        type: 'image',
+        bounds: [[44.02, -25], [64, 16]]
       }
     };
 let radarLayer = null;
@@ -1388,6 +1416,7 @@ async function getRadarImageUrl(timestamp, radarType) {
   let currentTime = new Date(date);
   const maxRetries = 2;
   const maxAttempts = radarType === 'uk-precip-intensity-pixelated' ? 4 : 288;
+  
   if (currentTime < minTime || currentTime > maxTime) {
     console.warn(`Timestamp ${currentTime.toISOString()} is outside filter range (${minTime.toISOString()} to ${maxTime.toISOString()})`);
     currentTime = new Date(Math.min(Math.max(currentTime.getTime(), minTime.getTime()), maxTime.getTime()));
@@ -3998,367 +4027,189 @@ function addLightningFlash3D(lng, lat) {
         <div><div class="color-box" style="background: #3265fe"></div>0.5-1mm/h</div>
         <div><div class="color-box" style="background: #0000fe"></div><0.5mm/h</div>
       `;
+    }else if (radarType === 'uk-precip-intensity-pixelated-color') {
+      legendDiv.innerHTML += '<h4>Rainfall Intensity</h4>';
+      legendDiv.innerHTML += `
+        <div><div class="color-box" style="background: #f9fd66"></div>>32mm/h</div>
+        <div><div class="color-box" style="background: #b0df68"></div>16-32mm/h</div>
+        <div><div class="color-box" style="background: #85b872"></div>8-16mm/h</div>
+        <div><div class="color-box" style="background: #62947a"></div>2-4mm/h</div>
+        <div><div class="color-box" style="background: #467888"></div>1-2mm/h</div>
+        <div><div class="color-box" style="background: #274ca6"></div>0.5-1mm/h</div>
+        <div><div class="color-box" style="background: #1a33b3"></div><0.5mm/h</div>
+      `;
     } else if (radarType === 'uk-precip-type') {
       legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>0.5 mm/h</div>
         <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.6 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>5 mm/h</div>
         <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>50 mm/h</div>
         <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>100 mm/h</div>
         <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Freezing Rain</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.5 mm/h</div>
         <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(252, 133, 145)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(250, 88, 103)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Hail</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>7 mm/h</div>
         <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Snow</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(34, 145, 176)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(8, 98, 138)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>15 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>30 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Rain and Snow (Sleet)</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
         <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets and Hail</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.3 mm/h</div>
         <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
       `;
       
     } else if (radarType === 'europe-precip-type') {
-      legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
+        legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>0.5 mm/h</div>
         <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.6 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>5 mm/h</div>
         <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>50 mm/h</div>
         <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>100 mm/h</div>
         <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Freezing Rain</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 217, 221)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.5 mm/h</div>
         <div><div class="color-box" style="background: rgb(244, 187, 193)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(250, 159, 167)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(252, 133, 145)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(250, 88, 103)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(246, 73, 82)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(245, 51, 59)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(212, 14, 23)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 15, 23)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(129, 5, 8)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Hail</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>7 mm/h</div>
         <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Snow</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(166, 219, 228)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(102, 188, 208)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(45, 155, 180)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(34, 145, 176)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(8, 98, 138)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(6, 72, 102)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(4, 51, 72)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>15 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>30 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(3, 36, 51)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Rain and Snow (Sleet)</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
         <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(72, 36, 118)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(64, 31, 104)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>50 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>100 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(56, 23, 90)"></div>200 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(204, 196, 223)"></div>0.3 mm/h</div>
       `;
       legendDiv.innerHTML += '<h4>Precipitation: Snow Pellets and Hail</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.3 mm/h</div>
         <div><div class="color-box" style="background: rgb(182, 172, 209)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(164, 149, 195)"></div>0.6 mm/h</div>
         <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(147, 128, 182)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(170, 110, 131)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(118, 93, 160)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(104, 76, 150)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(91, 59, 140)"></div>5 mm/h</div>
       `;
+    
     } else {
       // Default for other radar types (e.g., smooth Europe radar)
       legendDiv.innerHTML += '<h4>Precipitation: Rain</h4>';
       legendDiv.innerHTML += `
-        <div><div class="color-box" style="background: transparent"></div>0.125 mm/h</div>
         <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.2 mm/h</div>
-        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(134, 203, 107)"></div>0.4 mm/h</div>
         <div><div class="color-box" style="background: rgb(108, 185, 78)"></div>0.5 mm/h</div>
         <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.6 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.7 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>0.8 mm/h</div>
-        <div><div class="color-box" style="background: rgb(89, 167, 61)"></div>1 mm/h</div>
         <div><div class="color-box" style="background: rgb(79, 152, 57)"></div>1.25 mm/h</div>
         <div><div class="color-box" style="background: rgb(50, 113, 48)"></div>2 mm/h</div>
         <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>3 mm/h</div>
-        <div><div class="color-box" style="background: rgb(41, 88, 37)"></div>4 mm/h</div>
         <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>5 mm/h</div>
-        <div><div class="color-box" style="background: rgb(231, 232, 79)"></div>8 mm/h</div>
         <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>10 mm/h</div>
-        <div><div class="color-box" style="background: rgb(246, 176, 32)"></div>15 mm/h</div>
         <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>20 mm/h</div>
-        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>25 mm/h</div>
-        <div><div class="color-box" style="background: rgb(240, 40, 31)"></div>30 mm/h</div>
         <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>35 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>40 mm/h</div>
-        <div><div class="color-box" style="background: rgb(179, 31, 36)"></div>50 mm/h</div>
         <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>65 mm/h</div>
-        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>75 mm/h</div>
-        <div><div class="color-box" style="background: rgb(192, 76, 162)"></div>100 mm/h</div>
         <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>150 mm/h</div>
-        <div><div class="color-box" style="background: rgb(137, 60, 158)"></div>200 mm/h</div>
       `;
     }
   }
