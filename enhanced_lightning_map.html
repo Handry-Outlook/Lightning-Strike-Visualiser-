@@ -1146,7 +1146,8 @@
       <h4>Layers</h4>
 
       <label>Map Style: <select id="map-style" onchange="switchBaseMap(this.value)">
-          <option value="mapbox-navigation-night">Mapbox Navigation Night</option>
+          <option value="mapbox-traffic-day">Mapbox Traffic Day</option>
+          <option value="mapbox-traffic-night">Mapbox Traffic Night</option>
           <option value="custom">Mapbox Classic</option>
           <option value="mapbox-satellite">Mapbox Satellite</option>
           <option value="mapbox-outdoors">Mapbox Outdoors</option>
@@ -1154,8 +1155,7 @@
           <option value="mapbox-light">Mapbox Light</option>
           <option value="mapbox-streets-satellite">Mapbox Streets-Satellite</option>
           <option value="mapbox-navigation">Mapbox Navigation</option>
-          <option value="mapbox-traffic-day">Mapbox Traffic Day</option>
-          <option value="mapbox-traffic-night">Mapbox Traffic Night</option>
+          <option value="mapbox-navigation-night">Mapbox Navigation Night</option>
           <option value="osm">OpenStreetMap</option>
           <option value="opentopo">OpenTopoMap</option>
           <option value="esri">Esri World Imagery</option>
@@ -1218,8 +1218,8 @@
           sound</span></label>
       <label>Nowcast: <input type="checkbox" id="nowcast-toggle" checked onchange="toggleAllNowcast()"><span
           class="tooltip">Show lightning predictions</span></label>
-      
-      <label>Nowcast Confidence: <input type="range" id="min-nowcast-confidence" min="0" max="1" step="0.01" value="0.3"
+
+      <label>Nowcast Confidence: <input type="range" id="min-nowcast-confidence" min="0" max="1" step="0.01" value="0.1"
           onchange="is3DMode ? update3DView() : toggleNowcast()"><span class="tooltip">Minimum confidence for nowcast
           cones to be displayed</span></label>
     </div>
@@ -1453,7 +1453,7 @@
       })
     };
 
-    map = L.map('map', { layers: [baseLayers['mapbox-navigation-night']], zoomControl: false }).setView([53.5, -4.5], 6);
+    map = L.map('map', { layers: [baseLayers['mapbox-traffic-day']], zoomControl: false }).setView([53.5, -4.5], 6);
 
     map3D = new mapboxgl.Map({
       container: 'map-3d',
@@ -1545,7 +1545,7 @@
     let drawnItems3D = [];
     let isDrawingEnabled = false;
     let editingLayerId = null;
-
+    let previousNowcasts = [];
     let lastRadarType = null;
     let isFilterApplied = false;
     var polygonNowcastLayer = L.layerGroup();
@@ -3247,7 +3247,7 @@
       const button = document.querySelector('#top-bar button[onclick="toggleDarkMode()"]');
       button.textContent = document.body.classList.contains('dark-mode') ? '☀️ Light Mode' : '🌙 Dark Mode';
       const mapStyleSelect = document.getElementById('map-style');
-      const newMapStyle = document.body.classList.contains('dark-mode') ? 'mapbox-traffic-night' : 'mapbox-navigation-night';
+      const newMapStyle = document.body.classList.contains('dark-mode') ? 'mapbox-traffic-night' : 'mapbox-traffic-day';
       mapStyleSelect.value = newMapStyle;
       switchBaseMap(newMapStyle);
     }
@@ -5387,759 +5387,788 @@
  * and draws current clusters as convex hulls, and future projections as
  * expanding, time-stepped polygons, similar to the provided image.
  */
-function toggleNowcast() {
-    minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
+    function toggleNowcast() {
+      minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
 
-    // 1. Clean up existing layers
-    nowcastLayer.clearLayers();
+      // 1. Clean up existing layers
+      nowcastLayer.clearLayers();
 
-    if (document.getElementById('nowcast-toggle').checked && !is3DMode) {
-        
+      if (document.getElementById('nowcast-toggle').checked && !is3DMode) {
+
         // Recalculate based on current data
         currentNowcasts = calculateLightningNowcast(currentFiltered);
 
         currentNowcasts.forEach((cluster) => {
-            if (cluster.confidenceScore >= minNowcastConfidence) {
-                
-                // Determine color based on confidence
-                const color = cluster.confidenceScore > 0.9 ? '#800080' : // Purple
-                              cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
-                              cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
-                                                              '#008000';  // Green
+          if (cluster.confidenceScore >= minNowcastConfidence) {
 
-                // --- A. DRAW THE CLUSTER HULL (The Storm Shape) ---
-                // Matches the black-bordered polygons in your image
-                if (cluster.hullGeometry) {
-                    L.geoJSON(cluster.hullGeometry, {
-                        style: {
-                            fillColor: color,
-                            fillOpacity: 0.4,
-                            color: 'black',  // Dark border as seen in image
-                            weight: 2,
-                            opacity: 0.8
-                        }
-                    }).bindPopup(`
+            // Determine color based on confidence
+            const color = cluster.confidenceScore > 0.9 ? '#800080' : // Purple
+              cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
+                cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
+                  '#008000';  // Green
+
+            // --- A. DRAW THE CLUSTER HULL (The Storm Shape) ---
+            // Matches the black-bordered polygons in your image
+            if (cluster.hullGeometry) {
+              L.geoJSON(cluster.hullGeometry, {
+                style: {
+                  fillColor: color,
+                  fillOpacity: 0.4,
+                  color: 'black',  // Dark border as seen in image
+                  weight: 2,
+                  opacity: 0.8
+                }
+              }).bindPopup(`
                         <b>Detected Cell</b><br>
                         Size: ${cluster.clusterSize} strikes
                     `).addTo(nowcastLayer);
-                }
+            }
 
-                // --- B. DRAW THE VISUAL TRACK (Center Line) ---
-                const projectedCenter = turf.destination(
-                    [cluster.baseLon, cluster.baseLat],
-                    cluster.speedKmH, // 1 Hour projection
-                    cluster.directionDeg,
-                    { units: 'kilometers' }
-                );
-                
-                L.polyline([
-                    [cluster.baseLat, cluster.baseLon],
-                    [projectedCenter.geometry.coordinates[1], projectedCenter.geometry.coordinates[0]]
-                ], {
-                    color: color,
-                    weight: 2,
-                    dashArray: '5, 5',
-                    opacity: 0.6
-                }).addTo(nowcastLayer);
+            // --- B. DRAW THE VISUAL TRACK (Center Line) ---
+            const projectedCenter = turf.destination(
+              [cluster.baseLon, cluster.baseLat],
+              cluster.speedKmH, // 1 Hour projection
+              cluster.directionDeg,
+              { units: 'kilometers' }
+            );
 
-                // --- C. DRAW THE UNCERTAINTY ELLIPSE (The Forecast) ---
-                // Matches the red cones/ellipses in your image
-                const { semiMajorKm, semiMinorKm, rotationDeg } = cluster.uncertaintyEllipse;
-                
-                // Create the ellipse geometry using Turf
-                const ellipse = turf.ellipse(
-                    projectedCenter.geometry.coordinates,
-                    semiMajorKm,
-                    semiMinorKm,
-                    { 
-                        units: 'kilometers', 
-                        angle: rotationDeg,
-                        steps: 64
-                    }
-                );
+            L.polyline([
+              [cluster.baseLat, cluster.baseLon],
+              [projectedCenter.geometry.coordinates[1], projectedCenter.geometry.coordinates[0]]
+            ], {
+              color: color,
+              weight: 2,
+              dashArray: '5, 5',
+              opacity: 0.6
+            }).addTo(nowcastLayer);
 
-                L.geoJSON(ellipse, {
-                    style: {
-                        fillColor: color, // Light fill
-                        fillOpacity: 0.15,
-                        color: color,     // Solid colored border
-                        weight: 2,
-                        opacity: 0.9
-                    }
-                }).bindPopup(`
+            // --- C. DRAW THE UNCERTAINTY ELLIPSE (The Forecast) ---
+            // Matches the red cones/ellipses in your image
+            const { semiMajorKm, semiMinorKm, rotationDeg } = cluster.uncertaintyEllipse;
+
+            // Create the ellipse geometry using Turf
+            const ellipse = turf.ellipse(
+              projectedCenter.geometry.coordinates,
+              semiMajorKm,
+              semiMinorKm,
+              {
+                units: 'kilometers',
+                angle: rotationDeg,
+                steps: 64
+              }
+            );
+
+            L.geoJSON(ellipse, {
+              style: {
+                fillColor: color, // Light fill
+                fillOpacity: 0.15,
+                color: color,     // Solid colored border
+                weight: 2,
+                opacity: 0.9
+              }
+            }).bindPopup(`
                     <b>1-Hour Forecast</b><br>
                     Confidence: ${(cluster.confidenceScore * 100).toFixed(0)}%<br>
                     Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
                     Direction: ${cluster.directionDeg.toFixed(1)}°
                 `).addTo(nowcastLayer);
-            }
+          }
         });
-    }
+      }
 
-    // Toggle layer visibility on the map
-    if (document.getElementById('nowcast-toggle').checked) {
+      // Toggle layer visibility on the map
+      if (document.getElementById('nowcast-toggle').checked) {
         if (!map.hasLayer(nowcastLayer)) map.addLayer(nowcastLayer);
-    } else {
+      } else {
         if (map.hasLayer(nowcastLayer)) map.removeLayer(nowcastLayer);
+      }
+
+      updateLegend();
     }
-    
-    updateLegend();
-}
-function toggleAllNowcasts() {
-    const isNowcastChecked = document.getElementById('nowcast-toggle').checked;
-    
-    // 1. Calculate immediately if turned on
-    if (isNowcastChecked) {
+    function toggleAllNowcasts() {
+      const isNowcastChecked = document.getElementById('nowcast-toggle').checked;
+
+      // 1. Calculate immediately if turned on
+      if (isNowcastChecked) {
         // Assuming 'currentFiltered' is your current list of lightning strikes on screen
-        currentNowcasts = calculateLightningNowcast(currentFiltered); 
+        currentNowcasts = calculateLightningNowcast(currentFiltered);
         console.log(`Nowcast updated: ${currentNowcasts.length} storms found.`);
-    } else {
+      } else {
         currentNowcasts = [];
+      }
+
+      // 2. Draw everything immediately
+      drawMergedNowcast();
+
+      // 3. Update Legend (if you have one)
+      if (typeof updateLegend === 'function') updateLegend();
     }
+    /**
+     * Renders BOTH the New Polygons and the Old Cones in a single pass.
+     */
+    function drawMergedNowcast() {
+      const isNowcastChecked = document.getElementById('nowcast-toggle').checked;
 
-    // 2. Draw everything immediately
-    drawMergedNowcast();
-    
-    // 3. Update Legend (if you have one)
-    if (typeof updateLegend === 'function') updateLegend();
-}
-/**
- * Renders BOTH the New Polygons and the Old Cones in a single pass.
- */
-function drawMergedNowcast() {
-    const isNowcastChecked = document.getElementById('nowcast-toggle').checked;
-    
-    // --- 1. CLEAR EVERYTHING FIRST ---
-    polygonNowcastLayer.clearLayers();
-    nowcastLayer.clearLayers();
+      // --- 1. CLEAR EVERYTHING FIRST ---
+      polygonNowcastLayer.clearLayers();
+      nowcastLayer.clearLayers();
 
-    // If master toggle is off, remove layers from map and exit
-    if (!isNowcastChecked) {
+      // If master toggle is off, remove layers from map and exit
+      if (!isNowcastChecked) {
         if (map.hasLayer(polygonNowcastLayer)) map.removeLayer(polygonNowcastLayer);
         if (map.hasLayer(nowcastLayer)) map.removeLayer(nowcastLayer);
         return;
-    }
+      }
 
-    // --- 2. PREPARE SETTINGS ---
-    // Get Min Confidence from slider (or default to 0.5)
-    const confidenceInput = document.getElementById('min-nowcast-confidence');
-    const minConfidence = confidenceInput ? parseFloat(confidenceInput.value) : 0.5;
-    
-    // Check if we want to show specific sub-features (optional toggles)
-    // If you don't have these checkboxes in your HTML, default them to true
-    const showPolygons = document.getElementById('nowcast-polygon-toggle') ? document.getElementById('nowcast-polygon-toggle').checked : true;
-    const showCones = document.getElementById('nowcast-cone-toggle') ? document.getElementById('nowcast-cone-toggle').checked : true;
+      // --- 2. PREPARE SETTINGS ---
+      // Get Min Confidence from slider (or default to 0.5)
+      const confidenceInput = document.getElementById('min-nowcast-confidence');
+      const minConfidence = confidenceInput ? parseFloat(confidenceInput.value) : 0.5;
 
-    // --- 3. MAIN DRAWING LOOP ---
-    currentNowcasts.forEach((cluster) => {
+      // Check if we want to show specific sub-features (optional toggles)
+      // If you don't have these checkboxes in your HTML, default them to true
+      const showPolygons = document.getElementById('nowcast-polygon-toggle') ? document.getElementById('nowcast-polygon-toggle').checked : true;
+      const showCones = document.getElementById('nowcast-cone-toggle') ? document.getElementById('nowcast-cone-toggle').checked : true;
+
+      // --- 3. MAIN DRAWING LOOP ---
+      currentNowcasts.forEach((cluster) => {
         // Skip low confidence storms
         if (cluster.confidenceScore < minConfidence) return;
 
         // Determine Color
         const color = cluster.confidenceScore > 0.9 ? '#800080' : // Purple
-                      cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
-                      cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
-                                                    '#008000';  // Green
+          cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
+            cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
+              '#008000';  // Green
 
         // ---------------------------------------------------------
         // PART A: DRAW NEW POLYGONS (Hull + Future Shapes)
         // ---------------------------------------------------------
         if (showPolygons) {
-            // A1. Current Shape (The Convex Hull)
-            if (cluster.hullGeometry) {
-                L.geoJSON(cluster.hullGeometry, {
-                    style: {
-                        fillColor: color, fillOpacity: 0.4,
-                        color: 'black', weight: 2, opacity: 0.8
-                    }
-                }).bindPopup(`<b>Storm Cell</b><br>Strikes: ${cluster.clusterSize}`).addTo(polygonNowcastLayer);
-            }
+          // A1. Current Shape (The Convex Hull)
+          if (cluster.hullGeometry) {
+            L.geoJSON(cluster.hullGeometry, {
+              style: {
+                fillColor: color, fillOpacity: 0.4,
+                color: 'black', weight: 2, opacity: 0.8
+              }
+            }).bindPopup(`<b>Storm Cell</b><br>Strikes: ${cluster.clusterSize}`).addTo(polygonNowcastLayer);
+          }
 
-            // A2. Future Shapes (The Projected Polygons)
-            if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
-                cluster.nowcastPolygons.forEach(forecast => {
-                    // Leaflet needs [lat, lon], Turf gives [lon, lat] - flip them
-                    const latLngs = forecast.polygon.map(p => [p[1], p[0]]);
-                    
-                    // Fade out transparency over time (15min = solid, 60min = transparent)
-                    const opacity = Math.max(0.1, 1.0 - (forecast.timeMinutes / 80)); 
-                    
-                    L.polygon(latLngs, {
-                        color: color, weight: 1, opacity: opacity,
-                        fillColor: color, fillOpacity: 0.15,
-                        dashArray: '5, 5' // Dashed line for forecast
-                    
-                    }).bindPopup(`
+          // A2. Future Shapes (The Projected Polygons)
+          if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
+            cluster.nowcastPolygons.forEach(forecast => {
+              // Leaflet needs [lat, lon], Turf gives [lon, lat] - flip them
+              const latLngs = forecast.polygon.map(p => [p[1], p[0]]);
+
+              // Fade out transparency over time (15min = solid, 60min = transparent)
+              const opacity = Math.max(0.1, 1.0 - (forecast.timeMinutes / 80));
+
+              L.polygon(latLngs, {
+                color: color, weight: 1, opacity: opacity,
+                fillColor: color, fillOpacity: 0.15,
+                dashArray: '5, 5' // Dashed line for forecast
+
+              }).bindPopup(`
                     <b>1-Hour Forecast</b><br>
                     Confidence: ${(cluster.confidenceScore * 100).toFixed(0)}%<br>
                     Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
                     Direction: ${cluster.directionDeg.toFixed(1)}°
                 `).addTo(polygonnowcastLayer);
-                });
-            }
+            });
+          }
         }
 
         // ---------------------------------------------------------
         // PART B: DRAW OLD CONE/CIRCLE STYLE
         // ---------------------------------------------------------
         if (showCones) {
-            const radiusMeters = (cluster.confidenceScore * 5 + 5) * 1000;
-            const projectionDistKm = cluster.confidenceScore * 30 + 30; // Old projection distance logic
+          const radiusMeters = (cluster.confidenceScore * 5 + 5) * 1000;
+          const projectionDistKm = cluster.confidenceScore * 30 + 30; // Old projection distance logic
 
-            // B1. Draw Circle at Current Location
-            L.circle([cluster.baseLat, cluster.baseLon], {
-                radius: radiusMeters,
-                color: color, weight: 1,
-                fillColor: color, fillOpacity: 0.2
-            }).addTo(nowcastLayer);
+          // B1. Draw Circle at Current Location
+          L.circle([cluster.baseLat, cluster.baseLon], {
+            radius: radiusMeters,
+            color: color, weight: 1,
+            fillColor: color, fillOpacity: 0.2
+          }).addTo(nowcastLayer);
 
-            // B2. Draw Projected Center Point (The "Tip" of the cone)
-            // Use Turf to find the destination point
-            const destination = turf.destination(
-                [cluster.baseLon, cluster.baseLat], 
-                projectionDistKm, 
-                cluster.directionDeg, 
-                { units: 'kilometers' }
-            );
-            const [destLon, destLat] = destination.geometry.coordinates;
+          // B2. Draw Projected Center Point (The "Tip" of the cone)
+          // Use Turf to find the destination point
+          const destination = turf.destination(
+            [cluster.baseLon, cluster.baseLat],
+            projectionDistKm,
+            cluster.directionDeg,
+            { units: 'kilometers' }
+          );
+          const [destLon, destLat] = destination.geometry.coordinates;
 
-            // Draw line to destination
-            L.polyline([
-                [cluster.baseLat, cluster.baseLon],
-                [destLat, destLon]
-            ], { color: color, weight: 2, opacity: 0.6 }).addTo(nowcastLayer);
+          // Draw line to destination
+          L.polyline([
+            [cluster.baseLat, cluster.baseLon],
+            [destLat, destLon]
+          ], { color: color, weight: 2, opacity: 0.6 }).addTo(nowcastLayer);
 
-            // Draw marker at destination
-            L.circleMarker([destLat, destLon], {
-                radius: 4, color: color, fillColor: 'white', fillOpacity: 1, weight: 2
-            }).addTo(nowcastLayer);
+          // Draw marker at destination
+          L.circleMarker([destLat, destLon], {
+            radius: 4, color: color, fillColor: 'white', fillOpacity: 1, weight: 2
+          }).addTo(nowcastLayer);
         }
-    });
+      });
 
-    // --- 4. UPDATE MAP LAYERS ---
-    // This ensures they appear immediately without waiting
-    if (!map.hasLayer(polygonNowcastLayer) && showPolygons) map.addLayer(polygonNowcastLayer);
-    if (!map.hasLayer(nowcastLayer) && showCones) map.addLayer(nowcastLayer);
-}
-// --- MISSING HELPERS FOR POLYGON MATH ---
+      // --- 4. UPDATE MAP LAYERS ---
+      // This ensures they appear immediately without waiting
+      if (!map.hasLayer(polygonNowcastLayer) && showPolygons) map.addLayer(polygonNowcastLayer);
+      if (!map.hasLayer(nowcastLayer) && showCones) map.addLayer(nowcastLayer);
+    }
+    // --- MISSING HELPERS FOR POLYGON MATH ---
 
-function ransacRegression(bins, iterations, threshold, decayConstant) {
-    let bestModel = { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
-    let maxInliers = 0;
+    function ransacRegression(bins, iterations, threshold, decayConstant) {
+      let bestModel = { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
+      let maxInliers = 0;
 
-    for (let i = 0; i < iterations; i++) {
+      for (let i = 0; i < iterations; i++) {
         const sample = randomSample(bins, 2);
         if (sample.length < 2) continue;
         const model = fitLinearModel(sample, decayConstant);
-        
+
         const inliers = bins.filter(b => {
-            const t = (b.time - sample[0].time) / 1000;
-            const predLat = model.interceptLat + model.slopeLat * t;
-            const predLon = model.interceptLon + model.slopeLon * t;
-            return Math.abs(b.lat - predLat) < threshold && Math.abs(b.lon - predLon) < threshold;
+          const t = (b.time - sample[0].time) / 1000;
+          const predLat = model.interceptLat + model.slopeLat * t;
+          const predLon = model.interceptLon + model.slopeLon * t;
+          return Math.abs(b.lat - predLat) < threshold && Math.abs(b.lon - predLon) < threshold;
         });
 
         if (inliers.length > maxInliers) {
-            maxInliers = inliers.length;
-            bestModel = fitLinearModel(inliers.length >= 2 ? inliers : sample, decayConstant);
+          maxInliers = inliers.length;
+          bestModel = fitLinearModel(inliers.length >= 2 ? inliers : sample, decayConstant);
         }
+      }
+      return bestModel;
     }
-    return bestModel;
-}
 
-function getPolygonCentroid(polygon) {
-    let sumLon = 0, sumLat = 0;
-    for(const p of polygon) { sumLon += p[0]; sumLat += p[1]; }
-    return [sumLon / polygon.length, sumLat / polygon.length];
-}
+    function getPolygonCentroid(polygon) {
+      let sumLon = 0, sumLat = 0;
+      for (const p of polygon) { sumLon += p[0]; sumLat += p[1]; }
+      return [sumLon / polygon.length, sumLat / polygon.length];
+    }
 
-function translatePolygon(polygon, directionDeg, distanceKm) {
-    return polygon.map(point => {
+    function translatePolygon(polygon, directionDeg, distanceKm) {
+      return polygon.map(point => {
         // Simple approximation or use turf.destination for accuracy
         const dest = turf.destination(turf.point(point), distanceKm, directionDeg, { units: 'kilometers' });
         return dest.geometry.coordinates;
-    });
-}
+      });
+    }
 
-function scalePolygon(polygon, factor, centroid) {
-    if (factor === 1.0) return polygon;
-    const [clon, clat] = centroid;
-    return polygon.map(point => {
+    function scalePolygon(polygon, factor, centroid) {
+      if (factor === 1.0) return polygon;
+      const [clon, clat] = centroid;
+      return polygon.map(point => {
         const [plon, plat] = point;
         const dLon = plon - clon;
         const dLat = plat - clat;
         return [clon + dLon * factor, clat + dLat * factor];
-    });
-}
+      });
+    }
 
-/**
- * ----------------------------------------------------------------------------------
- * --- GEOSPATIAL HELPER FUNCTIONS ---
- * ----------------------------------------------------------------------------------
- */
+    /**
+     * ----------------------------------------------------------------------------------
+     * --- GEOSPATIAL HELPER FUNCTIONS ---
+     * ----------------------------------------------------------------------------------
+     */
 
-// --- HELPER FUNCTION: DISTANCE (Haversine Formula) ---
-function calculateDistance(coords1, coords2) {
-    const [lon1, lat1] = coords1;
-    const [lon2, lat2] = coords2;
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
-    const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
 
-/**
- * Calculates the initial bearing (forward azimuth) between two points (in degrees).
- */
-function calculateBearing(coords1, coords2) {
-    const [lon1, lat1] = coords1;
-    const [lon2, lat2] = coords2;
 
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
 
-    const y = Math.sin(dLon) * Math.cos(lat2Rad);
-    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
-              Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-    
-    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
+    /**
+     * Calculates the initial bearing (forward azimuth) between two points (in degrees).
+     */
 
-/**
- * Calculates the Circular Standard Deviation of a list of angles (in degrees).
- * Used to quantify directional consistency (based on Von Mises Distribution).
- */
-function calculateCircularStdDev(angles) {
-    if (angles.length < 2) return 90;
+    /**
+     * Calculates the Circular Standard Deviation of a list of angles (in degrees).
+     * Used to quantify directional consistency (based on Von Mises Distribution).
+     */
+    function calculateCircularStdDev(angles) {
+      if (angles.length < 2) return 90;
 
-    const degToRad = Math.PI / 180;
-    let sumSin = 0;
-    let sumCos = 0;
+      const degToRad = Math.PI / 180;
+      let sumSin = 0;
+      let sumCos = 0;
 
-    for (const angle of angles) {
+      for (const angle of angles) {
         sumSin += Math.sin(angle * degToRad);
         sumCos += Math.cos(angle * degToRad);
+      }
+
+      const meanSin = sumSin / angles.length;
+      const meanCos = sumCos / angles.length;
+
+      const R_sq = meanSin * meanSin + meanCos * meanCos;
+      const V = 1 - Math.sqrt(R_sq); // Circular Variance
+      const sigma_c_rad = Math.sqrt(-2 * Math.log(Math.max(1e-9, 1 - V))); // Clamp to prevent log(0)
+
+      // Return in degrees, capped at 90 (max possible deviation for random walk)
+      return Math.min(90, sigma_c_rad * 180 / Math.PI);
     }
 
-    const meanSin = sumSin / angles.length;
-    const meanCos = sumCos / angles.length;
+    /**
+     * ----------------------------------------------------------------------------------
+     * --- REGRESSION AND RANSAC HELPER FUNCTIONS ---
+     * ----------------------------------------------------------------------------------
+     */
 
-    const R_sq = meanSin * meanSin + meanCos * meanCos;
-    const V = 1 - Math.sqrt(R_sq); // Circular Variance
-    const sigma_c_rad = Math.sqrt(-2 * Math.log(Math.max(1e-9, 1 - V))); // Clamp to prevent log(0)
-    
-    // Return in degrees, capped at 90 (max possible deviation for random walk)
-    return Math.min(90, sigma_c_rad * 180 / Math.PI);
-}
-
-/**
- * ----------------------------------------------------------------------------------
- * --- REGRESSION AND RANSAC HELPER FUNCTIONS ---
- * ----------------------------------------------------------------------------------
- */
-
-function randomSample(array, n) {
-    const result = [];
-    const indices = Array.from({ length: array.length }, (_, i) => i);
-    for (let i = 0; i < n && indices.length > 0; i++) {
+    function randomSample(array, n) {
+      const result = [];
+      const indices = Array.from({ length: array.length }, (_, i) => i);
+      for (let i = 0; i < n && indices.length > 0; i++) {
         const idx = Math.floor(Math.random() * indices.length);
         result.push(array[indices.splice(idx, 1)[0]]);
+      }
+      return result;
     }
-    return result;
-}
 
-/**
- * Fits a weighted linear model and calculates the R2 and residual error.
- */
-function fitLinearModel(bins, decayConstant) {
-    let sumT = 0, sumLat = 0, sumLon = 0, sumTLat = 0, sumTLon = 0, sumT2 = 0, sumWeight = 0;
-    const baseTime = bins[0].time;
-    const maxTime = Math.max(...bins.map(b => b.time));
-    const minTime = Math.min(...bins.map(b => b.time));
+    /**
+     * Fits a weighted linear model and calculates the R2 and residual error.
+     */
+    function fitLinearModel(bins, decayConstant) {
+      let sumT = 0, sumLat = 0, sumLon = 0, sumTLat = 0, sumTLon = 0, sumT2 = 0, sumWeight = 0;
+      const baseTime = bins[0].time;
+      const maxTime = Math.max(...bins.map(b => b.time));
+      const minTime = Math.min(...bins.map(b => b.time));
 
-    bins.forEach(b => {
+      bins.forEach(b => {
         const t = (b.time - baseTime) / 1000;
-        
-        const ageRatio = (maxTime - minTime) > 0 ? (maxTime - b.time) / (maxTime - minTime) : 0;
-        const temporalWeight = 1.0 - (ageRatio * decayConstant);
-        const strikeCountWeight = Math.log1p(b.count || 1); 
-        const weight = temporalWeight * strikeCountWeight; 
-        
-        sumT += t * weight; sumLat += b.lat * weight; sumLon += b.lon * weight;
-        sumTLat += t * b.lat * weight; sumTLon += t * b.lon * weight;
-        sumT2 += t * t * weight; sumWeight += weight;
-    });
 
-    if (sumWeight === 0) return { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
-
-    const denominator = sumT2 * sumWeight - sumT * sumT;
-    const slopeLat = denominator !== 0 ? (sumTLat * sumWeight - sumT * sumLat) / denominator : 0;
-    const slopeLon = denominator !== 0 ? (sumTLon * sumWeight - sumT * sumLon) / denominator : 0;
-    const interceptLat = (sumLat - slopeLat * sumT) / sumWeight;
-    const interceptLon = (sumLon - slopeLon * sumT) / sumWeight;
-
-    let ssTotLat = 0, ssResLat = 0;
-    let ssTotLon = 0, ssResLon = 0;
-    const meanLat = sumLat / sumWeight;
-    const meanLon = sumLon / sumWeight;
-    let weightedResidualSum = 0;
-
-    bins.forEach(b => {
-        const t = (b.time - baseTime) / 1000;
-        
         const ageRatio = (maxTime - minTime) > 0 ? (maxTime - b.time) / (maxTime - minTime) : 0;
         const temporalWeight = 1.0 - (ageRatio * decayConstant);
         const strikeCountWeight = Math.log1p(b.count || 1);
         const weight = temporalWeight * strikeCountWeight;
-        
+
+        sumT += t * weight; sumLat += b.lat * weight; sumLon += b.lon * weight;
+        sumTLat += t * b.lat * weight; sumTLon += t * b.lon * weight;
+        sumT2 += t * t * weight; sumWeight += weight;
+      });
+
+      if (sumWeight === 0) return { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
+
+      const denominator = sumT2 * sumWeight - sumT * sumT;
+      const slopeLat = denominator !== 0 ? (sumTLat * sumWeight - sumT * sumLat) / denominator : 0;
+      const slopeLon = denominator !== 0 ? (sumTLon * sumWeight - sumT * sumLon) / denominator : 0;
+      const interceptLat = (sumLat - slopeLat * sumT) / sumWeight;
+      const interceptLon = (sumLon - slopeLon * sumT) / sumWeight;
+
+      let ssTotLat = 0, ssResLat = 0;
+      let ssTotLon = 0, ssResLon = 0;
+      const meanLat = sumLat / sumWeight;
+      const meanLon = sumLon / sumWeight;
+      let weightedResidualSum = 0;
+
+      bins.forEach(b => {
+        const t = (b.time - baseTime) / 1000;
+
+        const ageRatio = (maxTime - minTime) > 0 ? (maxTime - b.time) / (maxTime - minTime) : 0;
+        const temporalWeight = 1.0 - (ageRatio * decayConstant);
+        const strikeCountWeight = Math.log1p(b.count || 1);
+        const weight = temporalWeight * strikeCountWeight;
+
         const predLat = interceptLat + slopeLat * t;
         const predLon = interceptLon + slopeLon * t;
 
         // Sum of Squares Total (for R2)
         ssTotLat += weight * Math.pow(b.lat - meanLat, 2);
         ssTotLon += weight * Math.pow(b.lon - meanLon, 2);
-        
+
         // Sum of Squares Residual (for R2)
         ssResLat += weight * Math.pow(b.lat - predLat, 2);
         ssResLon += weight * Math.pow(b.lon - predLon, 2);
-        
+
         // Weighted Residual Sum (for Weighted Standard Error)
         const residualDistanceKm = calculateDistance([b.lon, b.lat], [predLon, predLat]);
         weightedResidualSum += residualDistanceKm * weight;
-    });
-    
-    // R2 is the average R2 of Lat and Lon components
-    const r2_lat = ssTotLat > 0 ? 1 - ssResLat / ssTotLat : 0;
-    const r2_lon = ssTotLon > 0 ? 1 - ssResLon / ssTotLon : 0;
-    const r2 = (r2_lat + r2_lon) / 2;
+      });
 
-    // Weighted Residual Error (Average Weighted Distance of inliers to the line)
-    const weightedResidualErrorKm = sumWeight > 0 ? weightedResidualSum / sumWeight : 100;
+      // R2 is the average R2 of Lat and Lon components
+      const r2_lat = ssTotLat > 0 ? 1 - ssResLat / ssTotLat : 0;
+      const r2_lon = ssTotLon > 0 ? 1 - ssResLon / ssTotLon : 0;
+      const r2 = (r2_lat + r2_lon) / 2;
 
-    return { slopeLat, slopeLon, interceptLat, interceptLon, r2, weightedResidualErrorKm };
-}
+      // Weighted Residual Error (Average Weighted Distance of inliers to the line)
+      const weightedResidualErrorKm = sumWeight > 0 ? weightedResidualSum / sumWeight : 100;
 
-
-
-/**
- * ----------------------------------------------------------------------------------
- * --- CLUSTERING FUNCTION (New Dedicated) ---
- * ----------------------------------------------------------------------------------
- */
-
-/**
- * ==================================================================================
- * MAIN NOWCAST LOGIC
- * ==================================================================================
- */
-
-function calculateLightningNowcast(lightningData) {
-    if (!lightningData || lightningData.length === 0) return [];
-
-    // --- 0. DYNAMIC PARAMETER CALCULATION ---
-    const referenceTime = typeof animationEnd !== 'undefined' && animationEnd ? new Date(animationEnd) : new Date();
-    const initialMaxTimeRange = 4 * 3600 * 1000; 
-    const recentLightning = lightningData.filter(s => (referenceTime.getTime() - s.time.getTime()) <= initialMaxTimeRange);
-    const recentLightningLength = recentLightning.length;
-    
-    // Default Parameters
-    let minClusterSize = 5; let maxInactivityMs = 15 * 60 * 1000;
-    let decayConstant = 0.5; let ransacThreshold = 0.05;
-    let maxTimeRange = 3 * 3600 * 1000; let jumpAnalysisWindow = 10 * 60 * 1000;
-    let binSize = 5 * 60 * 1000; let ransacIterations = 150;
-    let maxDistance = 30; let maxTemporalSeparation = 30 * 60 * 1000; 
-
-    // Dynamic Adjustment Logic
-    if (recentLightningLength > 0) {
-        recentLightning.sort((a, b) => a.time.getTime() - b.time.getTime());
-        // ... (Keep your existing dynamic parameter logic here) ...
-        // For brevity, using defaults if not strictly copied, but your previous logic was fine.
-         ransacIterations = Math.min(250, 100 + Math.floor(recentLightningLength / 2));
-         maxDistance = Math.min(50, Math.max(20, 150 / Math.sqrt(recentLightningLength + 1) * 10));
+      return { slopeLat, slopeLon, interceptLat, interceptLon, r2, weightedResidualErrorKm };
     }
-    
-    const finalLightning = recentLightning.filter(s => (referenceTime.getTime() - s.time.getTime()) <= maxTimeRange);
-    
-    // --- 1. CLUSTERING ---
-    const clusters = clusterLightningStrikes(finalLightning, { minClusterSize, maxDistance, maxTemporalSeparation }); 
 
-    // --- PASS 1: RAW VECTORS ---
-    const rawClusterInfos = [];
-    clusters.forEach((cluster) => {
+
+
+    /**
+     * ----------------------------------------------------------------------------------
+     * --- CLUSTERING FUNCTION (New Dedicated) ---
+     * ----------------------------------------------------------------------------------
+     */
+
+    /**
+     * ==================================================================================
+     * MAIN NOWCAST LOGIC
+     * ==================================================================================
+     */
+
+    /**
+     * Calculates lightning nowcast vectors, confidence, and geometry (Hulls/Polygons).
+     * All major constants are dynamically adjusted based on the volume and recency of the lightning data.
+     * The confidence calculation is optimized for stability in developing storms.
+     * * @param {Array<Object>} lightningData - Time-filtered lightning strikes.
+     * @returns {Array<Object>} - Array of calculated storm cluster objects.
+     */
+    function calculateLightningNowcast(lightningData) {
+      if (!lightningData || lightningData.length === 0) return [];
+
+      // --- 0. DYNAMIC PARAMETER CALCULATION & FILTERING ---
+      const referenceTime = typeof animationEnd !== 'undefined' && animationEnd ? new Date(animationEnd) : new Date();
+
+      // Initial Wide Filter: Assess all data from the last 5 hours.
+      const initialMaxTimeRange = 5 * 3600 * 1000;
+      const recentLightning = lightningData.filter(s => (referenceTime.getTime() - s.time.getTime()) <= initialMaxTimeRange);
+      const recentLightningLength = recentLightning.length;
+
+      recentLightning.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+      // --- BASE PARAMETER DEFINITION (Dynamic) ---
+
+      const maxDensityTarget = 2000;
+      const densityRatio = Math.min(1.0, recentLightningLength / maxDensityTarget);
+
+      let maxTimeRange = (3 - (2 * densityRatio)) * 3600 * 1000;
+      let maxDistance = Math.min(35, Math.max(15, 35 * (1.0 - densityRatio * 0.5)));
+      let maxTemporalSeparation = Math.max(10 * 60 * 1000, 30 * 60 * 1000 * (1.0 - densityRatio * 0.6));
+      let minClusterSize = Math.max(5, Math.floor(5 + (2 * densityRatio)));
+      let maxInactivityMs = Math.max(10 * 60 * 1000, 20 * 60 * 1000 * (1.0 - densityRatio * 0.5));
+
+      let ransacIterations = Math.min(250, 100 + Math.floor(recentLightningLength / 2));
+      let ransacThreshold = 0.05;
+      let decayConstant = 0.5;
+      let binSize = 5 * 60 * 1000;
+      let jumpAnalysisWindow = 10 * 60 * 1000;
+
+
+      // Final data set used for clustering and calculation
+      const finalLightning = recentLightning.filter(s => (referenceTime.getTime() - s.time.getTime()) <= maxTimeRange);
+
+      // --- 1. CLUSTERING ---
+      const clusters = clusterLightningStrikes(finalLightning, { minClusterSize, maxDistance, maxTemporalSeparation });
+
+      // --- PASS 1: RAW VECTORS & CONFIDENCE (Updated for Stability) ---
+      const rawClusterInfos = [];
+      const minBinCountForHighConfidence = 5; // Requires 25 minutes of history for max stability score
+
+      clusters.forEach((cluster) => {
         const strikeTimes = cluster.map(s => s.time.getTime());
         const minTime = Math.min(...strikeTimes);
         const maxTime = Math.max(...strikeTimes);
         const lastStrikeTime = new Date(maxTime);
         const timeSinceLastStrike = referenceTime.getTime() - lastStrikeTime.getTime();
-        
-        if (timeSinceLastStrike > maxInactivityMs) return; 
-        
+
+        if (timeSinceLastStrike > maxInactivityMs) return;
+
         // Binning
         const bins = [];
         for (let t = minTime; t < maxTime; t += binSize) {
-            const binStrikes = cluster.filter(s => s.time.getTime() >= t && s.time.getTime() < t + binSize);
-            if (binStrikes.length > 0) {
-                let sumLat = 0, sumLon = 0, sumWeight = 0;
-                binStrikes.forEach(s => {
-                    const ageRatio = (maxTime - s.time.getTime()) / (maxTime - minTime);
-                    const weight = 1.0 - (ageRatio * decayConstant); 
-                    sumLat += s.coordinates[1] * weight; sumLon += s.coordinates[0] * weight; sumWeight += weight;
-                });
-                bins.push({ 
-                    time: (t + t + binSize) / 2, lat: sumLat / sumWeight, lon: sumLon / sumWeight, count: binStrikes.length 
-                });
-            }
+          const binStrikes = cluster.filter(s => s.time.getTime() >= t && s.time.getTime() < t + binSize);
+          if (binStrikes.length > 0) {
+            let sumLat = 0, sumLon = 0, sumWeight = 0;
+            binStrikes.forEach(s => {
+              const ageRatio = (maxTime - s.time.getTime()) / (maxTime - minTime);
+              const weight = 1.0 - (ageRatio * decayConstant);
+              sumLat += s.coordinates[1] * weight; sumLon += s.coordinates[0] * weight; sumWeight += weight;
+            });
+            bins.push({
+              time: (t + t + binSize) / 2, lat: sumLat / sumWeight, lon: sumLon / sumWeight, count: binStrikes.length
+            });
+          }
         }
         if (bins.length === 0) return;
-        
+
         // RANSAC Regression
         let speedKmH = 0, directionDeg = 0, regressionScore = 0, weightedResidualErrorKm = 100;
         if (bins.length >= 2) {
-            const ransacModel = ransacRegression(bins, ransacIterations, ransacThreshold, decayConstant);
-            regressionScore = ransacModel.r2; 
-            weightedResidualErrorKm = ransacModel.weightedResidualErrorKm;
-            const latFactor = Math.cos(bins[0].lat * Math.PI / 180);
-            const speedLatKmH = ransacModel.slopeLat * 111 * 3600;
-            const speedLonKmH = ransacModel.slopeLon * 111 * latFactor * 3600;
-            speedKmH = Math.sqrt(speedLatKmH * speedLatKmH + speedLonKmH * speedLonKmH);
-            directionDeg = (Math.atan2(speedLonKmH, speedLatKmH) * 180 / Math.PI + 360) % 360;
+          const ransacModel = ransacRegression(bins, ransacIterations, ransacThreshold, decayConstant);
+          regressionScore = ransacModel.r2;
+          weightedResidualErrorKm = ransacModel.weightedResidualErrorKm;
+          const latFactor = Math.cos(bins[0].lat * Math.PI / 180);
+          const speedLatKmH = ransacModel.slopeLat * 111 * 3600;
+          const speedLonKmH = ransacModel.slopeLon * 111 * latFactor * 3600;
+          speedKmH = Math.sqrt(speedLatKmH * speedLatKmH + speedLonKmH * speedLonKmH);
+          directionDeg = (Math.atan2(speedLonKmH, speedLatKmH) * 180 / Math.PI + 360) % 360;
         } else {
-            regressionScore = 0.1;
+          regressionScore = 0.1;
         }
-        
+
         // Directional Consistency
         const bearings = [];
-        for (let i = 1; i < bins.length; i++) bearings.push(calculateBearing([bins[i-1].lon, bins[i-1].lat], [bins[i].lon, bins[i].lat]));
-        const circularStdDevDeg = calculateCircularStdDev(bearings); 
+        for (let i = 1; i < bins.length; i++) bearings.push(calculateBearing([bins[i - 1].lon, bins[i - 1].lat], [bins[i].lon, bins[i].lat]));
+        const circularStdDevDeg = calculateCircularStdDev(bearings);
         const directionalConsistencyScore = 1.0 - (circularStdDevDeg / 90.0);
-        
+
         // Lightning Jump
         const timeCutoff = referenceTime.getTime() - jumpAnalysisWindow;
         const latestCount = cluster.filter(s => s.time.getTime() >= timeCutoff).length;
         const middleCount = cluster.filter(s => s.time.getTime() < timeCutoff && s.time.getTime() >= timeCutoff - jumpAnalysisWindow).length;
         const lightningJumpDetected = (latestCount > 2.5 * middleCount && latestCount >= 6);
-        const lightningJumpBonus = lightningJumpDetected ? 0.35 : 0; 
+        const lightningJumpBonus = lightningJumpDetected ? 0.35 : 0;
 
-        // Confidence
-        const ratio = Math.min(timeSinceLastStrike / maxInactivityMs, 1.0); 
-        const decayFactor = Math.pow(1.0 - ratio, 2); 
+        // Confidence Calculation (UPDATED FOR STABILITY)
+        const ratio = Math.min(timeSinceLastStrike / maxInactivityMs, 1.0);
+        const decayFactor = Math.pow(1.0 - ratio, 2);
         const clusterSizeScore = Math.min(cluster.length / 50, 1);
-        
-        let baseConfidence = (clusterSizeScore * 0.20 + (speedKmH/100) * 0.05 + regressionScore * 0.35 + directionalConsistencyScore * 0.30 + (bins.length/5)*0.05);
-        baseConfidence *= decayFactor; 
-        baseConfidence *= (bins.length >= 2 ? 1 : 0.6); 
+
+        // Bin Stability Multiplier: Stronger penalty for low historical data
+        const binConfidenceMultiplier = Math.min(1.0, bins.length / minBinCountForHighConfidence);
+
+        let baseConfidence = (clusterSizeScore * 0.25 +       // Increased weight for stability
+          (speedKmH / 100) * 0.05 +
+          regressionScore * 0.25 +        // Reduced weight for initial stability
+          directionalConsistencyScore * 0.30 +
+          (bins.length / minBinCountForHighConfidence) * 0.05);
+
+        baseConfidence *= decayFactor;
+        baseConfidence *= binConfidenceMultiplier; // Apply stronger penalty for short history
+
         let confidenceScore = Math.min(1.0, baseConfidence + lightningJumpBonus);
 
         rawClusterInfos.push({
-            cluster, baseLat: bins[bins.length - 1].lat, baseLon: bins[bins.length - 1].lon, 
-            speedKmH, directionDeg, regressionScore, directionalConsistencyScore, weightedResidualErrorKm, 
-            confidenceScore, clusterSize: cluster.length, lightningJump: lightningJumpDetected, decaying: decayFactor < 0.5,
+          cluster, baseLat: bins[bins.length - 1].lat, baseLon: bins[bins.length - 1].lon,
+          speedKmH, directionDeg, regressionScore, directionalConsistencyScore, weightedResidualErrorKm,
+          confidenceScore, clusterSize: cluster.length, lightningJump: lightningJumpDetected, decaying: decayFactor < 0.5,
         });
-    });
+      });
 
-    // --- PASS 2: SMOOTHING & GEOMETRY GENERATION ---
-    const clusterInfos = [];
-    const projectionTimeHours = 1.0; 
+      // --- PASS 2: SMOOTHING & GEOMETRY GENERATION ---
+      const clusterInfos = [];
+      const projectionTimeHours = 1.0;
 
-    rawClusterInfos.forEach((currentCluster, idx) => {
-        // A. Smoothing (Weighted Neighbor Average)
+      // TEMPORAL SMOOTHING PARAMETERS
+      const maxSmoothingDistanceKm = 50;
+      const smoothingFactor = 0.4;
+
+      rawClusterInfos.forEach((currentCluster) => {
+        // A. Temporal Smoothing
         let moderatedSpeedKmH = currentCluster.speedKmH;
         let moderatedDirectionDeg = currentCluster.directionDeg;
-        // ... (Keep existing smoothing logic, simplified here for length) ...
-        // Assuming smoothing logic is preserved from your code or using raw values if isolated.
 
-        // B. Convex Hull (Current Shape)
-        let hullGeometry = null;
-        if (typeof turf !== 'undefined' && currentCluster.cluster.length >= 3) {
-            const points = turf.featureCollection(currentCluster.cluster.map(s => turf.point([s.coordinates[0], s.coordinates[1]])));
-            hullGeometry = turf.convex(points);
+        if (typeof previousNowcasts !== 'undefined' && previousNowcasts.length > 0) {
+
+          let nearestPrevNowcast = null;
+          let minDistance = Infinity;
+          const currentPoint = turf.point([currentCluster.baseLon, currentCluster.baseLat]);
+
+          previousNowcasts.forEach(prevCluster => {
+            const prevPoint = turf.point([prevCluster.baseLon, prevCluster.baseLat]);
+            const distance = turf.distance(currentPoint, prevPoint, { units: 'kilometers' });
+
+            if (distance < minDistance) {
+              minDistance = distance;
+              nearestPrevNowcast = prevCluster;
+            }
+          });
+
+          if (nearestPrevNowcast && minDistance <= maxSmoothingDistanceKm) {
+            const distanceRatio = minDistance / maxSmoothingDistanceKm;
+            const distanceWeight = 1.0 - distanceRatio;
+            const finalWeight = smoothingFactor * nearestPrevNowcast.confidenceScore * distanceWeight;
+            const inverseWeight = 1.0 - finalWeight;
+
+            const currentU = currentCluster.speedKmH * Math.sin(currentCluster.directionDeg * Math.PI / 180);
+            const currentV = currentCluster.speedKmH * Math.cos(currentCluster.directionDeg * Math.PI / 180);
+            const prevU = nearestPrevNowcast.speedKmH * Math.sin(nearestPrevNowcast.directionDeg * Math.PI / 180);
+            const prevV = nearestPrevNowcast.speedKmH * Math.cos(nearestPrevNowcast.directionDeg * Math.PI / 180);
+
+            const smoothedU = (currentU * inverseWeight) + (prevU * finalWeight);
+            const smoothedV = (currentV * inverseWeight) + (prevV * finalWeight);
+
+            moderatedSpeedKmH = Math.sqrt(smoothedU * smoothedU + smoothedV * smoothedV);
+            moderatedDirectionDeg = (Math.atan2(smoothedU, smoothedV) * 180 / Math.PI + 360) % 360;
+          }
         }
-        
-        // C. FUTURE POLYGON PROJECTION (This was missing!)
+
+        // B. Convex Hull (Current Shape Geometry)
+        let hullGeometry = null;
+        // Only draw hull if cluster size meets the dynamic minimum
+        if (typeof turf !== 'undefined' && currentCluster.cluster.length >= minClusterSize) {
+          const points = turf.featureCollection(currentCluster.cluster.map(s => turf.point([s.coordinates[0], s.coordinates[1]])));
+          hullGeometry = turf.convex(points);
+        }
+
+        // C. FUTURE POLYGON PROJECTION 
         const nowcastPolygons = [];
         if (hullGeometry && hullGeometry.geometry && hullGeometry.geometry.coordinates) {
-             const hullCoords = hullGeometry.geometry.coordinates[0]; // Get the ring
-             const projectionTimesMin = [15, 30, 45, 60];
+          const hullCoords = hullGeometry.geometry.coordinates[0];
+          const projectionTimesMin = [15, 30, 45, 60];
 
-             for (const tMin of projectionTimesMin) {
-                const distanceKm = moderatedSpeedKmH * (tMin / 60);
-                
-                // 1. Translate
-                const projectedHull = translatePolygon(hullCoords, moderatedDirectionDeg, distanceKm);
-                
-                // 2. Scale (Grow/Shrink)
-                let scaleFactor = 1.0;
-                if (currentCluster.lightningJump) scaleFactor = 1.0 + 0.1 * (tMin / 15);
-                else if (currentCluster.decaying) scaleFactor = 1.0 - 0.15 * (tMin / 15);
-                scaleFactor = Math.max(0.1, scaleFactor);
+          for (const tMin of projectionTimesMin) {
+            const distanceKm = moderatedSpeedKmH * (tMin / 60);
 
-                const projectedCentroid = getPolygonCentroid(projectedHull);
-                const finalHull = scalePolygon(projectedHull, scaleFactor, projectedCentroid);
+            const projectedHull = translatePolygon(hullCoords, moderatedDirectionDeg, distanceKm);
 
-                nowcastPolygons.push({ timeMinutes: tMin, polygon: finalHull });
-             }
+            let scaleFactor = 1.0;
+            if (currentCluster.lightningJump) scaleFactor = 1.0 + 0.1 * (tMin / 15);
+            else if (currentCluster.decaying) scaleFactor = 1.0 - 0.15 * (tMin / 15);
+            scaleFactor = Math.max(0.1, scaleFactor);
+
+            const projectedCentroid = getPolygonCentroid(projectedHull);
+            const finalHull = scalePolygon(projectedHull, scaleFactor, projectedCentroid);
+
+            nowcastPolygons.push({ timeMinutes: tMin, polygon: finalHull });
+          }
         }
 
         // D. Uncertainty Ellipse
-        const directionalErrorDeg = (1.0 - currentCluster.directionalConsistencyScore) * 90; 
+        const directionalErrorDeg = (1.0 - currentCluster.directionalConsistencyScore) * 90;
         const circularStdDevRad = directionalErrorDeg * Math.PI / 180;
         const projectionDistanceKm = moderatedSpeedKmH * projectionTimeHours;
         const semiMinorKm = Math.min(75, Math.max(10, projectionDistanceKm * Math.sin(circularStdDevRad) * 0.7));
         const semiMajorKm = Math.min(150, Math.max(20, projectionDistanceKm + (currentCluster.weightedResidualErrorKm * 3)));
 
         if (currentCluster.confidenceScore > 0.1) {
-             clusterInfos.push({
-                  baseLat: currentCluster.baseLat, baseLon: currentCluster.baseLon,
-                  speedKmH: moderatedSpeedKmH, directionDeg: moderatedDirectionDeg,
-                  confidenceScore: currentCluster.confidenceScore, clusterSize: currentCluster.clusterSize,
-                  hullGeometry: hullGeometry,
-                  nowcastPolygons: nowcastPolygons, // <-- ADDED THIS
-                  uncertaintyEllipse: { semiMajorKm, semiMinorKm, rotationDeg: moderatedDirectionDeg }
-             });
+          clusterInfos.push({
+            baseLat: currentCluster.baseLat, baseLon: currentCluster.baseLon,
+            speedKmH: moderatedSpeedKmH,
+            directionDeg: moderatedDirectionDeg,
+            confidenceScore: currentCluster.confidenceScore, clusterSize: currentCluster.clusterSize,
+            hullGeometry: hullGeometry,
+            nowcastPolygons: nowcastPolygons,
+            uncertaintyEllipse: { semiMajorKm, semiMinorKm, rotationDeg: moderatedDirectionDeg }
+          });
         }
-    });
+      });
 
-    return clusterInfos;
-}
-/**
- * ==================================================================================
- * HELPER FUNCTIONS (CLUSTERING & MATH)
- * ==================================================================================
- */
+      // CRITICAL: Store the current results for the next iteration's smoothing
+      if (typeof previousNowcasts !== 'undefined') {
+        previousNowcasts = clusterInfos;
+      }
 
-function clusterLightningStrikes(lightningData, params) {
-    if (!lightningData || lightningData.length === 0) return [];
-    
-    const { minClusterSize, maxDistance, maxTemporalSeparation } = params;
-    const localDensityWindowMs = 5 * 60 * 1000; 
-    const densityDistanceKm = 50; 
+      return clusterInfos;
+    }
+    /**
+     * ==================================================================================
+     * HELPER FUNCTIONS (CLUSTERING & MATH)
+     * ==================================================================================
+     */
 
-    const clusters = [];
-    const used = new Set();
+    function clusterLightningStrikes(lightningData, params) {
+      if (!lightningData || lightningData.length === 0) return [];
 
-    for (let i = 0; i < lightningData.length; i++) {
+      const { minClusterSize, maxDistance, maxTemporalSeparation } = params;
+      const localDensityWindowMs = 5 * 60 * 1000;
+      const densityDistanceKm = 50;
+
+      const clusters = [];
+      const used = new Set();
+
+      for (let i = 0; i < lightningData.length; i++) {
         if (used.has(i)) continue;
 
         const currentCluster = [];
-        const queue = [i]; 
+        const queue = [i];
         used.add(i);
 
         while (queue.length > 0) {
-            const idx = queue.shift();
-            const strike = lightningData[idx];
-            currentCluster.push(strike);
+          const idx = queue.shift();
+          const strike = lightningData[idx];
+          currentCluster.push(strike);
 
-            const localDensityCount = lightningData.filter(s => 
-                (strike.time.getTime() - s.time.getTime()) <= localDensityWindowMs &&
-                calculateDistance(strike.coordinates, s.coordinates) <= densityDistanceKm
-            ).length;
-            
-            const densityFactor = Math.max(0.5, 1.0 - (localDensityCount / 50) * 0.5); 
-            const dynamicMaxDistance = maxDistance * densityFactor; 
+          const localDensityCount = lightningData.filter(s =>
+            (strike.time.getTime() - s.time.getTime()) <= localDensityWindowMs &&
+            calculateDistance(strike.coordinates, s.coordinates) <= densityDistanceKm
+          ).length;
 
-            for (let j = 0; j < lightningData.length; j++) {
-                if (used.has(j)) continue;
-                const neighbor = lightningData[j];
-                const dist = calculateDistance(strike.coordinates, neighbor.coordinates);
-                const timeDiff = Math.abs(strike.time.getTime() - neighbor.time.getTime()); 
-                
-                if (dist <= dynamicMaxDistance && timeDiff <= maxTemporalSeparation) { 
-                    used.add(j);
-                    queue.push(j);
-                }
+          const densityFactor = Math.max(0.5, 1.0 - (localDensityCount / 50) * 0.5);
+          const dynamicMaxDistance = maxDistance * densityFactor;
+
+          for (let j = 0; j < lightningData.length; j++) {
+            if (used.has(j)) continue;
+            const neighbor = lightningData[j];
+            const dist = calculateDistance(strike.coordinates, neighbor.coordinates);
+            const timeDiff = Math.abs(strike.time.getTime() - neighbor.time.getTime());
+
+            if (dist <= dynamicMaxDistance && timeDiff <= maxTemporalSeparation) {
+              used.add(j);
+              queue.push(j);
             }
+          }
         }
         if (currentCluster.length >= minClusterSize) {
-            clusters.push(currentCluster);
+          clusters.push(currentCluster);
         }
+      }
+      return clusters;
     }
-    return clusters;
-}
 
-function calculateDistance(coords1, coords2) {
-    const [lon1, lat1] = coords1;
-    const [lon2, lat2] = coords2;
-    const R = 6371; 
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function calculateBearing(coords1, coords2) {
-    const [lon1, lat1] = coords1;
-    const [lon2, lat2] = coords2;
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const y = Math.sin(dLon) * Math.cos(lat2Rad);
-    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-function calculateCircularStdDev(angles) {
-    if (angles.length < 2) return 90;
-    const degToRad = Math.PI / 180;
-    let sumSin = 0, sumCos = 0;
-    for (const angle of angles) {
-        sumSin += Math.sin(angle * degToRad);
-        sumCos += Math.cos(angle * degToRad);
+    function calculateDistance(coords1, coords2) {
+      const [lon1, lat1] = coords1;
+      const [lon2, lat2] = coords2;
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
-    const R_sq = (sumSin / angles.length) ** 2 + (sumCos / angles.length) ** 2;
-    const sigma_c_rad = Math.sqrt(-2 * Math.log(Math.max(1e-9, 1 - Math.sqrt(R_sq))));
-    return Math.min(90, sigma_c_rad * 180 / Math.PI);
-}
 
-function randomSample(array, n) {
-    const result = [];
-    const indices = Array.from({ length: array.length }, (_, i) => i);
-    for (let i = 0; i < n && indices.length > 0; i++) {
+    function calculateBearing(coords1, coords2) {
+      const [lon1, lat1] = coords1;
+      const [lon2, lat2] = coords2;
+      const lat1Rad = lat1 * Math.PI / 180;
+      const lat2Rad = lat2 * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const y = Math.sin(dLon) * Math.cos(lat2Rad);
+      const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+
+
+    function randomSample(array, n) {
+      const result = [];
+      const indices = Array.from({ length: array.length }, (_, i) => i);
+      for (let i = 0; i < n && indices.length > 0; i++) {
         const idx = Math.floor(Math.random() * indices.length);
         result.push(array[indices.splice(idx, 1)[0]]);
+      }
+      return result;
     }
-    return result;
-}
 
-function fitLinearModel(bins, decayConstant) {
-    let sumT = 0, sumLat = 0, sumLon = 0, sumTLat = 0, sumTLon = 0, sumT2 = 0, sumWeight = 0;
-    const baseTime = bins[0].time;
-    const maxTime = Math.max(...bins.map(b => b.time));
-    const minTime = Math.min(...bins.map(b => b.time));
+    function fitLinearModel(bins, decayConstant) {
+      let sumT = 0, sumLat = 0, sumLon = 0, sumTLat = 0, sumTLon = 0, sumT2 = 0, sumWeight = 0;
+      const baseTime = bins[0].time;
+      const maxTime = Math.max(...bins.map(b => b.time));
+      const minTime = Math.min(...bins.map(b => b.time));
 
-    bins.forEach(b => {
-        const t = (b.time - baseTime) / 1000;
-        const ageRatio = (maxTime - minTime) > 0 ? (maxTime - b.time) / (maxTime - minTime) : 0;
-        const weight = (1.0 - (ageRatio * decayConstant)) * Math.log1p(b.count || 1); 
-        sumT += t * weight; sumLat += b.lat * weight; sumLon += b.lon * weight;
-        sumTLat += t * b.lat * weight; sumTLon += t * b.lon * weight;
-        sumT2 += t * t * weight; sumWeight += weight;
-    });
-
-    if (sumWeight === 0) return { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
-
-    const denominator = sumT2 * sumWeight - sumT * sumT;
-    const slopeLat = denominator !== 0 ? (sumTLat * sumWeight - sumT * sumLat) / denominator : 0;
-    const slopeLon = denominator !== 0 ? (sumTLon * sumWeight - sumT * sumLon) / denominator : 0;
-    const interceptLat = (sumLat - slopeLat * sumT) / sumWeight;
-    const interceptLon = (sumLon - slopeLon * sumT) / sumWeight;
-
-    let ssTotLat = 0, ssResLat = 0, ssTotLon = 0, ssResLon = 0, weightedResidualSum = 0;
-    const meanLat = sumLat / sumWeight;
-    const meanLon = sumLon / sumWeight;
-
-    bins.forEach(b => {
+      bins.forEach(b => {
         const t = (b.time - baseTime) / 1000;
         const ageRatio = (maxTime - minTime) > 0 ? (maxTime - b.time) / (maxTime - minTime) : 0;
         const weight = (1.0 - (ageRatio * decayConstant)) * Math.log1p(b.count || 1);
-        
+        sumT += t * weight; sumLat += b.lat * weight; sumLon += b.lon * weight;
+        sumTLat += t * b.lat * weight; sumTLon += t * b.lon * weight;
+        sumT2 += t * t * weight; sumWeight += weight;
+      });
+
+      if (sumWeight === 0) return { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
+
+      const denominator = sumT2 * sumWeight - sumT * sumT;
+      const slopeLat = denominator !== 0 ? (sumTLat * sumWeight - sumT * sumLat) / denominator : 0;
+      const slopeLon = denominator !== 0 ? (sumTLon * sumWeight - sumT * sumLon) / denominator : 0;
+      const interceptLat = (sumLat - slopeLat * sumT) / sumWeight;
+      const interceptLon = (sumLon - slopeLon * sumT) / sumWeight;
+
+      let ssTotLat = 0, ssResLat = 0, ssTotLon = 0, ssResLon = 0, weightedResidualSum = 0;
+      const meanLat = sumLat / sumWeight;
+      const meanLon = sumLon / sumWeight;
+
+      bins.forEach(b => {
+        const t = (b.time - baseTime) / 1000;
+        const ageRatio = (maxTime - minTime) > 0 ? (maxTime - b.time) / (maxTime - minTime) : 0;
+        const weight = (1.0 - (ageRatio * decayConstant)) * Math.log1p(b.count || 1);
+
         const predLat = interceptLat + slopeLat * t;
         const predLon = interceptLon + slopeLon * t;
 
@@ -6147,123 +6176,123 @@ function fitLinearModel(bins, decayConstant) {
         ssTotLon += weight * Math.pow(b.lon - meanLon, 2);
         ssResLat += weight * Math.pow(b.lat - predLat, 2);
         ssResLon += weight * Math.pow(b.lon - predLon, 2);
-        
+
         weightedResidualSum += calculateDistance([b.lon, b.lat], [predLon, predLat]) * weight;
-    });
-    
-    const r2 = ((ssTotLat > 0 ? 1 - ssResLat / ssTotLat : 0) + (ssTotLon > 0 ? 1 - ssResLon / ssTotLon : 0)) / 2;
-    const weightedResidualErrorKm = weightedResidualSum / sumWeight;
+      });
 
-    return { slopeLat, slopeLon, interceptLat, interceptLon, r2, weightedResidualErrorKm };
-}
+      const r2 = ((ssTotLat > 0 ? 1 - ssResLat / ssTotLat : 0) + (ssTotLon > 0 ? 1 - ssResLon / ssTotLon : 0)) / 2;
+      const weightedResidualErrorKm = weightedResidualSum / sumWeight;
 
-function ransacRegression(bins, iterations, threshold, decayConstant) {
-    let bestModel = { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
-    let maxInliers = 0;
+      return { slopeLat, slopeLon, interceptLat, interceptLon, r2, weightedResidualErrorKm };
+    }
 
-    for (let i = 0; i < iterations; i++) {
+    function ransacRegression(bins, iterations, threshold, decayConstant) {
+      let bestModel = { slopeLat: 0, slopeLon: 0, interceptLat: 0, interceptLon: 0, r2: 0, weightedResidualErrorKm: 100 };
+      let maxInliers = 0;
+
+      for (let i = 0; i < iterations; i++) {
         const sample = randomSample(bins, 2);
         if (sample.length < 2) continue;
         const model = fitLinearModel(sample, decayConstant);
         const inliers = bins.filter(b => {
-            const t = (b.time - sample[0].time) / 1000;
-            const predLat = model.interceptLat + model.slopeLat * t;
-            const predLon = model.interceptLon + model.slopeLon * t;
-            return Math.abs(b.lat - predLat) < threshold && Math.abs(b.lon - predLon) < threshold;
+          const t = (b.time - sample[0].time) / 1000;
+          const predLat = model.interceptLat + model.slopeLat * t;
+          const predLon = model.interceptLon + model.slopeLon * t;
+          return Math.abs(b.lat - predLat) < threshold && Math.abs(b.lon - predLon) < threshold;
         });
         if (inliers.length > maxInliers) {
-            maxInliers = inliers.length;
-            bestModel = fitLinearModel(inliers.length >= 2 ? inliers : sample, decayConstant);
+          maxInliers = inliers.length;
+          bestModel = fitLinearModel(inliers.length >= 2 ? inliers : sample, decayConstant);
         }
+      }
+      return bestModel;
     }
-    return bestModel;
-}
 
     function updateNowcast(filtered) {
-    // 1. CLEAR ALL LAYERS (Both 2D and 3D)
-    // Clear the new polygon layer
-    if (typeof polygonNowcastLayer !== 'undefined') {
+      // 1. CLEAR ALL LAYERS (Both 2D and 3D)
+      // Clear the new polygon layer
+      if (typeof polygonNowcastLayer !== 'undefined') {
         polygonNowcastLayer.clearLayers();
-    }
-    // Clear the old cone layer
-    if (typeof nowcastLayer !== 'undefined') {
+      }
+      // Clear the old cone layer
+      if (typeof nowcastLayer !== 'undefined') {
         nowcastLayer.clearLayers();
-    }
-    
-    // Clear 3D layers
-    if (typeof nowcastLayer3D !== 'undefined') {
+      }
+
+      // Clear 3D layers
+      if (typeof nowcastLayer3D !== 'undefined') {
         nowcastLayer3D.forEach(layer => {
-            if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
-            if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
+          if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
+          if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
         });
         nowcastLayer3D = [];
-    }
+      }
 
-    // 2. CHECK TOGGLE
-    if (!document.getElementById('nowcast-toggle').checked) return;
+      // 2. CHECK TOGGLE
+      if (!document.getElementById('nowcast-toggle').checked) return;
 
-    // 3. CALCULATE NOWCAST WITH FILTERED DATA
-    // This ensures the nowcast updates exactly when you move the slider
-    const minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value) || 0.5;
-    currentNowcasts = calculateLightningNowcast(filtered);
+      // 3. CALCULATE NOWCAST WITH FILTERED DATA
+      // This ensures the nowcast updates exactly when you move the slider
+      const minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value) || 0.5;
+      currentNowcasts = calculateLightningNowcast(filtered);
 
-    // 4. DRAWING LOOP
-    currentNowcasts.forEach((cluster, index) => {
+      // 4. DRAWING LOOP
+      currentNowcasts.forEach((cluster, index) => {
         // Skip low confidence
         if (cluster.confidenceScore < minNowcastConfidence) return;
 
         // Determine Color
         const confidenceColor = cluster.confidenceScore > 0.9 ? '#800080' : // Purple
-                                cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
-                                cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
-                                                                '#008000';//green
+          cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
+            cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
+              '#008000';//green
 
         // ============================================================
         // 2D MODE (Leaflet)
         // ============================================================
         if (!is3DMode) {
-            
-            // --- A. DRAW NEW POLYGONS (Hull + Forecasts) ---
-            if (typeof polygonNowcastLayer !== 'undefined') {
-                // Draw Current Hull
-                if (cluster.hullGeometry) {
-                    L.geoJSON(cluster.hullGeometry, {
-                        style: {
-                            fillColor: confidenceColor, fillOpacity: 0.4,
-                            color: 'black', weight: 2, opacity: 0.8
-                        }
-                    }).bindPopup(`<b>Storm Cell</b><br>Size: ${cluster.clusterSize}`).addTo(polygonNowcastLayer);
-                }
 
-                // Draw Future Polygons
-                if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
-                    cluster.nowcastPolygons.forEach(forecast => {
-                        const latLngs = forecast.polygon.map(p => [p[1], p[0]]); // Flip to [lat, lon]
-                        const opacity = Math.max(0.1, 1.0 - (forecast.timeMinutes / 80));
-                        
-                        L.polygon(latLngs, {
-                            color: confidenceColor, weight: 1, opacity: opacity,
-                            fillColor: confidenceColor, fillOpacity: 0.15,
-                            dashArray: '5, 5'
-                        }).bindPopup(`
+          // --- A. DRAW NEW POLYGONS (Hull + Forecasts) ---
+          if (typeof polygonNowcastLayer !== 'undefined') {
+            // Draw Current Hull
+            if (cluster.hullGeometry) {
+              L.geoJSON(cluster.hullGeometry, {
+                style: {
+                  fillColor: confidenceColor, fillOpacity: 0.4,
+                  color: 'black', weight: 2, opacity: 0.8
+                }
+              }).bindPopup(`<b>Storm Cell</b><br>Size: ${cluster.clusterSize}`).addTo(polygonNowcastLayer);
+            }
+
+            // Draw Future Polygons
+            if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
+              cluster.nowcastPolygons.forEach(forecast => {
+                const latLngs = forecast.polygon.map(p => [p[1], p[0]]); // Flip to [lat, lon]
+                const opacity = Math.max(0.1, 1.0 - (forecast.timeMinutes / 80));
+
+                L.polygon(latLngs, {
+                  color: confidenceColor, weight: 1, opacity: opacity,
+                  fillColor: confidenceColor, fillOpacity: 0.15,
+                  dashArray: '5, 5'
+                }).bindPopup(`
                     <b>1-Hour Forecast</b><br>
                     Confidence: ${(cluster.confidenceScore * 100).toFixed(0)}%<br>
                     Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
                     Direction: ${cluster.directionDeg.toFixed(1)}°
                 `).addTo(polygonNowcastLayer);
-                    });
-                }
+              });
             }
+          }
 
-            // --- B. DRAW OLD CONES (Optional, kept for reference) ---
-            // If you only want Polygons, you can delete this section.
-            if (typeof nowcastLayer !== 'undefined') {
-                // Draw small circle at base
-                L.circle([cluster.baseLat, cluster.baseLon], {
-                    radius: (cluster.confidenceScore * 5 + 5) * 1000,
-                    color: confidenceColor, weight: 1, fillOpacity: 0.2
-                }).addTo(nowcastLayer);
-            }
+          // --- B. DRAW OLD CONES (Optional, kept for reference) ---
+          // If you only want Polygons, you can delete this section.
+          if (typeof nowcastLayer !== 'undefined') {
+            // Draw small circle at base
+            L.circle([cluster.baseLat, cluster.baseLon], {
+              radius: (cluster.confidenceScore * 5 + 5) * 1000,
+              color: confidenceColor, weight: 1, fillOpacity: 0.2
+            }).addTo(nowcastLayer);
+          }
         }
 
         // ============================================================
@@ -6271,83 +6300,83 @@ function ransacRegression(bins, iterations, threshold, decayConstant) {
         // ============================================================
         // Keeping your existing 3D logic so 3D mode doesn't break.
         else {
-            const radiusKm = cluster.confidenceScore * 5 + 5;
-            const coneRadiusKm = cluster.confidenceScore * 30 + 30;
-            const radiusDeg = radiusKm / 111;
+          const radiusKm = cluster.confidenceScore * 5 + 5;
+          const coneRadiusKm = cluster.confidenceScore * 30 + 30;
+          const radiusDeg = radiusKm / 111;
 
-            // Render Cluster Circle
-            const circleId = `nowcast-circle-${index}`;
-            map3D.addSource(circleId, {
-                type: 'geojson',
-                data: {
-                    type: 'Feature',
-                    geometry: { type: 'Point', coordinates: [cluster.baseLon, cluster.baseLat] },
-                    properties: { radius: radiusDeg }
-                }
-            });
-            map3D.addLayer({
-                id: circleId,
-                type: 'circle',
-                source: circleId,
-                paint: {
-                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, (radiusKm * 1000) / 1000, 10, (radiusKm * 1000) / 250],
-                    'circle-color': confidenceColor,
-                    'circle-opacity': 0.5,
-                    'circle-stroke-width': 2,
-                    'circle-stroke-color': confidenceColor
-                }
-            });
-            nowcastLayer3D.push({ id: circleId, source: circleId });
-
-            // Render Cone Sector
-            if (typeof turf !== 'undefined') {
-                const cone = turf.sector(
-                    [cluster.baseLon, cluster.baseLat],
-                    coneRadiusKm,
-                    cluster.directionDeg - 15,
-                    cluster.directionDeg + 15,
-                    { units: 'kilometers' }
-                );
-                const coneId = `nowcast-cone-${index}`;
-                map3D.addSource(coneId, { type: 'geojson', data: cone });
-                map3D.addLayer({
-                    id: coneId,
-                    type: 'fill',
-                    source: coneId,
-                    paint: { 'fill-color': confidenceColor, 'fill-opacity': 0.5 }
-                });
-                nowcastLayer3D.push({ id: coneId, source: coneId });
+          // Render Cluster Circle
+          const circleId = `nowcast-circle-${index}`;
+          map3D.addSource(circleId, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [cluster.baseLon, cluster.baseLat] },
+              properties: { radius: radiusDeg }
             }
-        }
-    });
+          });
+          map3D.addLayer({
+            id: circleId,
+            type: 'circle',
+            source: circleId,
+            paint: {
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, (radiusKm * 1000) / 1000, 10, (radiusKm * 1000) / 250],
+              'circle-color': confidenceColor,
+              'circle-opacity': 0.5,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': confidenceColor
+            }
+          });
+          nowcastLayer3D.push({ id: circleId, source: circleId });
 
-    // Ensure layers are added to map if visible
-    if (!is3DMode) {
+          // Render Cone Sector
+          if (typeof turf !== 'undefined') {
+            const cone = turf.sector(
+              [cluster.baseLon, cluster.baseLat],
+              coneRadiusKm,
+              cluster.directionDeg - 15,
+              cluster.directionDeg + 15,
+              { units: 'kilometers' }
+            );
+            const coneId = `nowcast-cone-${index}`;
+            map3D.addSource(coneId, { type: 'geojson', data: cone });
+            map3D.addLayer({
+              id: coneId,
+              type: 'fill',
+              source: coneId,
+              paint: { 'fill-color': confidenceColor, 'fill-opacity': 0.5 }
+            });
+            nowcastLayer3D.push({ id: coneId, source: coneId });
+          }
+        }
+      });
+
+      // Ensure layers are added to map if visible
+      if (!is3DMode) {
         if (typeof polygonNowcastLayer !== 'undefined' && !map.hasLayer(polygonNowcastLayer)) {
-            map.addLayer(polygonNowcastLayer);
+          map.addLayer(polygonNowcastLayer);
         }
         if (typeof nowcastLayer !== 'undefined' && !map.hasLayer(nowcastLayer)) {
-            map.addLayer(nowcastLayer);
+          map.addLayer(nowcastLayer);
         }
+      }
+
+      if (typeof updateLegend === 'function') updateLegend();
     }
 
-    if (typeof updateLegend === 'function') updateLegend();
-}
-
     function calculateDistance(coords1, coords2) {
-    const [lon1, lat1] = coords1;
-    const [lon2, lat2] = coords2;
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
-    const a = 
+      const [lon1, lat1] = coords1;
+      const [lon2, lat2] = coords2;
+      const R = 6371; // Earth's radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const lat1Rad = lat1 * Math.PI / 180;
+      const lat2Rad = lat2 * Math.PI / 180;
+      const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
 
     function initializeDragAndDrop() {
       const mapDiv = document.getElementById('map');
