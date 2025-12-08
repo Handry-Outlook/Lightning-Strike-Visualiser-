@@ -4203,14 +4203,19 @@
       }
 
       if (nowcastEnabled) {
-        legendDiv.innerHTML += '<h4>Nowcast</h4>';
-        legendDiv.innerHTML += `
-      <div><div class="color-box" style="background: purple"></div>Very High Confidence</div>
-      <div><div class="color-box" style="background: red"></div>High Confidence</div>
-      <div><div class="color-box" style="background: orange"></div>Moderate Confidence</div>
-      <div><div class="color-box" style="background: green"></div>Low Confidence</div>
+      legendDiv.innerHTML += '<h4>Nowcast Confidence </h4>';
+      legendDiv.innerHTML += `
+      <div style="display: flex; align-items: center;">
+          <div class="color-gradient" style="
+              width: 100px; 
+              height: 20px; 
+              background: linear-gradient(to right, #FF8C00, #CC0000); 
+              opacity: 1.0; 
+              border: 1px solid #333;
+          "></div>
+          
     `;
-      }
+}
 
       // Fix: Proper radar legend structure with all conditions inside radarEnabled check
       if (radarEnabled && radarType) {
@@ -4690,7 +4695,70 @@
       updateLegend();
       if (is3DMode) update3DView();
     }
+    /**
+ * Converts a hex color string (e.g., "#FF8C00") to an RGB array [R, G, B].
+ * Assumes a valid 6-digit hex code with optional '#' prefix.
+ */
+function hexToRgb(hex) {
+    const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
 
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    
+    return result ? [
+        parseInt(result[1], 16),
+        parseInt(result[2], 16),
+        parseInt(result[3], 16)
+    ] : [0, 0, 0]; // Return black on failure
+}
+
+/**
+ * Converts an RGB array [R, G, B] to a 6-digit hex color string.
+ */
+function rgbToHex(r, g, b) {
+    const toHex = (c) => {
+        const hex = Math.round(c).toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+    };
+    return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+/**
+ * Linearly interpolates between two hex colors based on a confidence score.
+ * * @param {string} colorLow - Hex color for the lowest confidence (e.g., #FF8C00).
+ * @param {string} colorHigh - Hex color for the highest confidence (e.g., #CC0000).
+ * @param {number} confidenceScore - Value between 0.0 and 1.0.
+ * @returns {string} The interpolated hex color string.
+ */
+function interpolateColor(colorLow, colorHigh, confidenceScore) {
+    // 1. Clamp the score between 0 and 1
+    const t = Math.max(0, Math.min(1, confidenceScore));
+
+    // 2. Convert hex to RGB arrays
+    const rgbLow = hexToRgb(colorLow);
+    const rgbHigh = hexToRgb(colorHigh);
+
+    // 3. Linear interpolation for R, G, and B components
+    const R_low = rgbLow[0];
+    const G_low = rgbLow[1];
+    const B_low = rgbLow[2];
+
+    const R_high = rgbHigh[0];
+    const G_high = rgbHigh[1];
+    const B_high = rgbHigh[2];
+
+    const R = R_low + (R_high - R_low) * t;
+    const G = G_low + (G_high - G_low) * t;
+    const B = B_low + (B_high - B_low) * t;
+
+    // 4. Convert the interpolated RGB back to a Hex code
+    return rgbToHex(R, G, B);
+}
+const LOW_CONFIDENCE_COLOR = '#FF8C00'; // Dark Orange
+const HIGH_CONFIDENCE_COLOR = '#CC0000'; // Deep Red
+    // In your loop when drawing a nowcast polygon:
+    
+
+    // Render the polygon with finalFillColor and finalOpacity
     function updateStrikeColors() {
       const colorMode = document.getElementById('color-mode').checked;
       const end = new Date(document.getElementById('end-time').value);
@@ -5387,240 +5455,143 @@
  * and draws current clusters as convex hulls, and future projections as
  * expanding, time-stepped polygons, similar to the provided image.
  */
-    function toggleNowcast() {
-      minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
+    // NOTE: Assuming all required helper functions (calculatePotentialImpact, getImpactHtml, etc.) 
+// are defined and available in the global scope.
 
-      // 1. Clean up existing layers
-      nowcastLayer.clearLayers();
+function toggleNowcast() {
+    
+    const minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value);
 
-      if (document.getElementById('nowcast-toggle').checked && !is3DMode) {
+    // 1. Clean up existing layers: CLEAR BOTH OLD cone layer AND NEW polygon layer
+    if (typeof nowcastLayer !== 'undefined') {
+        nowcastLayer.clearLayers();
+    }
+    if (typeof polygonNowcastLayer !== 'undefined') {
+        polygonNowcastLayer.clearLayers();
+    }
+
+    if (document.getElementById('nowcast-toggle').checked && !is3DMode) {
 
         // Recalculate based on current data
         currentNowcasts = calculateLightningNowcast(currentFiltered);
 
         currentNowcasts.forEach((cluster) => {
-          if (cluster.confidenceScore >= minNowcastConfidence) {
+            const confidence = cluster.confidenceScore;
+            
+            if (confidence >= minNowcastConfidence) {
 
-            // Determine color based on confidence
-            const color = cluster.confidenceScore > 0.9 ? '#800080' : // Purple
-              cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
-                cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
-                  '#008000';  // Green
+                // --- DYNAMIC COLOR AND OPACITY CALCULATION ---
+                const confidenceColor = interpolateColor(LOW_CONFIDENCE_COLOR, HIGH_CONFIDENCE_COLOR, confidence);
+                const baseOpacity = Math.max(0.2, confidence * 0.8 + 0.2); 
+                // --- END DYNAMIC CALCULATION ---
 
-            // --- A. DRAW THE CLUSTER HULL (The Storm Shape) ---
-            // Matches the black-bordered polygons in your image
-            if (cluster.hullGeometry) {
-              L.geoJSON(cluster.hullGeometry, {
-                style: {
-                  fillColor: color,
-                  fillOpacity: 0.4,
-                  color: 'black',  // Dark border as seen in image
-                  weight: 2,
-                  opacity: 0.8
+                // --- IMPACT CALCULATION & STYLING LOGIC ---
+                const potentialImpact = calculatePotentialImpact(cluster.clusterSize, confidence);
+                const impactHtml = getImpactHtml(potentialImpact);
+                
+                // Determine custom styling based on impact level
+                let customStrokeColor = 'red'; // Default border color for hull
+                let customStrokeWeight = 2;       // Default border weight for hull
+                let forecastStrokeWeight = 1;     // Default border weight for forecasts
+
+                if (potentialImpact.includes('LEVEL 5 - EXTREME') || potentialImpact.includes('LEVEL 4 - HIGH')) {
+                    // Apply special styling for high-risk alerts
+                    customStrokeColor = '#8A2BE2'; // BlueViolet/Purple
+                    customStrokeWeight = 8;        // Thick outline for the hull
+                    forecastStrokeWeight = 4;      // Thicker outline for the forecast polygons
                 }
-              }).bindPopup(`
-                        <b>Detected Cell</b><br>
-                        Size: ${cluster.clusterSize} strikes
-                    `).addTo(nowcastLayer);
+                // ------------------------------------------
+                
+                if (typeof polygonNowcastLayer !== 'undefined') {
+
+                    // --- A1. DRAW FUTURE POLYGONS FIRST (BOTTOM LAYERS) ---
+                    if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
+                        cluster.nowcastPolygons.sort((a, b) => b.timeMinutes - a.timeMinutes); 
+
+                        cluster.nowcastPolygons.forEach(forecast => {
+                            const latLngs = forecast.polygon.map(p => [p[1], p[0]]); 
+                            
+                            const timeDecayFactor = 1.0 - (forecast.timeMinutes / 80);
+                            const finalStrokeOpacity = baseOpacity * timeDecayFactor;
+                            const finalFillOpacity = baseOpacity * timeDecayFactor * 0.3;
+
+                            L.polygon(latLngs, {
+                                // Use conditional weight/color for forecast stroke
+                                color: customStrokeColor !== 'black' ? customStrokeColor : confidenceColor, 
+                                weight: forecastStrokeWeight, 
+                                opacity: finalStrokeOpacity, 
+                                fillColor: confidenceColor, 
+                                fillOpacity: finalFillOpacity, 
+                                dashArray: '5, 5'
+                            }).bindPopup(`
+                                <div style="font-size: 14px;">
+                                    <h4>🧭 ${forecast.timeMinutes}-Minute Projection</h4>
+                                    <hr style="margin: 4px 0;">
+                                    <b>Potential Impact:</b> ${impactHtml}<br>
+                                    <b>Confidence:</b> ${(confidence * 100).toFixed(0)}% (${confidence.toFixed(2)})<br>
+                                    <b>Projected Speed:</b> ${cluster.speedKmH.toFixed(1)} km/h<br>
+                                    <b>Projected Direction:</b> ${cluster.directionDeg.toFixed(1)}° (${getDirection(cluster.directionDeg)})<br>
+                                </div>
+                            `).addTo(polygonNowcastLayer);
+                        });
+                    }
+                    
+                    // --- A2. DRAW CURRENT HULL LAST (TOP LAYER - Z-INDEX) ---
+                    if (cluster.hullGeometry) {
+                        
+                        L.geoJSON(cluster.hullGeometry, {
+                            style: {
+                                fillColor: confidenceColor, 
+                                fillOpacity: Math.min(baseOpacity, 0.7), 
+                                // Apply conditional stroke color and weight
+                                color: customStrokeColor, 
+                                weight: customStrokeWeight, 
+                                opacity: 0.9 
+                            }
+                        }).bindPopup(`
+                            <div style="font-size: 14px;">
+                                <h4>🌩️ Current Storm Cell (Hull)</h4>
+                                <hr style="margin: 4px 0;">
+                                <b>Cell Size:</b> ${cluster.clusterSize} strikes<br>
+                                <b>Potential Impact:</b> ${impactHtml}<br>
+                                <b>Nowcast Confidence:</b> ${(confidence * 100).toFixed(0)}% (${confidence.toFixed(2)})<br>
+                                <b>Storm Motion:</b> ${cluster.speedKmH.toFixed(1)} km/h @ ${cluster.directionDeg.toFixed(1)}° (${getDirection(cluster.directionDeg)})<br>
+                            </div>
+                        `).addTo(polygonNowcastLayer);
+                    }
+                }
             }
-
-            // --- B. DRAW THE VISUAL TRACK (Center Line) ---
-            const projectedCenter = turf.destination(
-              [cluster.baseLon, cluster.baseLat],
-              cluster.speedKmH, // 1 Hour projection
-              cluster.directionDeg,
-              { units: 'kilometers' }
-            );
-
-            L.polyline([
-              [cluster.baseLat, cluster.baseLon],
-              [projectedCenter.geometry.coordinates[1], projectedCenter.geometry.coordinates[0]]
-            ], {
-              color: color,
-              weight: 2,
-              dashArray: '5, 5',
-              opacity: 0.6
-            }).addTo(nowcastLayer);
-
-            // --- C. DRAW THE UNCERTAINTY ELLIPSE (The Forecast) ---
-            // Matches the red cones/ellipses in your image
-            const { semiMajorKm, semiMinorKm, rotationDeg } = cluster.uncertaintyEllipse;
-
-            // Create the ellipse geometry using Turf
-            const ellipse = turf.ellipse(
-              projectedCenter.geometry.coordinates,
-              semiMajorKm,
-              semiMinorKm,
-              {
-                units: 'kilometers',
-                angle: rotationDeg,
-                steps: 64
-              }
-            );
-
-            L.geoJSON(ellipse, {
-              style: {
-                fillColor: color, // Light fill
-                fillOpacity: 0.15,
-                color: color,     // Solid colored border
-                weight: 2,
-                opacity: 0.9
-              }
-            }).bindPopup(`
-                    <b>1-Hour Forecast</b><br>
-                    Confidence: ${(cluster.confidenceScore * 100).toFixed(0)}%<br>
-                    Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
-                    Direction: ${cluster.directionDeg.toFixed(1)}°
-                `).addTo(nowcastLayer);
-          }
         });
-      }
-
-      // Toggle layer visibility on the map
-      if (document.getElementById('nowcast-toggle').checked) {
-        if (!map.hasLayer(nowcastLayer)) map.addLayer(nowcastLayer);
-      } else {
-        if (map.hasLayer(nowcastLayer)) map.removeLayer(nowcastLayer);
-      }
-
-      updateLegend();
     }
-    function toggleAllNowcasts() {
-      const isNowcastChecked = document.getElementById('nowcast-toggle').checked;
-
-      // 1. Calculate immediately if turned on
-      if (isNowcastChecked) {
-        // Assuming 'currentFiltered' is your current list of lightning strikes on screen
-        currentNowcasts = calculateLightningNowcast(currentFiltered);
-        console.log(`Nowcast updated: ${currentNowcasts.length} storms found.`);
-      } else {
-        currentNowcasts = [];
-      }
-
-      // 2. Draw everything immediately
-      drawMergedNowcast();
-
-      // 3. Update Legend (if you have one)
-      if (typeof updateLegend === 'function') updateLegend();
-    }
-    /**
-     * Renders BOTH the New Polygons and the Old Cones in a single pass.
-     */
-    function drawMergedNowcast() {
-      const isNowcastChecked = document.getElementById('nowcast-toggle').checked;
-
-      // --- 1. CLEAR EVERYTHING FIRST ---
-      polygonNowcastLayer.clearLayers();
-      nowcastLayer.clearLayers();
-
-      // If master toggle is off, remove layers from map and exit
-      if (!isNowcastChecked) {
-        if (map.hasLayer(polygonNowcastLayer)) map.removeLayer(polygonNowcastLayer);
-        if (map.hasLayer(nowcastLayer)) map.removeLayer(nowcastLayer);
-        return;
-      }
-
-      // --- 2. PREPARE SETTINGS ---
-      // Get Min Confidence from slider (or default to 0.5)
-      const confidenceInput = document.getElementById('min-nowcast-confidence');
-      const minConfidence = confidenceInput ? parseFloat(confidenceInput.value) : 0.5;
-
-      // Check if we want to show specific sub-features (optional toggles)
-      // If you don't have these checkboxes in your HTML, default them to true
-      const showPolygons = document.getElementById('nowcast-polygon-toggle') ? document.getElementById('nowcast-polygon-toggle').checked : true;
-      const showCones = document.getElementById('nowcast-cone-toggle') ? document.getElementById('nowcast-cone-toggle').checked : true;
-
-      // --- 3. MAIN DRAWING LOOP ---
-      currentNowcasts.forEach((cluster) => {
-        // Skip low confidence storms
-        if (cluster.confidenceScore < minConfidence) return;
-
-        // Determine Color
-        const color = cluster.confidenceScore > 0.9 ? '#800080' : // Purple
-          cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
-            cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
-              '#008000';  // Green
-
-        // ---------------------------------------------------------
-        // PART A: DRAW NEW POLYGONS (Hull + Future Shapes)
-        // ---------------------------------------------------------
-        if (showPolygons) {
-          // A1. Current Shape (The Convex Hull)
-          if (cluster.hullGeometry) {
-            L.geoJSON(cluster.hullGeometry, {
-              style: {
-                fillColor: color, fillOpacity: 0.4,
-                color: 'black', weight: 2, opacity: 0.8
-              }
-            }).bindPopup(`<b>Storm Cell</b><br>Strikes: ${cluster.clusterSize}`).addTo(polygonNowcastLayer);
-          }
-
-          // A2. Future Shapes (The Projected Polygons)
-          if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
-            cluster.nowcastPolygons.forEach(forecast => {
-              // Leaflet needs [lat, lon], Turf gives [lon, lat] - flip them
-              const latLngs = forecast.polygon.map(p => [p[1], p[0]]);
-
-              // Fade out transparency over time (15min = solid, 60min = transparent)
-              const opacity = Math.max(0.1, 1.0 - (forecast.timeMinutes / 80));
-
-              L.polygon(latLngs, {
-                color: color, weight: 1, opacity: opacity,
-                fillColor: color, fillOpacity: 0.15,
-                dashArray: '5, 5' // Dashed line for forecast
-
-              }).bindPopup(`
-                    <b>1-Hour Forecast</b><br>
-                    Confidence: ${(cluster.confidenceScore * 100).toFixed(0)}%<br>
-                    Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
-                    Direction: ${cluster.directionDeg.toFixed(1)}°
-                `).addTo(polygonnowcastLayer);
-            });
-          }
+    
+    // 2. Toggle layer visibility on the map
+    const isChecked = document.getElementById('nowcast-toggle').checked;
+    
+    if (typeof polygonNowcastLayer !== 'undefined') {
+        if (isChecked && !map.hasLayer(polygonNowcastLayer)) {
+            map.addLayer(polygonNowcastLayer);
+        } else if (!isChecked && map.hasLayer(polygonNowcastLayer)) {
+            map.removeLayer(polygonNowcastLayer);
         }
-
-        // ---------------------------------------------------------
-        // PART B: DRAW OLD CONE/CIRCLE STYLE
-        // ---------------------------------------------------------
-        if (showCones) {
-          const radiusMeters = (cluster.confidenceScore * 5 + 5) * 1000;
-          const projectionDistKm = cluster.confidenceScore * 30 + 30; // Old projection distance logic
-
-          // B1. Draw Circle at Current Location
-          L.circle([cluster.baseLat, cluster.baseLon], {
-            radius: radiusMeters,
-            color: color, weight: 1,
-            fillColor: color, fillOpacity: 0.2
-          }).addTo(nowcastLayer);
-
-          // B2. Draw Projected Center Point (The "Tip" of the cone)
-          // Use Turf to find the destination point
-          const destination = turf.destination(
-            [cluster.baseLon, cluster.baseLat],
-            projectionDistKm,
-            cluster.directionDeg,
-            { units: 'kilometers' }
-          );
-          const [destLon, destLat] = destination.geometry.coordinates;
-
-          // Draw line to destination
-          L.polyline([
-            [cluster.baseLat, cluster.baseLon],
-            [destLat, destLon]
-          ], { color: color, weight: 2, opacity: 0.6 }).addTo(nowcastLayer);
-
-          // Draw marker at destination
-          L.circleMarker([destLat, destLon], {
-            radius: 4, color: color, fillColor: 'white', fillOpacity: 1, weight: 2
-          }).addTo(nowcastLayer);
-        }
-      });
-
-      // --- 4. UPDATE MAP LAYERS ---
-      // This ensures they appear immediately without waiting
-      if (!map.hasLayer(polygonNowcastLayer) && showPolygons) map.addLayer(polygonNowcastLayer);
-      if (!map.hasLayer(nowcastLayer) && showCones) map.addLayer(nowcastLayer);
     }
+
+    if (typeof nowcastLayer !== 'undefined') {
+        if (isChecked && !map.hasLayer(nowcastLayer)) {
+            map.addLayer(nowcastLayer);
+        } else if (!isChecked && map.hasLayer(nowcastLayer)) {
+            map.removeLayer(nowcastLayer);
+        }
+    }
+    
+    // Update legend after drawing/clearing
+    if (typeof updateLegend === 'function') updateLegend();
+}
+// Note: toggleAllNowcasts() remains unchanged as it just calls drawMergedNowcast()
+
+/**
+ * Renders BOTH the New Polygons and the Old Cones in a single pass.
+ */
+
     // --- MISSING HELPERS FOR POLYGON MATH ---
 
     function ransacRegression(bins, iterations, threshold, decayConstant) {
@@ -5821,87 +5792,94 @@
      * @returns {Array<Object>} - Array of calculated storm cluster objects.
      */
     function calculateLightningNowcast(lightningData) {
-      if (!lightningData || lightningData.length === 0) return [];
+    if (!lightningData || lightningData.length === 0) return [];
 
-      // --- 0. DYNAMIC PARAMETER CALCULATION & FILTERING ---
-      const referenceTime = typeof animationEnd !== 'undefined' && animationEnd ? new Date(animationEnd) : new Date();
+    // --- 0. DYNAMIC PARAMETER CALCULATION & FILTERING ---
+    const referenceTime = typeof animationEnd !== 'undefined' && animationEnd ? new Date(animationEnd) : new Date();
 
-      // Initial Wide Filter: Assess all data from the last 5 hours.
-      const initialMaxTimeRange = 5 * 3600 * 1000;
-      const recentLightning = lightningData.filter(s => (referenceTime.getTime() - s.time.getTime()) <= initialMaxTimeRange);
-      const recentLightningLength = recentLightning.length;
+    const initialMaxTimeRange = 5 * 3600 * 1000;
+    const recentLightning = lightningData.filter(s => (referenceTime.getTime() - s.time.getTime()) <= initialMaxTimeRange);
+    const recentLightningLength = recentLightning.length;
 
-      recentLightning.sort((a, b) => a.time.getTime() - b.time.getTime());
+    recentLightning.sort((a, b) => a.time.getTime() - b.time.getTime());
 
-      // --- BASE PARAMETER DEFINITION (Dynamic) ---
+    // --- BASE PARAMETER DEFINITION (Dynamic) ---
 
-      const maxDensityTarget = 2000;
-      const densityRatio = Math.min(1.0, recentLightningLength / maxDensityTarget);
+    const maxDensityTarget = 2000;
+    const densityRatio = Math.min(1.0, recentLightningLength / maxDensityTarget); // 0.0 to 1.0
 
-      let maxTimeRange = (3 - (2 * densityRatio)) * 3600 * 1000;
-      let maxDistance = Math.min(35, Math.max(15, 35 * (1.0 - densityRatio * 0.5)));
-      let maxTemporalSeparation = Math.max(10 * 60 * 1000, 30 * 60 * 1000 * (1.0 - densityRatio * 0.6));
-      let minClusterSize = Math.max(5, Math.floor(5 + (2 * densityRatio)));
-      let maxInactivityMs = Math.max(10 * 60 * 1000, 20 * 60 * 1000 * (1.0 - densityRatio * 0.5));
+    let maxTimeRange = (3 - (2 * densityRatio)) * 3600 * 1000;
+    let maxDistance = Math.min(35, Math.max(15, 35 * (1.0 - densityRatio * 0.5)));
+    let maxTemporalSeparation = Math.max(10 * 60 * 1000, 30 * 60 * 1000 * (1.0 - densityRatio * 0.6));
+    let minClusterSize = Math.max(5, Math.floor(5 + (2 * densityRatio)));
+    let maxInactivityMs = Math.max(10 * 60 * 1000, 20 * 60 * 1000 * (1.0 - densityRatio * 0.5));
 
-      let ransacIterations = Math.min(250, 100 + Math.floor(recentLightningLength / 2));
-      let ransacThreshold = 0.05;
-      let decayConstant = 0.5;
-      let binSize = 5 * 60 * 1000;
-      let jumpAnalysisWindow = 10 * 60 * 1000;
+    let ransacIterations = Math.min(250, 100 + Math.floor(recentLightningLength / 2));
+    let baseDecayConstant = 0.5 + (0.1 * densityRatio);
+    let binSize = 5 * 60 * 1000;
+    let jumpAnalysisWindow = 10 * 60 * 1000;
+    
+    // NEW CONSTANT: Enforce a speed cap, especially useful for highly stable, slow-moving cells
+    const maxSpeedCapKmH = 80; 
 
+    const finalLightning = recentLightning.filter(s => (referenceTime.getTime() - s.time.getTime()) <= maxTimeRange);
 
-      // Final data set used for clustering and calculation
-      const finalLightning = recentLightning.filter(s => (referenceTime.getTime() - s.time.getTime()) <= maxTimeRange);
+    // --- 1. CLUSTERING ---
+    const clusters = clusterLightningStrikes(finalLightning, { minClusterSize, maxDistance, maxTemporalSeparation });
 
-      // --- 1. CLUSTERING ---
-      const clusters = clusterLightningStrikes(finalLightning, { minClusterSize, maxDistance, maxTemporalSeparation });
+    // --- PASS 1: RAW VECTORS & CONFIDENCE (Updated for Intensity & Stability) ---
+    const rawClusterInfos = [];
+    const minBinCountForHighConfidence = 5;
 
-      // --- PASS 1: RAW VECTORS & CONFIDENCE (Updated for Stability) ---
-      const rawClusterInfos = [];
-      const minBinCountForHighConfidence = 5; // Requires 25 minutes of history for max stability score
-
-      clusters.forEach((cluster) => {
+    clusters.forEach((cluster) => {
         const strikeTimes = cluster.map(s => s.time.getTime());
         const minTime = Math.min(...strikeTimes);
         const maxTime = Math.max(...strikeTimes);
         const lastStrikeTime = new Date(maxTime);
         const timeSinceLastStrike = referenceTime.getTime() - lastStrikeTime.getTime();
+        const clusterTimeSpanHours = (maxTime - minTime) / (3600 * 1000);
 
         if (timeSinceLastStrike > maxInactivityMs) return;
 
         // Binning
         const bins = [];
         for (let t = minTime; t < maxTime; t += binSize) {
-          const binStrikes = cluster.filter(s => s.time.getTime() >= t && s.time.getTime() < t + binSize);
-          if (binStrikes.length > 0) {
-            let sumLat = 0, sumLon = 0, sumWeight = 0;
-            binStrikes.forEach(s => {
-              const ageRatio = (maxTime - s.time.getTime()) / (maxTime - minTime);
-              const weight = 1.0 - (ageRatio * decayConstant);
-              sumLat += s.coordinates[1] * weight; sumLon += s.coordinates[0] * weight; sumWeight += weight;
-            });
-            bins.push({
-              time: (t + t + binSize) / 2, lat: sumLat / sumWeight, lon: sumLon / sumWeight, count: binStrikes.length
-            });
-          }
+            const binStrikes = cluster.filter(s => s.time.getTime() >= t && s.time.getTime() < t + binSize);
+            if (binStrikes.length > 0) {
+                let sumLat = 0, sumLon = 0, sumWeight = 0;
+                binStrikes.forEach(s => {
+                    const ageRatio = (maxTime - s.time.getTime()) / (maxTime - minTime);
+                    const weight = 1.0 - (ageRatio * baseDecayConstant);
+                    sumLat += s.coordinates[1] * weight; sumLon += s.coordinates[0] * weight; sumWeight += weight;
+                });
+                bins.push({
+                    time: (t + t + binSize) / 2, lat: sumLat / sumWeight, lon: sumLon / sumWeight, count: binStrikes.length
+                });
+            }
         }
         if (bins.length === 0) return;
+
+        // Dynamic RANSAC Threshold (as before)
+        let ransacThreshold = Math.max(0.03, Math.min(0.1, 0.05 + (clusterTimeSpanHours * 0.02))); 
+
 
         // RANSAC Regression
         let speedKmH = 0, directionDeg = 0, regressionScore = 0, weightedResidualErrorKm = 100;
         if (bins.length >= 2) {
-          const ransacModel = ransacRegression(bins, ransacIterations, ransacThreshold, decayConstant);
-          regressionScore = ransacModel.r2;
-          weightedResidualErrorKm = ransacModel.weightedResidualErrorKm;
-          const latFactor = Math.cos(bins[0].lat * Math.PI / 180);
-          const speedLatKmH = ransacModel.slopeLat * 111 * 3600;
-          const speedLonKmH = ransacModel.slopeLon * 111 * latFactor * 3600;
-          speedKmH = Math.sqrt(speedLatKmH * speedLatKmH + speedLonKmH * speedLonKmH);
-          directionDeg = (Math.atan2(speedLonKmH, speedLatKmH) * 180 / Math.PI + 360) % 360;
+            const ransacModel = ransacRegression(bins, ransacIterations, ransacThreshold, baseDecayConstant); 
+            regressionScore = ransacModel.r2;
+            weightedResidualErrorKm = ransacModel.weightedResidualErrorKm;
+            const latFactor = Math.cos(bins[0].lat * Math.PI / 180);
+            const speedLatKmH = ransacModel.slopeLat * 111 * 3600;
+            const speedLonKmH = ransacModel.slopeLon * 111 * latFactor * 3600;
+            speedKmH = Math.sqrt(speedLatKmH * speedLatKmH + speedLonKmH * speedLonKmH);
+            directionDeg = (Math.atan2(speedLonKmH, speedLatKmH) * 180 / Math.PI + 360) % 360;
         } else {
-          regressionScore = 0.1;
+            regressionScore = 0.1;
         }
+        
+        // Apply max speed cap to raw calculation
+        speedKmH = Math.min(speedKmH, maxSpeedCapKmH);
 
         // Directional Consistency
         const bearings = [];
@@ -5916,109 +5894,114 @@
         const lightningJumpDetected = (latestCount > 2.5 * middleCount && latestCount >= 6);
         const lightningJumpBonus = lightningJumpDetected ? 0.35 : 0;
 
-        // Confidence Calculation (UPDATED FOR STABILITY)
+        // Confidence Calculation
         const ratio = Math.min(timeSinceLastStrike / maxInactivityMs, 1.0);
         const decayFactor = Math.pow(1.0 - ratio, 2);
         const clusterSizeScore = Math.min(cluster.length / 50, 1);
 
-        // Bin Stability Multiplier: Stronger penalty for low historical data
-        const binConfidenceMultiplier = Math.min(1.0, bins.length / minBinCountForHighConfidence);
+        // **UPDATED** Intensity-Adjusted Bin Stability Multiplier
+        const binStabilityBoost = 1.0 + (0.1 * clusterSizeScore); // Max 1.1 boost for intense storms
+        const binConfidenceMultiplier = Math.min(1.0, (bins.length / minBinCountForHighConfidence) * binStabilityBoost);
 
-        let baseConfidence = (clusterSizeScore * 0.25 +       // Increased weight for stability
-          (speedKmH / 100) * 0.05 +
-          regressionScore * 0.25 +        // Reduced weight for initial stability
-          directionalConsistencyScore * 0.30 +
-          (bins.length / minBinCountForHighConfidence) * 0.05);
+        // **UPDATED** Increased weight for stability metrics
+        let baseConfidence = (clusterSizeScore * 0.15 +          // Slightly reduced direct cluster size weight
+            (speedKmH / maxSpeedCapKmH) * 0.05 +                // Capped speed contribution
+            regressionScore * 0.30 +                            // Increased weight for linear fit (stability)
+            directionalConsistencyScore * 0.35 +                // Increased weight for consistent direction (stability)
+            (bins.length / minBinCountForHighConfidence) * 0.10); // Increased weight for history length
 
         baseConfidence *= decayFactor;
-        baseConfidence *= binConfidenceMultiplier; // Apply stronger penalty for short history
+        baseConfidence *= binConfidenceMultiplier;
 
         let confidenceScore = Math.min(1.0, baseConfidence + lightningJumpBonus);
 
         rawClusterInfos.push({
-          cluster, baseLat: bins[bins.length - 1].lat, baseLon: bins[bins.length - 1].lon,
-          speedKmH, directionDeg, regressionScore, directionalConsistencyScore, weightedResidualErrorKm,
-          confidenceScore, clusterSize: cluster.length, lightningJump: lightningJumpDetected, decaying: decayFactor < 0.5,
+            cluster, baseLat: bins[bins.length - 1].lat, baseLon: bins[bins.length - 1].lon,
+            speedKmH, directionDeg, regressionScore, directionalConsistencyScore, weightedResidualErrorKm,
+            confidenceScore, clusterSize: cluster.length, lightningJump: lightningJumpDetected, decaying: decayFactor < 0.5,
         });
-      });
+    });
 
-      // --- PASS 2: SMOOTHING & GEOMETRY GENERATION ---
-      const clusterInfos = [];
-      const projectionTimeHours = 1.0;
+    // --- PASS 2: SMOOTHING & GEOMETRY GENERATION ---
+    const clusterInfos = [];
+    const projectionTimeHours = 1.0;
+    const maxSmoothingDistanceKm = 50;
 
-      // TEMPORAL SMOOTHING PARAMETERS
-      const maxSmoothingDistanceKm = 50;
-      const smoothingFactor = 0.4;
-
-      rawClusterInfos.forEach((currentCluster) => {
+    rawClusterInfos.forEach((currentCluster) => {
         // A. Temporal Smoothing
         let moderatedSpeedKmH = currentCluster.speedKmH;
-        let moderatedDirectionDeg = currentCluster.directionDeg;
-
+        let moderatedDirectionDeg = currentCluster.cluster.length < minClusterSize ? 0 : currentCluster.directionDeg; 
+        
         if (typeof previousNowcasts !== 'undefined' && previousNowcasts.length > 0) {
+            
+            // Dynamic Smoothing Factor (as before)
+            const dynamicSmoothingFactor = 0.8 - (currentCluster.directionalConsistencyScore * 0.6); 
 
-          let nearestPrevNowcast = null;
-          let minDistance = Infinity;
-          const currentPoint = turf.point([currentCluster.baseLon, currentCluster.baseLat]);
+            let nearestPrevNowcast = null;
+            let minDistance = Infinity;
+            const currentPoint = turf.point([currentCluster.baseLon, currentCluster.baseLat]);
 
-          previousNowcasts.forEach(prevCluster => {
-            const prevPoint = turf.point([prevCluster.baseLon, prevCluster.baseLat]);
-            const distance = turf.distance(currentPoint, prevPoint, { units: 'kilometers' });
+            previousNowcasts.forEach(prevCluster => {
+                const prevPoint = turf.point([prevCluster.baseLon, prevCluster.baseLat]);
+                const distance = turf.distance(currentPoint, prevPoint, { units: 'kilometers' });
 
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestPrevNowcast = prevCluster;
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestPrevNowcast = prevCluster;
+                }
+            });
+
+            if (nearestPrevNowcast && minDistance <= maxSmoothingDistanceKm) {
+                const distanceRatio = minDistance / maxSmoothingDistanceKm;
+                const distanceWeight = 1.0 - distanceRatio;
+                
+                const finalWeight = dynamicSmoothingFactor * nearestPrevNowcast.confidenceScore * distanceWeight; 
+                const inverseWeight = 1.0 - finalWeight;
+
+                const currentU = currentCluster.speedKmH * Math.sin(currentCluster.directionDeg * Math.PI / 180);
+                const currentV = currentCluster.speedKmH * Math.cos(currentCluster.directionDeg * Math.PI / 180);
+                const prevU = nearestPrevNowcast.speedKmH * Math.sin(nearestPrevNowcast.directionDeg * Math.PI / 180);
+                const prevV = nearestPrevNowcast.speedKmH * Math.cos(nearestPrevNowcast.directionDeg * Math.PI / 180);
+
+                const smoothedU = (currentU * inverseWeight) + (prevU * finalWeight);
+                const smoothedV = (currentV * inverseWeight) + (prevV * finalWeight);
+
+                moderatedSpeedKmH = Math.sqrt(smoothedU * smoothedU + smoothedV * smoothedV);
+                moderatedDirectionDeg = (Math.atan2(smoothedU, smoothedV) * 180 / Math.PI + 360) % 360;
+                
+                // Final check: Apply speed cap after smoothing
+                moderatedSpeedKmH = Math.min(moderatedSpeedKmH, maxSpeedCapKmH); 
             }
-          });
-
-          if (nearestPrevNowcast && minDistance <= maxSmoothingDistanceKm) {
-            const distanceRatio = minDistance / maxSmoothingDistanceKm;
-            const distanceWeight = 1.0 - distanceRatio;
-            const finalWeight = smoothingFactor * nearestPrevNowcast.confidenceScore * distanceWeight;
-            const inverseWeight = 1.0 - finalWeight;
-
-            const currentU = currentCluster.speedKmH * Math.sin(currentCluster.directionDeg * Math.PI / 180);
-            const currentV = currentCluster.speedKmH * Math.cos(currentCluster.directionDeg * Math.PI / 180);
-            const prevU = nearestPrevNowcast.speedKmH * Math.sin(nearestPrevNowcast.directionDeg * Math.PI / 180);
-            const prevV = nearestPrevNowcast.speedKmH * Math.cos(nearestPrevNowcast.directionDeg * Math.PI / 180);
-
-            const smoothedU = (currentU * inverseWeight) + (prevU * finalWeight);
-            const smoothedV = (currentV * inverseWeight) + (prevV * finalWeight);
-
-            moderatedSpeedKmH = Math.sqrt(smoothedU * smoothedU + smoothedV * smoothedV);
-            moderatedDirectionDeg = (Math.atan2(smoothedU, smoothedV) * 180 / Math.PI + 360) % 360;
-          }
         }
 
         // B. Convex Hull (Current Shape Geometry)
         let hullGeometry = null;
-        // Only draw hull if cluster size meets the dynamic minimum
         if (typeof turf !== 'undefined' && currentCluster.cluster.length >= minClusterSize) {
-          const points = turf.featureCollection(currentCluster.cluster.map(s => turf.point([s.coordinates[0], s.coordinates[1]])));
-          hullGeometry = turf.convex(points);
+            const points = turf.featureCollection(currentCluster.cluster.map(s => turf.point([s.coordinates[0], s.coordinates[1]])));
+            hullGeometry = turf.convex(points);
         }
 
         // C. FUTURE POLYGON PROJECTION 
         const nowcastPolygons = [];
         if (hullGeometry && hullGeometry.geometry && hullGeometry.geometry.coordinates) {
-          const hullCoords = hullGeometry.geometry.coordinates[0];
-          const projectionTimesMin = [15, 30, 45, 60];
+            const hullCoords = hullGeometry.geometry.coordinates[0];
+            const projectionTimesMin = [15, 30, 45, 60];
 
-          for (const tMin of projectionTimesMin) {
-            const distanceKm = moderatedSpeedKmH * (tMin / 60);
+            for (const tMin of projectionTimesMin) {
+                const distanceKm = moderatedSpeedKmH * (tMin / 60);
 
-            const projectedHull = translatePolygon(hullCoords, moderatedDirectionDeg, distanceKm);
+                const projectedHull = translatePolygon(hullCoords, moderatedDirectionDeg, distanceKm);
 
-            let scaleFactor = 1.0;
-            if (currentCluster.lightningJump) scaleFactor = 1.0 + 0.1 * (tMin / 15);
-            else if (currentCluster.decaying) scaleFactor = 1.0 - 0.15 * (tMin / 15);
-            scaleFactor = Math.max(0.1, scaleFactor);
+                let scaleFactor = 1.0;
+                if (currentCluster.lightningJump) scaleFactor = 1.0 + 0.1 * (tMin / 15);
+                else if (currentCluster.decaying) scaleFactor = 1.0 - 0.15 * (tMin / 15);
+                scaleFactor = Math.max(0.1, scaleFactor);
 
-            const projectedCentroid = getPolygonCentroid(projectedHull);
-            const finalHull = scalePolygon(projectedHull, scaleFactor, projectedCentroid);
+                const projectedCentroid = getPolygonCentroid(projectedHull);
+                const finalHull = scalePolygon(projectedHull, scaleFactor, projectedCentroid);
 
-            nowcastPolygons.push({ timeMinutes: tMin, polygon: finalHull });
-          }
+                nowcastPolygons.push({ timeMinutes: tMin, polygon: finalHull });
+            }
         }
 
         // D. Uncertainty Ellipse
@@ -6029,25 +6012,24 @@
         const semiMajorKm = Math.min(150, Math.max(20, projectionDistanceKm + (currentCluster.weightedResidualErrorKm * 3)));
 
         if (currentCluster.confidenceScore > 0.1) {
-          clusterInfos.push({
-            baseLat: currentCluster.baseLat, baseLon: currentCluster.baseLon,
-            speedKmH: moderatedSpeedKmH,
-            directionDeg: moderatedDirectionDeg,
-            confidenceScore: currentCluster.confidenceScore, clusterSize: currentCluster.clusterSize,
-            hullGeometry: hullGeometry,
-            nowcastPolygons: nowcastPolygons,
-            uncertaintyEllipse: { semiMajorKm, semiMinorKm, rotationDeg: moderatedDirectionDeg }
-          });
+            clusterInfos.push({
+                baseLat: currentCluster.baseLat, baseLon: currentCluster.baseLon,
+                speedKmH: moderatedSpeedKmH,
+                directionDeg: moderatedDirectionDeg,
+                confidenceScore: currentCluster.confidenceScore, clusterSize: currentCluster.clusterSize,
+                hullGeometry: hullGeometry,
+                nowcastPolygons: nowcastPolygons,
+                uncertaintyEllipse: { semiMajorKm, semiMinorKm, rotationDeg: moderatedDirectionDeg }
+            });
         }
-      });
+    });
 
-      // CRITICAL: Store the current results for the next iteration's smoothing
-      if (typeof previousNowcasts !== 'undefined') {
+    if (typeof previousNowcasts !== 'undefined') {
         previousNowcasts = clusterInfos;
-      }
-
-      return clusterInfos;
     }
+
+    return clusterInfos;
+}
     /**
      * ==================================================================================
      * HELPER FUNCTIONS (CLUSTERING & MATH)
@@ -6208,161 +6190,301 @@
       return bestModel;
     }
 
-    function updateNowcast(filtered) {
-      // 1. CLEAR ALL LAYERS (Both 2D and 3D)
-      // Clear the new polygon layer
-      if (typeof polygonNowcastLayer !== 'undefined') {
-        polygonNowcastLayer.clearLayers();
-      }
-      // Clear the old cone layer
-      if (typeof nowcastLayer !== 'undefined') {
-        nowcastLayer.clearLayers();
-      }
+/**
+ * Calculates a professional, diagnostic risk rating and description based on storm intensity 
+ * and prediction confidence. Uses a Level 1 to Level 5 scale.
+ */
+function calculatePotentialImpact(clusterSize, confidence) {
+    
+    const highConfidence = confidence > 0.8;
+    const moderateConfidence = confidence > 0.5;
 
-      // Clear 3D layers
-      if (typeof nowcastLayer3D !== 'undefined') {
+    // --- Level 5: Extreme Risk (Focus on Size > 3000) ---
+
+    // Catches the most massive cells
+    if (clusterSize >= 6000) return `LEVEL 5 - EXTREME: Cell size over 6,000 strikes. Sustained, widespread activity.`; 
+    
+    // Massive cell with high predictability
+    if (clusterSize > 3000 && highConfidence) return `LEVEL 5 - EXTREME: Massive cell with high forecast confidence. Prepare for widespread impact.`; 
+    
+    // Large cell with strong evidence of consistent, extreme intensity
+    if (clusterSize > 1000 && confidence > 0.9) return `LEVEL 5 - EXTREME: Cell highly concentrated (over 1,000 strikes). High predictability.`; 
+
+
+    // --- Level 4: High Risk (Focus on Size 300 - 3000) ---
+
+    // Very large cell, regardless of confidence
+    if (clusterSize > 3000) return `LEVEL 4 - HIGH: Very large cell (over 3,000 strikes). High potential for significant coverage.`;
+    
+    // Significant size with good predictability
+    if (clusterSize > 300 && highConfidence) return `LEVEL 4 - HIGH: Significant cell size with strong directional confidence.`; 
+    
+    // Large cell, moderate predictability
+    if (clusterSize > 1000 && moderateConfidence) return `LEVEL 4 - HIGH: Large area of activity (over 1,000 strikes). Moderate predictability.`;
+
+
+    // --- Level 3: Moderate Risk (Focus on Size 80 - 300) ---
+
+    // Moderate size with excellent predictability
+    if (clusterSize > 80 && highConfidence) return `LEVEL 3 - MODERATE: Concentrated strike cluster with high forecast confidence.`;
+    
+    // Medium-large size, moderate predictability
+    if (clusterSize > 200 && moderateConfidence) return `LEVEL 3 - MODERATE: Medium-large cell. Maintain situational awareness.`; 
+    
+    // Large size, low predictability (still requires attention)
+    if (clusterSize > 500 && confidence > 0.3) return `LEVEL 3 - MODERATE: Large but disorganized cell. Monitor for consolidation.`;
+
+
+    // --- Level 2: Minor Risk (Focus on Size 15 - 80) ---
+
+    // Small clusters that are still predictable
+    if (clusterSize > 15 && moderateConfidence) return `LEVEL 2 - MINOR: Defined activity cluster. Low potential for local impact.`;
+    
+    // General tracking of scattered cells
+    if (clusterSize > 5) return `LEVEL 2 - MINOR: Isolated, sparse strike activity tracked.`;
+
+    
+    // --- Level 1: Negligible Risk ---
+    return `LEVEL 1 - NEGLIGIBLE: Insignificant activity. Negligible risk.`;
+}
+/**
+ * Helper function to convert degrees to cardinal/intercardinal direction.
+ */
+function getDirection(degrees) {
+    if (degrees > 337.5 || degrees <= 22.5) return "N";
+    if (degrees > 22.5 && degrees <= 67.5) return "NE";
+    if (degrees > 67.5 && degrees <= 112.5) return "E";
+    if (degrees > 112.5 && degrees <= 157.5) return "SE";
+    if (degrees > 157.5 && degrees <= 202.5) return "S";
+    if (degrees > 202.5 && degrees <= 247.5) return "SW";
+    if (degrees > 247.5 && degrees <= 292.5) return "W";
+    if (degrees > 292.5 && degrees <= 337.5) return "NW";
+    return "";
+}
+// NOTE: Ensure these helper functions are defined in your script scope:
+// getDirection, interpolateColor, LOW_CONFIDENCE_COLOR_HEX, HIGH_CONFIDENCE_COLOR_HEX, calculatePotentialImpact
+
+// Utility to generate styled HTML for the impact level
+function getImpactHtml(impact) {
+    let color;
+    let weight = 'normal';
+    
+    // Determine color based on the numerical Level
+    if (impact.includes('LEVEL 5 - EXTREME')) {
+        color = '#FF0000'; // Bright Red
+        weight = 'bolder'; 
+    } else if (impact.includes('LEVEL 4 - HIGH')) {
+        color = '#FF4500'; // Orange-Red
+        weight = 'bold';
+    } else if (impact.includes('LEVEL 3 - MODERATE')) {
+        color = '#FF8C00'; // Dark Orange
+        weight = 'bold';
+    } else if (impact.includes('LEVEL 2 - MINOR')) {
+        color = '#DAA520'; // Goldenrod/Yellowish
+    } else { // LEVEL 1 - NEGLIGIBLE
+        color = '#32CD32'; // Green
+    }
+
+    // Convert to uppercase for high visibility in the popup
+    const formattedImpact = impact.toUpperCase();
+
+    return `<span style="color: ${color}; font-weight: ${weight};">${formattedImpact}</span>`;
+}
+
+function updateNowcast(filtered) {
+    // 1. CLEAR ALL LAYERS (Both 2D and 3D)
+    if (typeof polygonNowcastLayer !== 'undefined') {
+        polygonNowcastLayer.clearLayers();
+    }
+    if (typeof nowcastLayer !== 'undefined') {
+        nowcastLayer.clearLayers();
+    }
+    if (typeof nowcastLayer3D !== 'undefined') {
         nowcastLayer3D.forEach(layer => {
-          if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
-          if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
+            if (map3D.getLayer(layer.id)) map3D.removeLayer(layer.id);
+            if (map3D.getSource(layer.source)) map3D.removeSource(layer.source);
         });
         nowcastLayer3D = [];
-      }
+    }
 
-      // 2. CHECK TOGGLE
-      if (!document.getElementById('nowcast-toggle').checked) return;
+    // 2. CHECK TOGGLE
+    if (!document.getElementById('nowcast-toggle').checked) return;
 
-      // 3. CALCULATE NOWCAST WITH FILTERED DATA
-      // This ensures the nowcast updates exactly when you move the slider
-      const minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value) || 0.5;
-      currentNowcasts = calculateLightningNowcast(filtered);
+    // 3. CALCULATE NOWCAST WITH FILTERED DATA
+    const minNowcastConfidence = parseFloat(document.getElementById('min-nowcast-confidence').value) || 0.5;
+    currentNowcasts = calculateLightningNowcast(filtered);
 
-      // 4. DRAWING LOOP
-      currentNowcasts.forEach((cluster, index) => {
+    // 4. DRAWING LOOP
+    currentNowcasts.forEach((cluster, index) => {
+        const confidence = cluster.confidenceScore;
+
         // Skip low confidence
-        if (cluster.confidenceScore < minNowcastConfidence) return;
+        if (confidence < minNowcastConfidence) return;
 
-        // Determine Color
-        const confidenceColor = cluster.confidenceScore > 0.9 ? '#800080' : // Purple
-          cluster.confidenceScore > 0.8 ? '#FF0000' : // Red
-            cluster.confidenceScore > 0.7 ? '#FFA500' : // Orange
-              '#008000';//green
+        // ============================================================
+        // DYNAMIC COLOR & OPACITY CALCULATION
+        // HIGH CONFIDENCE => HIGH OPACITY (LOW TRANSPARENCY)
+        // ============================================================
+        // NOTE: Assuming LOW_CONFIDENCE_COLOR_HEX/HIGH_CONFIDENCE_COLOR_HEX constants are available
+        const confidenceColor = interpolateColor(LOW_CONFIDENCE_COLOR, HIGH_CONFIDENCE_COLOR, confidence);
+        
+        // Base opacity: Min 0.2 opacity at CS 0.0, Max 1.0 opacity at CS 1.0 (for uncapped use)
+        const baseOpacity = Math.max(0.2, confidence * 0.8 + 0.2); 
+        // ============================================================
+
+        // --- IMPACT CALCULATION & STYLING LOGIC ---
+        const potentialImpact = calculatePotentialImpact(cluster.clusterSize, confidence);
+        const impactHtml = getImpactHtml(potentialImpact);
+        
+        // Determine custom styling based on impact level (Level 4/5 = Purple/Thick)
+        let customStrokeColor = 'red'; // Default border color for hull
+        let customStrokeWeight = 2;       // Default border weight for hull
+        let forecastStrokeWeight = 1;     // Default border weight for forecasts
+
+        if (potentialImpact.includes('LEVEL 5 - EXTREME') || potentialImpact.includes('LEVEL 4 - HIGH')) {
+            // Apply special styling for high-risk alerts: Purple and thicker
+            customStrokeColor = '#8A2BE2'; // BlueViolet/Purple
+            customStrokeWeight = 8;        // Thick outline for the hull
+            forecastStrokeWeight = 4;      // Thicker outline for the forecast polygons
+        }
+        // ------------------------------------------
 
         // ============================================================
         // 2D MODE (Leaflet)
         // ============================================================
         if (!is3DMode) {
 
-          // --- A. DRAW NEW POLYGONS (Hull + Forecasts) ---
-          if (typeof polygonNowcastLayer !== 'undefined') {
-            // Draw Current Hull
-            if (cluster.hullGeometry) {
-              L.geoJSON(cluster.hullGeometry, {
-                style: {
-                  fillColor: confidenceColor, fillOpacity: 0.4,
-                  color: 'black', weight: 2, opacity: 0.8
+            if (typeof polygonNowcastLayer !== 'undefined') {
+                
+                // --- A1. DRAW FUTURE POLYGONS FIRST (BOTTOM LAYERS) ---
+                if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
+                    cluster.nowcastPolygons.sort((a, b) => b.timeMinutes - a.timeMinutes); 
+
+                    cluster.nowcastPolygons.forEach(forecast => {
+                        const latLngs = forecast.polygon.map(p => [p[1], p[0]]); 
+                        
+                        const timeDecayFactor = 1.0 - (forecast.timeMinutes / 80);
+                        const finalStrokeOpacity = baseOpacity * timeDecayFactor;
+                        const finalFillOpacity = baseOpacity * timeDecayFactor * 0.3; 
+
+                        L.polygon(latLngs, {
+                            // Use conditional weight/color for forecast stroke
+                            color: customStrokeColor !== 'black' ? customStrokeColor : confidenceColor, 
+                            weight: forecastStrokeWeight, 
+                            opacity: finalStrokeOpacity, 
+                            fillColor: confidenceColor, 
+                            fillOpacity: finalFillOpacity, 
+                            dashArray: '5, 5'
+                        }).bindPopup(`
+                            <div style="font-size: 14px;">
+                                <h4>🧭 ${forecast.timeMinutes}-Minute Projection</h4>
+                                <hr style="margin: 4px 0;">
+                                <b>Potential Impact:</b> ${impactHtml}<br>
+                                <b>Confidence:</b> ${(confidence * 100).toFixed(0)}% (${confidence.toFixed(2)})<br>
+                                <b>Projected Speed:</b> ${cluster.speedKmH.toFixed(1)} km/h<br>
+                                <b>Projected Direction:</b> ${cluster.directionDeg.toFixed(1)}° (${getDirection(cluster.directionDeg)})<br>
+                            </div>
+                        `).addTo(polygonNowcastLayer);
+                    });
                 }
-              }).bindPopup(`<b>Storm Cell</b><br>Size: ${cluster.clusterSize}`).addTo(polygonNowcastLayer);
+                
+                // --- A2. DRAW CURRENT HULL LAST (TOP LAYER - Z-INDEX) ---
+                if (cluster.hullGeometry) {
+                    L.geoJSON(cluster.hullGeometry, {
+                        style: {
+                            fillColor: confidenceColor, 
+                            // FIX: Hull opacity is capped at 0.7 
+                            fillOpacity: Math.min(baseOpacity, 0.7), // Reverted cap to 0.7
+                            // Apply conditional stroke color and weight
+                            color: customStrokeColor, 
+                            weight: customStrokeWeight, 
+                            opacity: 0.9 // Stroke opacity remains high
+                        }
+                    }).bindPopup(`
+                        <div style="font-size: 14px;">
+                            <h4>🌩️ Current Storm Cell (Hull)</h4>
+                            <hr style="margin: 4px 0;">
+                            <b>Cell Size:</b> ${cluster.clusterSize} strikes<br>
+                            <b>Potential Impact:</b> ${impactHtml}<br>
+                            <b>Nowcast Confidence:</b> ${(confidence * 100).toFixed(0)}% (${confidence.toFixed(2)})<br>
+                            <b>Storm Motion:</b> ${cluster.speedKmH.toFixed(1)} km/h @ ${cluster.directionDeg.toFixed(1)}° (${getDirection(cluster.directionDeg)})<br>
+                        </div>
+                    `).addTo(polygonNowcastLayer);
+                }
             }
 
-            // Draw Future Polygons
-            if (cluster.nowcastPolygons && cluster.nowcastPolygons.length > 0) {
-              cluster.nowcastPolygons.forEach(forecast => {
-                const latLngs = forecast.polygon.map(p => [p[1], p[0]]); // Flip to [lat, lon]
-                const opacity = Math.max(0.1, 1.0 - (forecast.timeMinutes / 80));
-
-                L.polygon(latLngs, {
-                  color: confidenceColor, weight: 1, opacity: opacity,
-                  fillColor: confidenceColor, fillOpacity: 0.15,
-                  dashArray: '5, 5'
-                }).bindPopup(`
-                    <b>1-Hour Forecast</b><br>
-                    Confidence: ${(cluster.confidenceScore * 100).toFixed(0)}%<br>
-                    Speed: ${cluster.speedKmH.toFixed(1)} km/h<br>
-                    Direction: ${cluster.directionDeg.toFixed(1)}°
-                `).addTo(polygonNowcastLayer);
-              });
-            }
-          }
-
-          // --- B. DRAW OLD CONES (Optional, kept for reference) ---
-          // If you only want Polygons, you can delete this section.
-          if (typeof nowcastLayer !== 'undefined') {
-            // Draw small circle at base
-            L.circle([cluster.baseLat, cluster.baseLon], {
-              radius: (cluster.confidenceScore * 5 + 5) * 1000,
-              color: confidenceColor, weight: 1, fillOpacity: 0.2
-            }).addTo(nowcastLayer);
-          }
+            
         }
 
         // ============================================================
-        // 3D MODE (Mapbox GL JS)
+        // 3D MODE (Mapbox GL JS) 
         // ============================================================
-        // Keeping your existing 3D logic so 3D mode doesn't break.
         else {
-          const radiusKm = cluster.confidenceScore * 5 + 5;
-          const coneRadiusKm = cluster.confidenceScore * 30 + 30;
-          const radiusDeg = radiusKm / 111;
+            const radiusKm = confidence * 5 + 5;
+            const coneRadiusKm = confidence * 30 + 30;
+            const radiusDeg = radiusKm / 111;
 
-          // Render Cluster Circle
-          const circleId = `nowcast-circle-${index}`;
-          map3D.addSource(circleId, {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: { type: 'Point', coordinates: [cluster.baseLon, cluster.baseLat] },
-              properties: { radius: radiusDeg }
-            }
-          });
-          map3D.addLayer({
-            id: circleId,
-            type: 'circle',
-            source: circleId,
-            paint: {
-              'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, (radiusKm * 1000) / 1000, 10, (radiusKm * 1000) / 250],
-              'circle-color': confidenceColor,
-              'circle-opacity': 0.5,
-              'circle-stroke-width': 2,
-              'circle-stroke-color': confidenceColor
-            }
-          });
-          nowcastLayer3D.push({ id: circleId, source: circleId });
-
-          // Render Cone Sector
-          if (typeof turf !== 'undefined') {
-            const cone = turf.sector(
-              [cluster.baseLon, cluster.baseLat],
-              coneRadiusKm,
-              cluster.directionDeg - 15,
-              cluster.directionDeg + 15,
-              { units: 'kilometers' }
-            );
-            const coneId = `nowcast-cone-${index}`;
-            map3D.addSource(coneId, { type: 'geojson', data: cone });
-            map3D.addLayer({
-              id: coneId,
-              type: 'fill',
-              source: coneId,
-              paint: { 'fill-color': confidenceColor, 'fill-opacity': 0.5 }
+            // Render Cluster Circle
+            const circleId = `nowcast-circle-${index}`;
+            map3D.addSource(circleId, {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [cluster.baseLon, cluster.baseLat] },
+                    properties: { radius: radiusDeg }
+                }
             });
-            nowcastLayer3D.push({ id: coneId, source: coneId });
-          }
-        }
-      });
+            map3D.addLayer({
+                id: circleId,
+                type: 'circle',
+                source: circleId,
+                paint: {
+                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, (radiusKm * 1000) / 1000, 10, (radiusKm * 1000) / 250],
+                    'circle-color': confidenceColor,
+                    'circle-opacity': baseOpacity, // Dynamic opacity
+                    'circle-stroke-width': customStrokeWeight, // Use custom weight for emphasis
+                    'circle-stroke-color': customStrokeColor // Use custom color for emphasis
+                }
+            });
+            nowcastLayer3D.push({ id: circleId, source: circleId });
 
-      // Ensure layers are added to map if visible
-      if (!is3DMode) {
+            // Render Cone Sector (Cone Sector uses color and fill opacity)
+            if (typeof turf !== 'undefined') {
+                const cone = turf.sector(
+                    [cluster.baseLon, cluster.baseLat],
+                    coneRadiusKm,
+                    cluster.directionDeg - 15,
+                    cluster.directionDeg + 15,
+                    { units: 'kilometers' }
+                );
+                const coneId = `nowcast-cone-${index}`;
+                map3D.addSource(coneId, { type: 'geojson', data: cone });
+                map3D.addLayer({
+                    id: coneId,
+                    type: 'fill',
+                    source: coneId,
+                    paint: { 
+                        'fill-color': confidenceColor, 
+                        'fill-opacity': baseOpacity * 0.5 // Dynamic fill opacity
+                    }
+                });
+                nowcastLayer3D.push({ id: coneId, source: coneId });
+            }
+        }
+    });
+
+    // Ensure layers are added to map if visible
+    if (!is3DMode) {
         if (typeof polygonNowcastLayer !== 'undefined' && !map.hasLayer(polygonNowcastLayer)) {
-          map.addLayer(polygonNowcastLayer);
+            map.addLayer(polygonNowcastLayer);
         }
         if (typeof nowcastLayer !== 'undefined' && !map.hasLayer(nowcastLayer)) {
-          map.addLayer(nowcastLayer);
+            map.addLayer(nowcastLayer);
         }
-      }
-
-      if (typeof updateLegend === 'function') updateLegend();
     }
 
+    if (typeof updateLegend === 'function') updateLegend();
+}
     function calculateDistance(coords1, coords2) {
       const [lon1, lat1] = coords1;
       const [lon2, lat2] = coords2;
